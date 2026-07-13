@@ -34,10 +34,12 @@ export default function CandidatesView() {
   const [filterRec, setFilterRec] = useState<string>('ALL')
 
   const fetchCandidates = async () => {
-    if (!user?.companyId) return
     setLoading(true)
     try {
-      const res = await fetch(`/api/candidates?companyId=${user.companyId}`)
+      const params = new URLSearchParams()
+      if (user?.companyId) params.set('companyId', user.companyId)
+      if (user?.role) params.set('role', user.role)
+      const res = await fetch(`/api/candidates?${params.toString()}`)
       const data = await res.json()
       setCandidates(data.candidates || [])
     } catch (e) {

@@ -12,11 +12,8 @@ export async function GET(req: NextRequest) {
     const companyId = req.nextUrl.searchParams.get('companyId')
     const role = req.nextUrl.searchParams.get('role')
 
-    if (!companyId) {
-      return NextResponse.json({ error: 'companyId is required' }, { status: 400 })
-    }
-
-    const where: Record<string, unknown> = { companyId, active: true }
+    // Super Admin (no companyId) sees all candidates
+    const where: Record<string, unknown> = { ...(companyId ? { companyId } : {}), active: true }
     if (role) {
       where.role = role
     }

@@ -35,8 +35,9 @@ export default function InviteView() {
   const [copiedToken, setCopiedToken] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!user?.companyId) return
-    fetch(`/api/positions?companyId=${user.companyId}`)
+    const params = new URLSearchParams()
+    if (user?.companyId) params.set('companyId', user.companyId)
+    fetch(`/api/positions?${params.toString()}`)
       .then(res => res.json())
       .then(data => setPositions(data.positions || []))
       .catch(console.error)

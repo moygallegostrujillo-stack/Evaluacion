@@ -99,18 +99,31 @@ export default function DashboardView() {
   const [loading, setLoading] = useState(true)
 
   const fetchDashboard = useCallback(async () => {
-    if (!user?.companyId) return
     setLoading(true)
     try {
-      const res = await fetch(`/api/dashboard?companyId=${user.companyId}`)
+      const params = new URLSearchParams()
+      if (user?.companyId) params.set('companyId', user.companyId)
+      if (user?.role) params.set('role', user.role)
+      const res = await fetch(`/api/dashboard?${params.toString()}`)
+      if (!res.ok) {
+        console.error('Dashboard API error:', res.status)
+        setData(null)
+        return
+      }
       const d = await res.json()
+      if (d.error) {
+        console.error('Dashboard data error:', d.error)
+        setData(null)
+        return
+      }
       setData(d)
     } catch (e) {
       console.error('Error fetching dashboard', e)
+      setData(null)
     } finally {
       setLoading(false)
     }
-  }, [user?.companyId])
+  }, [user?.companyId, user?.role])
 
   useEffect(() => {
     fetchDashboard()

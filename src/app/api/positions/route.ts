@@ -35,12 +35,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ positions })
     }
 
-    if (!companyId) {
-      return NextResponse.json({ error: 'companyId is required' }, { status: 400 })
-    }
+    // Super Admin (no companyId) sees all positions
+    const where = companyId ? { companyId, active: true } : { active: true }
 
     const positions = await db.position.findMany({
-      where: { companyId, active: true },
+      where,
       orderBy: { createdAt: 'desc' },
       include: {
         evaluationTemplates: {

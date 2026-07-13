@@ -39,12 +39,11 @@ export async function GET(req: NextRequest) {
   try {
     const companyId = req.nextUrl.searchParams.get('companyId')
 
-    if (!companyId) {
-      return NextResponse.json({ error: 'companyId is required' }, { status: 400 })
-    }
+    // Super Admin (no companyId) sees all vacancies
+    const where = companyId ? { companyId } : {}
 
     const vacancies = await db.vacancy.findMany({
-      where: { companyId },
+      where,
       include: {
         questions: {
           orderBy: { order: 'asc' },

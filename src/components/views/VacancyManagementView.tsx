@@ -170,10 +170,11 @@ export default function VacancyManagementView() {
   // ============================================
 
   const fetchVacancies = useCallback(async () => {
-    if (!user?.companyId) return
     setLoading(true)
     try {
-      const res = await fetch(`/api/vacancies?companyId=${user.companyId}`)
+      const params = new URLSearchParams()
+      if (user?.companyId) params.set('companyId', user.companyId)
+      const res = await fetch(`/api/vacancies?${params.toString()}`)
       const data = await res.json()
       if (data.vacancies) {
         setVacancies(data.vacancies)

@@ -27,7 +27,10 @@ export default function CandidateDetailView() {
   const [scheduling, setScheduling] = useState(false)
 
   useEffect(() => {
-    if (!selectedResultId) return
+    if (!selectedResultId) {
+      setLoading(false)
+      return
+    }
     setLoading(true)
     fetch(`/api/results?resultId=${selectedResultId}`)
       .then(res => res.json())

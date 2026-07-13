@@ -148,12 +148,15 @@ export default function QuestionsManagementView() {
   // ============================================
 
   useEffect(() => {
-    if (!user?.companyId) return
     setLoading(true)
+    const posParams = new URLSearchParams()
+    if (user?.companyId) posParams.set('companyId', user.companyId)
+    const vacParams = new URLSearchParams()
+    if (user?.companyId) vacParams.set('companyId', user.companyId)
 
     Promise.all([
-      fetch(`/api/positions?companyId=${user.companyId}`).then(r => r.json()),
-      fetch(`/api/vacancies?companyId=${user.companyId}`).then(r => r.json()),
+      fetch(`/api/positions?${posParams.toString()}`).then(r => r.json()),
+      fetch(`/api/vacancies?${vacParams.toString()}`).then(r => r.json()),
     ])
       .then(([posData, vacData]) => {
         setPositions(posData.positions || [])

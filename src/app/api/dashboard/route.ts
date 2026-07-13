@@ -4,42 +4,42 @@ import { db } from '@/lib/db'
 export async function GET(req: NextRequest) {
   try {
     const companyId = req.nextUrl.searchParams.get('companyId')
+    const role = req.nextUrl.searchParams.get('role')
 
-    if (!companyId) {
-      return NextResponse.json({ error: 'companyId is required' }, { status: 400 })
-    }
+    // Super admin without companyId sees all data
+    const where = companyId ? { companyId } : {}
 
     // Total candidates
     const totalCandidates = await db.user.count({
-      where: { companyId, role: 'CANDIDATO', active: true },
+      where: { ...where, role: 'CANDIDATO', active: true },
     })
 
     // Completed evaluations
     const completedEvaluations = await db.evaluationSession.count({
-      where: { companyId, status: 'COMPLETED' },
+      where: { ...where, status: 'COMPLETED' },
     })
 
     // Pending evaluations (NOT_STARTED + IN_PROGRESS)
     const pendingEvaluations = await db.evaluationSession.count({
-      where: { companyId, status: { in: ['NOT_STARTED', 'IN_PROGRESS'] } },
+      where: { ...where, status: { in: ['NOT_STARTED', 'IN_PROGRESS'] } },
     })
 
     // Recommendation counts
     const aptoCount = await db.evaluationResult.count({
-      where: { companyId, recommendation: 'APTO' },
+      where: { ...where, recommendation: 'APTO' },
     })
 
     const entrevistaCount = await db.evaluationResult.count({
-      where: { companyId, recommendation: 'ENTREVISTA_ADICIONAL' },
+      where: { ...where, recommendation: 'ENTREVISTA_ADICIONAL' },
     })
 
     const noRecomendadoCount = await db.evaluationResult.count({
-      where: { companyId, recommendation: 'NO_RECOMENDADO' },
+      where: { ...where, recommendation: 'NO_RECOMENDADO' },
     })
 
     // Recent results
     const recentResults = await db.evaluationResult.findMany({
-      where: { companyId },
+      where: companyId ? { companyId } : {},
       orderBy: { createdAt: 'desc' },
       take: 5,
       include: {
@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
 
     // Position stats - count candidates per position
     const sessions = await db.evaluationSession.findMany({
-      where: { companyId },
+      where: companyId ? { companyId } : {},
       select: { positionId: true, position: { select: { id: true, title: true } } },
     })
 

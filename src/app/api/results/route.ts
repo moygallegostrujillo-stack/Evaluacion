@@ -126,7 +126,21 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ results })
     }
 
-    return NextResponse.json({ error: 'At least one filter parameter is required (companyId, candidateId, resultId, or compareIds)' }, { status: 400 })
+    // Super Admin (no companyId) sees all results
+    const results = await db.evaluationResult.findMany({
+      where: {},
+      orderBy: { createdAt: 'desc' },
+      include: {
+        candidate: {
+          select: { id: true, name: true, email: true },
+        },
+        position: {
+          select: { id: true, title: true, category: true },
+        },
+      },
+    })
+
+    return NextResponse.json({ results })
   } catch (error) {
     console.error('Results GET error:', error)
     return NextResponse.json({ error: 'Error fetching results' }, { status: 500 })

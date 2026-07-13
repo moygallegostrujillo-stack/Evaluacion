@@ -26,8 +26,9 @@ export default function InterviewsView() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!user?.companyId) return
-    fetch(`/api/interviews?companyId=${user.companyId}`)
+    const params = new URLSearchParams()
+    if (user?.companyId) params.set('companyId', user.companyId)
+    fetch(`/api/interviews?${params.toString()}`)
       .then(res => res.json())
       .then(data => setInterviews(data.interviews || []))
       .catch(console.error)
