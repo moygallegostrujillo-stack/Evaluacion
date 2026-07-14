@@ -274,7 +274,7 @@ async function calculateStepScores(
     const systemQuestions = await getSystemQuestions(companyId)
     const bigFiveIds = new Set(systemQuestions.bigFiveQuestions.map((q) => q.id))
 
-    const psicometricaResponses = responses.filter((r) => r.section === 'PSICOMETRICA')
+    const psicometricaResponses = responses.filter((r) => r.section.toUpperCase() === 'PSICOMETRICA')
 
     const scoredResponses: ScoredResponse[] = psicometricaResponses.map((r) => {
       // Find the question metadata
@@ -304,7 +304,7 @@ async function calculateStepScores(
     // Psicologica
     const systemQuestions = await getSystemQuestions(companyId)
 
-    const psicologicaResponses = responses.filter((r) => r.section === 'PSICOLOGICA')
+    const psicologicaResponses = responses.filter((r) => r.section.toUpperCase() === 'PSICOLOGICA')
 
     const scoredResponses: ScoredResponse[] = psicologicaResponses.map((r) => {
       const systemQ = systemQuestions.psychologicalQuestions.find((q) => q.id === r.questionId)
@@ -331,7 +331,7 @@ async function calculateStepScores(
 
   if (completedStep === 3) {
     // Conocimientos
-    const knowledgeResponses = responses.filter((r) => r.section === 'CONOCIMIENTOS')
+    const knowledgeResponses = responses.filter((r) => r.section.toUpperCase() === 'CONOCIMIENTOS')
 
     let correct = 0
     for (const resp of knowledgeResponses) {

@@ -216,7 +216,7 @@ export default function PublicEvaluationView() {
         body: JSON.stringify({
           step: 'answer',
           applicationId,
-          section: step,
+          section: step.toUpperCase(),
           questionId: currentQuestion?.questionId,
           vacancyQuestionId: currentQuestion?.vacancyQuestionId,
           value: String(value),

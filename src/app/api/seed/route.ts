@@ -496,6 +496,55 @@ export async function GET() {
       },
     })
 
+    // ============================================
+    // CREATE DEMO VACANCIES
+    // ============================================
+    const vendedorVacancy = await db.vacancy.create({
+      data: {
+        title: 'Vendedor/a',
+        slug: 'vendedor-a',
+        description: 'Se busca vendedor/a con experiencia en atención al cliente para tienda de moda',
+        sector: 'RETAIL',
+        status: 'ACTIVE',
+        includePsicometrica: true,
+        includePsicologica: true,
+        maxVideoSeconds: 60,
+        companyId: retailCompany.id,
+        questions: {
+          create: [
+            { text: '¿Cuál es la técnica de venta más efectiva para conocer las necesidades del cliente?', type: 'MULTIPLE_CHOICE', options: '["Hablar ininterrumpidamente del producto","Hacer preguntas abiertas y escuchar activamente","Ofrecer el producto más caro primero","Presionar para cerrar la venta rápido"]', correctAnswer: 1, order: 1 },
+            { text: '¿Qué es el "upselling" en ventas?', type: 'MULTIPLE_CHOICE', options: '["Vender un producto más barato","Ofrecer un producto o servicio adicional o de mayor valor","Regalar productos para fidelizar","Reducir el precio para cerrar la venta"]', correctAnswer: 1, order: 2 },
+            { text: '¿Cuál es la regla del "3 metros" en atención al cliente?', type: 'MULTIPLE_CHOICE', options: '["Mantener 3 metros de distancia del cliente","Reconocer y saludar al cliente cuando está a 3 metros","Solo atender clientes que estén a 3 metros","Volver a saludar cada 3 minutos"]', correctAnswer: 1, order: 3 },
+            { text: '¿Qué es el "cross-selling" o venta cruzada?', type: 'MULTIPLE_CHOICE', options: '["Vender productos de la competencia","Ofrecer productos complementarios al que el cliente ya va a comprar","Vender solo un producto por cliente","Intercambiar productos entre tiendas"]', correctAnswer: 1, order: 4 },
+            { text: '¿Cuál es la técnica adecuada para manejar objecciones de precio?', type: 'MULTIPLE_CHOICE', options: '["Bajar el precio inmediatamente","Demostrar el valor y beneficios del producto","Insistir en que es el mejor precio","Ignorar la objeción"]', correctAnswer: 1, order: 5 },
+          ],
+        },
+      },
+    })
+
+    const meseroVacancy = await db.vacancy.create({
+      data: {
+        title: 'Mesero/a',
+        slug: 'mesero-a',
+        description: 'Se busca mesero/a para restaurante de comida chiapaneca',
+        sector: 'RESTAURANT',
+        status: 'ACTIVE',
+        includePsicometrica: true,
+        includePsicologica: true,
+        maxVideoSeconds: 60,
+        companyId: restaurantCompany.id,
+        questions: {
+          create: [
+            { text: '¿Cuál es la temperatura mínima interna segura para cocinar pollo?', type: 'MULTIPLE_CHOICE', options: '["55°C","63°C","74°C","85°C"]', correctAnswer: 2, order: 1 },
+            { text: '¿Qué debe hacer un mesero si un cliente reporta una alergia alimentaria?', type: 'MULTIPLE_CHOICE', options: '["Ignorar la solicitud","Informar inmediatamente a cocina y verificar ingredientes","Sugerir otro platillo sin verificar","Decir que no hay ingredientes alergénicos"]', correctAnswer: 1, order: 2 },
+            { text: '¿Cuál es la regla básica de higiene al manipular alimentos?', type: 'MULTIPLE_CHOICE', options: '["Lavarse las manos solo al inicio del turno","Usar guantes en todo momento","Lavarse las manos frecuentemente y después de cada interrupción","No es necesario si se usa cubrebocas"]', correctAnswer: 2, order: 3 },
+            { text: '¿Qué significa la sigla FIFO en el manejo de inventarios?', type: 'MULTIPLE_CHOICE', options: '["First In First Out (Primero en entrar, primero en salir)","Fast In Fast Out","Fresh Ingredients First Order","Food In Food Out"]', correctAnswer: 0, order: 4 },
+            { text: '¿Cuánto tiempo máximo pueden permanecer alimentos perecederos a temperatura ambiente?', type: 'MULTIPLE_CHOICE', options: '["1 hora","2 horas","4 horas","8 horas"]', correctAnswer: 1, order: 5 },
+          ],
+        },
+      },
+    })
+
     return NextResponse.json({
       success: true,
       message: 'Database seeded successfully',
@@ -505,6 +554,7 @@ export async function GET() {
         positions: 5,
         templates: 15,
         questions: 150,
+        vacancies: 2,
         demoResults: 3,
         credentials: {
           superAdmin: 'admin@evaluhr.com / admin123',
