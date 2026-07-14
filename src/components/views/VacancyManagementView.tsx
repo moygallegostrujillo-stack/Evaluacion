@@ -156,7 +156,11 @@ export default function VacancyManagementView() {
     title: '',
     description: '',
     sector: 'GENERAL',
+    companyId: '',
   })
+
+  // Companies for Super Admin
+  const [companies, setCompanies] = useState<Array<{id: string; name: string}>>([])
 
   // Question form
   const [questionForm, setQuestionForm] = useState({
@@ -233,8 +237,31 @@ export default function VacancyManagementView() {
   // Create vacancy
   // ============================================
 
+  // Fetch companies for Super Admin
+  const fetchCompanies = useCallback(async () => {
+    if (user?.companyId) return // Not needed for regular users
+    try {
+      const res = await fetch('/api/companies')
+      const data = await res.json()
+      if (data.companies) {
+        setCompanies(data.companies)
+      }
+    } catch (e) {
+      console.error('Error fetching companies', e)
+    }
+  }, [user?.companyId])
+
+  useEffect(() => {
+    fetchCompanies()
+  }, [fetchCompanies])
+
   const handleCreateVacancy = async () => {
-    if (!createForm.title.trim() || !user?.companyId) return
+    if (!createForm.title.trim()) return
+    const companyId = user?.companyId || createForm.companyId
+    if (!companyId) {
+      toast({ title: 'Error', description: 'Selecciona una empresa', variant: 'destructive' })
+      return
+    }
     try {
       const res = await fetch('/api/vacancies', {
         method: 'POST',
@@ -243,7 +270,7 @@ export default function VacancyManagementView() {
           title: createForm.title.trim(),
           description: createForm.description.trim() || undefined,
           sector: createForm.sector,
-          companyId: user.companyId,
+          companyId,
         }),
       })
       const data = await res.json()
@@ -802,6 +829,24 @@ export default function VacancyManagementView() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
+            {!user?.companyId && companies.length > 0 && (
+              <div className="space-y-2">
+                <Label>Empresa *</Label>
+                <Select
+                  value={createForm.companyId}
+                  onValueChange={(val) => setCreateForm((p) => ({ ...p, companyId: val }))}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Selecciona una empresa" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {companies.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="vacancy-title">Título *</Label>
               <Input
@@ -845,7 +890,7 @@ export default function VacancyManagementView() {
             <Button
               className="bg-emerald-600 hover:bg-emerald-700 text-white"
               onClick={handleCreateVacancy}
-              disabled={!createForm.title.trim()}
+              disabled={!createForm.title.trim() || (!user?.companyId && !createForm.companyId)}
             >
               Crear Vacante
             </Button>
