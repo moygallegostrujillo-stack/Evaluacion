@@ -39,6 +39,7 @@ export async function GET(req: NextRequest) {
         includePsicometrica: vacancy.includePsicometrica,
         includePsicologica: vacancy.includePsicologica,
         maxVideoSeconds: vacancy.maxVideoSeconds,
+        companyPhone: vacancy.company.phone,
         knowledgeQuestionCount: vacancy.questions.length,
       },
     })

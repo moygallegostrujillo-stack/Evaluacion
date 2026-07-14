@@ -38,7 +38,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import {
   Briefcase, Plus, Link2, Copy, Pause, Play, XCircle,
   Edit3, Trash2, Users, HelpCircle, CheckCircle2, Video,
-  RefreshCw, ExternalLink
+  RefreshCw, ExternalLink, Sparkles, Loader2
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
@@ -168,6 +168,9 @@ export default function VacancyManagementView() {
     options: ['', '', '', ''],
     correctAnswer: 0,
   })
+
+  // AI generation state
+  const [generatingQuestions, setGeneratingQuestions] = useState(false)
 
   // ============================================
   // Fetch vacancies
@@ -424,6 +427,39 @@ export default function VacancyManagementView() {
   }
 
   // ============================================
+  // AI Generate Questions
+  // ============================================
+  const handleGenerateQuestions = async () => {
+    if (!selectedVacancyId) return
+    setGeneratingQuestions(true)
+    try {
+      const res = await fetch(`/api/vacancies/${selectedVacancyId}/generate-questions`, {
+        method: 'POST',
+      })
+      const data = await res.json()
+      if (data.questions && data.questions.length > 0) {
+        toast({ 
+          title: 'Preguntas generadas', 
+          description: `Se generaron ${data.questions.length} preguntas con IA` 
+        })
+        fetchDetail(selectedVacancyId)
+        fetchVacancies()
+      } else {
+        toast({ 
+          title: 'Error', 
+          description: data.error || 'No se pudieron generar preguntas', 
+          variant: 'destructive' 
+        })
+      }
+    } catch (e) {
+      console.error('Error generating questions', e)
+      toast({ title: 'Error', description: 'No se pudieron generar preguntas con IA', variant: 'destructive' })
+    } finally {
+      setGeneratingQuestions(false)
+    }
+  }
+
+  // ============================================
   // Render helpers
   // ============================================
 
@@ -674,16 +710,31 @@ export default function VacancyManagementView() {
                         {selectedVacancy.questions?.length || 0}
                       </Badge>
                     </div>
-                    {selectedVacancy.status !== 'CLOSED' && (
+                    <div className="flex items-center gap-2">
                       <Button
                         size="sm"
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                        onClick={openAddQuestion}
+                        className="bg-violet-600 hover:bg-violet-700 text-white"
+                        onClick={handleGenerateQuestions}
+                        disabled={generatingQuestions || selectedVacancy.status === 'CLOSED'}
                       >
-                        <Plus className="w-4 h-4 mr-1" />
-                        Agregar
+                        {generatingQuestions ? (
+                          <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                        ) : (
+                          <Sparkles className="w-4 h-4 mr-1" />
+                        )}
+                        {generatingQuestions ? 'Generando...' : 'Generar con IA'}
                       </Button>
-                    )}
+                      {selectedVacancy.status !== 'CLOSED' && (
+                        <Button
+                          size="sm"
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                          onClick={openAddQuestion}
+                        >
+                          <Plus className="w-4 h-4 mr-1" />
+                          Agregar
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </CardHeader>
                 <Separator />

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState, useRef, useCallback } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { useAppStore } from '@/lib/store'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -11,8 +11,8 @@ import { Progress } from '@/components/ui/progress'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import {
   Briefcase, User, Mail, Phone, Calendar, ArrowRight,
-  Video, Upload, Camera, StopCircle, CheckCircle2,
-  Clock, Brain, BookOpen, ClipboardList, AlertCircle
+  Video, CheckCircle2, Clock, Brain, BookOpen, ClipboardList,
+  AlertCircle, MessageCircle, Send
 } from 'lucide-react'
 
 // ============================================
@@ -26,7 +26,11 @@ interface VacancyInfo {
   sector: string
   company?: string
   companyName?: string
+  companyPhone?: string
   knowledgeQuestionCount: number
+  includePsicometrica?: boolean
+  includePsicologica?: boolean
+  maxVideoSeconds?: number
 }
 
 interface QuestionData {
@@ -61,7 +65,6 @@ export default function PublicEvaluationView() {
   const slug = useAppStore((s) => s.vacancySlug)
   const applicationId = useAppStore((s) => s.vacancyApplicationId)
   const setApplicationId = useAppStore((s) => s.setVacancyApplicationId)
-  const setCurrentView = useAppStore((s) => s.setCurrentView)
   const answers = useAppStore((s) => s.vacancyAnswers)
   const setAnswer = useAppStore((s) => s.setVacancyAnswer)
 
@@ -77,16 +80,9 @@ export default function PublicEvaluationView() {
   const [candidatePhone, setCandidatePhone] = useState('')
   const [candidateAge, setCandidateAge] = useState('')
 
-  // Video state
-  const [videoMode, setVideoMode] = useState<'record' | 'upload' | null>(null)
-  const [isRecording, setIsRecording] = useState(false)
-  const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null)
-  const [uploadFile, setUploadFile] = useState<File | null>(null)
-  const [recordingTime, setRecordingTime] = useState(0)
-  const mediaStreamRef = useRef<MediaStream | null>(null)
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
-  const timerRef = useRef<NodeJS.Timeout | null>(null)
-  const videoRef = useRef<HTMLVideoElement | null>(null)
+  // WhatsApp notification tracking
+  const [videoSentViaWhatsApp, setVideoSentViaWhatsApp] = useState(false)
+  const [notifySent, setNotifySent] = useState(false)
 
   // ============================================
   // Load vacancy info
@@ -286,83 +282,51 @@ export default function PublicEvaluationView() {
   }
 
   // ============================================
-  // Video recording
+  // Complete video step (WhatsApp or skip)
   // ============================================
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-      mediaStreamRef.current = stream
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-      }
-      const recorder = new MediaRecorder(stream, { mimeType: 'video/webm' })
-      mediaRecorderRef.current = recorder
-      const chunks: Blob[] = []
-      recorder.ondataavailable = (e) => chunks.push(e.data)
-      recorder.onstop = () => {
-        const blob = new Blob(chunks, { type: 'video/webm' })
-        setRecordedBlob(blob)
-        stream.getTracks().forEach(t => t.stop())
-        if (timerRef.current) clearInterval(timerRef.current)
-      }
-      recorder.start()
-      setIsRecording(true)
-      setRecordingTime(0)
-      timerRef.current = setInterval(() => {
-        setRecordingTime(prev => {
-          if (prev >= 60) {
-            stopRecording()
-            return 60
-          }
-          return prev + 1
-        })
-      }, 1000)
-    } catch {
-      alert('No se pudo acceder a la cámara. Intenta subir un video en su lugar.')
-    }
-  }
-
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop()
-      setIsRecording(false)
-    }
-  }
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    if (file.size > 50 * 1024 * 1024) {
-      alert('El archivo es muy grande (máximo 50MB)')
-      return
-    }
-    setUploadFile(file)
-  }
-
-  const submitVideo = async () => {
-    const blob = recordedBlob || uploadFile
-    if (!blob || !applicationId) return
+  const handleCompleteVideoStep = async (videoSent: boolean) => {
+    if (!applicationId) return
     setLoading(true)
     try {
-      const formData = new FormData()
-      formData.append('applicationId', applicationId)
-      formData.append('video', blob, recordedBlob ? 'video.webm' : (uploadFile?.name || 'video.mp4'))
-      formData.append('videoType', videoMode === 'record' ? 'RECORDED' : 'UPLOADED')
       const res = await fetch('/api/public/video', {
         method: 'POST',
-        body: formData,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          applicationId,
+          videoSent,
+        }),
       })
       const data = await res.json()
       if (data.success) {
         setStep('complete')
       } else {
-        alert(data.error || 'Error al subir el video')
+        alert(data.error || 'Error al completar')
       }
     } catch {
-      alert('Error al subir el video')
+      alert('Error de conexión')
     } finally {
       setLoading(false)
     }
+  }
+
+  // ============================================
+  // Generate WhatsApp link
+  // ============================================
+  const getWhatsAppLink = (phone: string | undefined, message: string) => {
+    if (!phone) return '#'
+    // Clean phone number - remove spaces, dashes, parentheses
+    const cleanPhone = phone.replace(/[\s\-\(\)]/g, '')
+    // Ensure it starts with country code (Mexico: 52)
+    let formattedPhone = cleanPhone
+    if (cleanPhone.startsWith('0')) {
+      formattedPhone = '52' + cleanPhone.substring(1)
+    } else if (!cleanPhone.startsWith('52') && !cleanPhone.startsWith('+')) {
+      formattedPhone = '52' + cleanPhone
+    }
+    if (formattedPhone.startsWith('+')) {
+      formattedPhone = formattedPhone.substring(1)
+    }
+    return `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`
   }
 
   // ============================================
@@ -402,7 +366,7 @@ export default function PublicEvaluationView() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 flex flex-col">
       {/* Header */}
       <div className="bg-white/80 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
@@ -432,7 +396,7 @@ export default function PublicEvaluationView() {
         </div>
       )}
 
-      <div className="max-w-2xl mx-auto px-4 py-6">
+      <div className="max-w-2xl mx-auto px-4 py-6 flex-1">
         {/* ===================== VACANCY INFO ===================== */}
         {step === 'vacancy-info' && vacancy && (
           <div className="space-y-6">
@@ -451,14 +415,18 @@ export default function PublicEvaluationView() {
               <CardContent className="p-6">
                 <h3 className="font-semibold mb-4">Proceso de evaluación</h3>
                 <div className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-violet-100 text-violet-700 flex items-center justify-center"><Brain className="w-4 h-4" /></div>
-                    <div><p className="text-sm font-medium">Evaluación Psicométrica</p><p className="text-xs text-gray-500">Test de personalidad Big Five</p></div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center"><ClipboardList className="w-4 h-4" /></div>
-                    <div><p className="text-sm font-medium">Evaluación Psicológica</p><p className="text-xs text-gray-500">Estrés, empatía, adaptabilidad, liderazgo</p></div>
-                  </div>
+                  {vacancy.includePsicometrica !== false && (
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-violet-100 text-violet-700 flex items-center justify-center"><Brain className="w-4 h-4" /></div>
+                      <div><p className="text-sm font-medium">Evaluación Psicométrica</p><p className="text-xs text-gray-500">Test de personalidad Big Five</p></div>
+                    </div>
+                  )}
+                  {vacancy.includePsicologica !== false && (
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center"><ClipboardList className="w-4 h-4" /></div>
+                      <div><p className="text-sm font-medium">Evaluación Psicológica</p><p className="text-xs text-gray-500">Estrés, empatía, adaptabilidad, liderazgo</p></div>
+                    </div>
+                  )}
                   {vacancy.knowledgeQuestionCount > 0 && (
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center"><BookOpen className="w-4 h-4" /></div>
@@ -466,8 +434,8 @@ export default function PublicEvaluationView() {
                     </div>
                   )}
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center"><Video className="w-4 h-4" /></div>
-                    <div><p className="text-sm font-medium">Video de Presentación</p><p className="text-xs text-gray-500">Máximo 1 minuto</p></div>
+                    <div className="w-8 h-8 rounded-lg bg-green-100 text-green-700 flex items-center justify-center"><MessageCircle className="w-4 h-4" /></div>
+                    <div><p className="text-sm font-medium">Video de Presentación</p><p className="text-xs text-gray-500">Envíalo por WhatsApp</p></div>
                   </div>
                 </div>
               </CardContent>
@@ -598,118 +566,84 @@ export default function PublicEvaluationView() {
           </div>
         )}
 
-        {/* ===================== VIDEO STEP ===================== */}
+        {/* ===================== VIDEO STEP (WhatsApp) ===================== */}
         {step === 'video' && (
           <div className="space-y-6">
             <div className="text-center">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-rose-100 text-rose-600 mb-4">
-                <Video className="w-8 h-8" />
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-green-100 text-green-600 mb-4">
+                <MessageCircle className="w-8 h-8" />
               </div>
               <h2 className="text-2xl font-bold">Video de Presentación</h2>
-              <p className="text-gray-500 mt-1">Graba un video de máximo 1 minuto presentándote</p>
+              <p className="text-gray-500 mt-1">Envía tu video por WhatsApp para completar tu aplicación</p>
             </div>
 
-            {!videoMode && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Card className="shadow-md border-0 cursor-pointer hover:shadow-lg transition-shadow" onClick={() => setVideoMode('record')}>
-                  <CardContent className="p-6 text-center">
-                    <Camera className="w-10 h-10 text-emerald-600 mx-auto mb-3" />
-                    <p className="font-semibold">Grabar Video</p>
-                    <p className="text-xs text-gray-500 mt-1">Usa la cámara de tu dispositivo</p>
-                  </CardContent>
-                </Card>
-                <Card className="shadow-md border-0 cursor-pointer hover:shadow-lg transition-shadow" onClick={() => setVideoMode('upload')}>
-                  <CardContent className="p-6 text-center">
-                    <Upload className="w-10 h-10 text-teal-600 mx-auto mb-3" />
-                    <p className="font-semibold">Subir Video</p>
-                    <p className="text-xs text-gray-500 mt-1">Sube un archivo de video</p>
-                  </CardContent>
-                </Card>
-              </div>
-            )}
+            <Card className="shadow-lg border-0">
+              <CardContent className="p-6 space-y-4">
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+                  <h3 className="font-semibold text-emerald-800 mb-2">Instrucciones:</h3>
+                  <ol className="space-y-2 text-sm text-emerald-700">
+                    <li className="flex items-start gap-2">
+                      <span className="bg-emerald-200 text-emerald-800 rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">1</span>
+                      <span>Graba un video de máximo 1 minuto presentándote</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="bg-emerald-200 text-emerald-800 rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">2</span>
+                      <span>Dime tu nombre, experiencia y por qué te interesa el puesto</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="bg-emerald-200 text-emerald-800 rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">3</span>
+                      <span>Envíalo por WhatsApp usando el botón de abajo</span>
+                    </li>
+                  </ol>
+                </div>
 
-            {videoMode === 'record' && (
-              <Card className="shadow-lg border-0">
-                <CardContent className="p-6 space-y-4">
-                  <video ref={videoRef} autoPlay muted playsInline className="w-full rounded-lg bg-gray-900 aspect-video" />
-                  {isRecording && (
-                    <div className="flex items-center justify-center gap-2 text-red-600">
-                      <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
-                      <span className="font-mono text-lg">00:{String(recordingTime).padStart(2, '0')}</span>
-                      <span className="text-xs text-gray-400">/ 01:00</span>
-                    </div>
-                  )}
-                  {!isRecording && !recordedBlob && (
-                    <Button onClick={startRecording} className="w-full bg-red-600 hover:bg-red-700" size="lg">
-                      <Camera className="w-5 h-5 mr-2" /> Iniciar Grabación
+                {vacancy?.companyPhone && (
+                  <a
+                    href={getWhatsAppLink(vacancy.companyPhone, `¡Hola! Soy ${candidateName || 'candidato'} y acabo de completar mi evaluación para la vacante de ${vacancy?.title || ''}. Adjunto mi video de presentación. ¡Gracias!`)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block"
+                  >
+                    <Button
+                      className="w-full bg-green-600 hover:bg-green-700 text-white py-6 text-lg"
+                      onClick={() => setVideoSentViaWhatsApp(true)}
+                    >
+                      <MessageCircle className="w-6 h-6 mr-2" />
+                      Enviar Video por WhatsApp
+                    </Button>
+                  </a>
+                )}
+
+                {!vacancy?.companyPhone && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-center">
+                    <p className="text-sm text-amber-700">
+                      La empresa aún no ha configurado un número de WhatsApp. 
+                      Puedes continuar y te contactarán por correo.
+                    </p>
+                  </div>
+                )}
+
+                <div className="flex gap-3">
+                  {videoSentViaWhatsApp && (
+                    <Button
+                      className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+                      onClick={() => handleCompleteVideoStep(true)}
+                      disabled={loading}
+                    >
+                      {loading ? 'Guardando...' : '¡Video Enviado! Continuar'} <CheckCircle2 className="w-4 h-4 ml-1" />
                     </Button>
                   )}
-                  {isRecording && (
-                    <Button onClick={stopRecording} className="w-full bg-gray-800 hover:bg-gray-900" size="lg">
-                      <StopCircle className="w-5 h-5 mr-2" /> Detener Grabación
-                    </Button>
-                  )}
-                  {recordedBlob && (
-                    <>
-                      <video src={URL.createObjectURL(recordedBlob)} controls className="w-full rounded-lg" />
-                      <div className="flex gap-3">
-                        <Button variant="outline" className="flex-1" onClick={() => { setRecordedBlob(null); setRecordingTime(0) }}>
-                          Grabar de nuevo
-                        </Button>
-                        <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700" onClick={submitVideo} disabled={loading}>
-                          {loading ? 'Enviando...' : 'Enviar Video'} <CheckCircle2 className="w-4 h-4 ml-1" />
-                        </Button>
-                      </div>
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-
-            {videoMode === 'upload' && (
-              <Card className="shadow-lg border-0">
-                <CardContent className="p-6 space-y-4">
-                  {!uploadFile ? (
-                    <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-emerald-400 transition-colors">
-                      <Upload className="w-10 h-10 text-gray-400 mx-auto mb-3" />
-                      <p className="text-sm text-gray-500 mb-3">Arrastra tu video aquí o haz clic para seleccionar</p>
-                      <p className="text-xs text-gray-400 mb-4">Máximo 50MB, formato MP4 o WebM</p>
-                      <input
-                        type="file"
-                        accept="video/*"
-                        onChange={handleFileUpload}
-                        className="hidden"
-                        id="video-upload"
-                      />
-                      <Button variant="outline" onClick={() => document.getElementById('video-upload')?.click()}>
-                        Seleccionar Archivo
-                      </Button>
-                    </div>
-                  ) : (
-                    <>
-                      <video src={URL.createObjectURL(uploadFile)} controls className="w-full rounded-lg" />
-                      <p className="text-sm text-gray-500 text-center">{uploadFile.name} ({(uploadFile.size / 1024 / 1024).toFixed(1)} MB)</p>
-                      <div className="flex gap-3">
-                        <Button variant="outline" className="flex-1" onClick={() => setUploadFile(null)}>
-                          Cambiar archivo
-                        </Button>
-                        <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700" onClick={submitVideo} disabled={loading}>
-                          {loading ? 'Enviando...' : 'Enviar Video'} <CheckCircle2 className="w-4 h-4 ml-1" />
-                        </Button>
-                      </div>
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Skip video option */}
-            <p className="text-center text-xs text-gray-400">
-              El video es opcional pero recomendado para mejorar tu perfil
-            </p>
-            <Button variant="ghost" className="w-full text-gray-500" onClick={() => setStep('complete')}>
-              Continuar sin video
-            </Button>
+                  <Button
+                    variant="outline"
+                    className={videoSentViaWhatsApp ? '' : 'w-full'}
+                    onClick={() => handleCompleteVideoStep(false)}
+                    disabled={loading}
+                  >
+                    {loading ? 'Guardando...' : 'Continuar sin video'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         )}
 
@@ -732,6 +666,45 @@ export default function PublicEvaluationView() {
                 </p>
               </CardContent>
             </Card>
+
+            {/* WhatsApp notification to HR */}
+            {vacancy?.companyPhone && !notifySent && (
+              <Card className="shadow-md border-0">
+                <CardContent className="p-6 space-y-3">
+                  <div className="flex items-center gap-2 text-green-700">
+                    <Send className="w-5 h-5" />
+                    <span className="font-semibold">Notifica a la empresa</span>
+                  </div>
+                  <p className="text-sm text-gray-600">
+                    Ayuda a que la empresa vea tu aplicación más rápido. Notifícales por WhatsApp que ya completaste tu evaluación.
+                  </p>
+                  <a
+                    href={getWhatsAppLink(vacancy.companyPhone, `¡Hola! Soy ${candidateName || 'un candidato'} y acabo de completar mi evaluación para la vacante de ${vacancy?.title || ''}. Mi correo es ${candidateEmail || ''}. ¡Quedo atento/a!`)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block"
+                  >
+                    <Button
+                      className="w-full bg-green-600 hover:bg-green-700 text-white"
+                      onClick={() => setNotifySent(true)}
+                    >
+                      <MessageCircle className="w-5 h-5 mr-2" />
+                      Notificar por WhatsApp
+                    </Button>
+                  </a>
+                </CardContent>
+              </Card>
+            )}
+
+            {notifySent && (
+              <Card className="shadow-md border-0 bg-green-50">
+                <CardContent className="p-4 text-center">
+                  <CheckCircle2 className="w-6 h-6 text-green-600 mx-auto mb-2" />
+                  <p className="text-sm text-green-700 font-medium">¡Notificación enviada!</p>
+                  <p className="text-xs text-green-600">La empresa ha sido notificada de tu aplicación.</p>
+                </CardContent>
+              </Card>
+            )}
           </div>
         )}
       </div>
