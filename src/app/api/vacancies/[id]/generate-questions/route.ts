@@ -1,10 +1,52 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import ZAI from 'z-ai-web-dev-sdk'
 
 // ============================================
 // POST - Generate knowledge questions with AI
 // ============================================
+
+interface ChatMessage {
+  role: 'assistant' | 'user'
+  content: string
+}
+
+async function callAI(messages: ChatMessage[]): Promise<string> {
+  const baseUrl = process.env.ZAI_BASE_URL
+  const apiKey = process.env.ZAI_API_KEY
+  const chatId = process.env.ZAI_CHAT_ID
+  const userId = process.env.ZAI_USER_ID
+  const token = process.env.ZAI_TOKEN
+
+  if (!baseUrl || !apiKey) {
+    throw new Error('AI API no configurada. Se requieren ZAI_BASE_URL y ZAI_API_KEY.')
+  }
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${apiKey}`,
+    'X-Z-AI-From': 'Z',
+  }
+  if (chatId) headers['X-Chat-Id'] = chatId
+  if (userId) headers['X-User-Id'] = userId
+  if (token) headers['X-Token'] = token
+
+  const response = await fetch(`${baseUrl}/chat/completions`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      messages,
+      thinking: { type: 'disabled' },
+    }),
+  })
+
+  if (!response.ok) {
+    const errorBody = await response.text()
+    throw new Error(`AI API error (${response.status}): ${errorBody}`)
+  }
+
+  const data = await response.json()
+  return data.choices?.[0]?.message?.content || ''
+}
 
 export async function POST(
   req: NextRequest,
@@ -33,34 +75,29 @@ export async function POST(
 
     const sectorDescription = sectorLabels[vacancy.sector] || vacancy.sector
 
-    const zai = await ZAI.create()
-    const completion = await zai.chat.completions.create({
-      messages: [
-        {
-          role: 'assistant',
-          content: `Eres un experto en recursos humanos que crea preguntas de evaluación de conocimiento para puestos de trabajo en México. 
+    const aiResponse = await callAI([
+      {
+        role: 'assistant',
+        content: `Eres un experto en recursos humanos que crea preguntas de evaluación de conocimiento para puestos de trabajo en México. 
 Generas preguntas técnicas relevantes al puesto y sector, con 4 opciones de respuesta y una correcta.
 IMPORTANTE: Responde SOLO con JSON válido, sin texto adicional. El formato debe ser exactamente:
 {"questions": [{"text": "pregunta", "options": ["opción A", "opción B", "opción C", "opción D"], "correctAnswer": 0}]}
 El correctAnswer es el índice (0-3) de la respuesta correcta.
 Genera entre 5 y 10 preguntas.`
-        },
-        {
-          role: 'user',
-          content: `Genera preguntas de conocimiento para la vacante: "${vacancy.title}"
+      },
+      {
+        role: 'user',
+        content: `Genera preguntas de conocimiento para la vacante: "${vacancy.title}"
 Sector: ${sectorDescription}
 Empresa: ${vacancy.company.name}
 ${vacancy.description ? `Descripción: ${vacancy.description}` : ''}
 
 Las preguntas deben ser relevantes al puesto, prácticas, y enfocadas en conocimientos técnicos que un candidato necesitaría para desempeñarse bien en este rol.`
-        }
-      ],
-      thinking: { type: 'disabled' }
-    })
+      }
+    ])
 
-    const response = completion.choices[0]?.message?.content
-    if (!response) {
-      return NextResponse.json({ error: 'AI generation failed' }, { status: 500 })
+    if (!aiResponse) {
+      return NextResponse.json({ error: 'AI no generó respuesta' }, { status: 500 })
     }
 
     // Parse the AI response
@@ -72,7 +109,7 @@ Las preguntas deben ser relevantes al puesto, prácticas, y enfocadas en conocim
 
     try {
       // Try to extract JSON from the response (it might have markdown formatting)
-      const jsonMatch = response.match(/\{[\s\S]*\}/)
+      const jsonMatch = aiResponse.match(/\{[\s\S]*\}/)
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0])
         if (parsed.questions && Array.isArray(parsed.questions)) {
@@ -83,7 +120,7 @@ Las preguntas deben ser relevantes al puesto, prácticas, y enfocadas en conocim
       }
     } catch (parseError) {
       console.error('Error parsing AI response:', parseError)
-      return NextResponse.json({ error: 'Error processing generated questions' }, { status: 500 })
+      return NextResponse.json({ error: 'Error procesando las preguntas generadas' }, { status: 500 })
     }
 
     if (generatedQuestions.length === 0) {
