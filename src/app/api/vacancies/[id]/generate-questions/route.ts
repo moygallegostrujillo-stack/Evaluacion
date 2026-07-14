@@ -128,6 +128,7 @@ Las preguntas deben ser relevantes al puesto, prácticas, y enfocadas en conocim
     }, { status: 201 })
   } catch (error) {
     console.error('Error generating questions:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    return NextResponse.json({ error: 'Error generando preguntas', details: errorMessage }, { status: 500 })
   }
 }
