@@ -30,7 +30,7 @@ export async function GET() {
     // ============================================
     const restaurantCompany = await db.company.create({
       data: {
-        name: 'Restaurante El Sazón Chiapaneco',
+        name: 'Café de Chiapas',
         sector: 'RESTAURANT',
         plan: 'PRO',
         phone: '+52 961 123 4567',
@@ -43,7 +43,7 @@ export async function GET() {
 
     const retailCompany = await db.company.create({
       data: {
-        name: 'Moda Chiapas S.A. de C.V.',
+        name: 'Marlui',
         sector: 'RETAIL',
         plan: 'BASIC',
         phone: '+52 961 987 6543',
@@ -69,7 +69,7 @@ export async function GET() {
 
     const rhRestaurant = await db.user.create({
       data: {
-        email: 'rh@elsazon.com',
+        email: 'rh@cafedechiapas.com',
         name: 'María García López',
         password: hashPassword('rh1234'),
         role: 'RH',
@@ -80,7 +80,7 @@ export async function GET() {
 
     const gerenteRestaurant = await db.user.create({
       data: {
-        email: 'gerente@elsazon.com',
+        email: 'gerente@cafedechiapas.com',
         name: 'Carlos Méndez Ruiz',
         password: hashPassword('gerente1234'),
         role: 'GERENTE',
@@ -91,7 +91,7 @@ export async function GET() {
 
     const rhRetail = await db.user.create({
       data: {
-        email: 'rh@modachiapas.com',
+        email: 'rh@marlui.com',
         name: 'Ana López Díaz',
         password: hashPassword('rh1234'),
         role: 'RH',
@@ -558,9 +558,9 @@ export async function GET() {
         demoResults: 3,
         credentials: {
           superAdmin: 'admin@evaluhr.com / admin123',
-          rhRestaurant: 'rh@elsazon.com / rh1234',
-          gerenteRestaurant: 'gerente@elsazon.com / gerente1234',
-          rhRetail: 'rh@modachiapas.com / rh1234',
+          rhRestaurant: 'rh@cafedechiapas.com / rh1234',
+          gerenteRestaurant: 'gerente@cafedechiapas.com / gerente1234',
+          rhRetail: 'rh@marlui.com / rh1234',
           candidate: 'juan.perez@email.com / candidato1234',
         },
       },

@@ -183,7 +183,7 @@ async function getSystemQuestions(companyId: string) {
     where: { companyId },
     include: {
       evaluationTemplates: {
-        where: { type: { in: ['PSICOMETRICA', 'PSICOLOGICA'] } },
+        where: { type: { in: ['PSICOMETRICA', 'PSICOLOGICA', 'CONOCIMIENTOS'] } },
         include: { questions: true },
       },
     },
@@ -205,6 +205,15 @@ async function getSystemQuestions(companyId: string) {
     reverseScored: boolean
     order: number
   }> = []
+  let knowledgeQuestions: Array<{
+    id: string
+    text: string
+    category: string
+    type: string
+    options: string | null
+    correctAnswer: number | null
+    order: number
+  }> = []
 
   if (position) {
     const psicometricaTemplate = position.evaluationTemplates.find(
@@ -212,6 +221,9 @@ async function getSystemQuestions(companyId: string) {
     )
     const psicologicaTemplate = position.evaluationTemplates.find(
       (t) => t.type === 'PSICOLOGICA'
+    )
+    const conocimientosTemplate = position.evaluationTemplates.find(
+      (t) => t.type === 'CONOCIMIENTOS'
     )
 
     if (psicometricaTemplate) {
@@ -235,6 +247,18 @@ async function getSystemQuestions(companyId: string) {
         order: q.order,
       }))
     }
+
+    if (conocimientosTemplate) {
+      knowledgeQuestions = conocimientosTemplate.questions.map((q) => ({
+        id: q.id,
+        text: q.text,
+        category: q.category,
+        type: q.type,
+        options: q.options,
+        correctAnswer: q.correctAnswer,
+        order: q.order,
+      }))
+    }
   }
 
   // Fallback to hardcoded if no templates found
@@ -245,7 +269,7 @@ async function getSystemQuestions(companyId: string) {
     psychologicalQuestions = HARDCODED_PSYCHOLOGICAL
   }
 
-  return { bigFiveQuestions, psychologicalQuestions }
+  return { bigFiveQuestions, psychologicalQuestions, knowledgeQuestions }
 }
 
 // ============================================
@@ -330,13 +354,22 @@ async function calculateStepScores(
   }
 
   if (completedStep === 3) {
-    // Conocimientos
+    // Conocimientos - handle both VacancyQuestion and system Question responses
     const knowledgeResponses = responses.filter((r) => r.section.toUpperCase() === 'CONOCIMIENTOS')
+
+    // Get system questions to find correct answers for template-based questions
+    const systemQuestions = await getSystemQuestions(companyId)
+    const systemKnowledgeMap = new Map(
+      systemQuestions.knowledgeQuestions.map((q) => [q.id, q])
+    )
 
     let correct = 0
     for (const resp of knowledgeResponses) {
       const selectedIdx = parseInt(resp.value, 10)
-      const correctIdx = resp.vacancyQuestion?.correctAnswer ?? 0
+      // Check VacancyQuestion first, then fall back to system Question
+      const correctIdx = resp.vacancyQuestion?.correctAnswer
+        ?? systemKnowledgeMap.get(resp.questionId ?? '')?.correctAnswer
+        ?? 0
       if (selectedIdx === correctIdx) {
         correct++
       }
@@ -556,20 +589,42 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    // Step 3: conocimientos (vacancy questions)
+    // Step 3: conocimientos (vacancy questions + position template questions)
     if (currentStep === 3) {
+      const systemQuestions = await getSystemQuestions(vacancy.companyId)
+
+      // Start with vacancy custom questions
+      const allQuestions = vacancy.questions.map((q) => ({
+        id: q.id,
+        text: q.text,
+        type: q.type,
+        options: q.options ? JSON.parse(q.options) : null,
+        correctAnswer: undefined, // Don't expose correct answer to candidate
+        order: q.order,
+        vacancyQuestionId: q.id,
+      }))
+
+      // Add position template knowledge questions if no custom questions
+      if (allQuestions.length === 0 && systemQuestions.knowledgeQuestions.length > 0) {
+        for (const q of systemQuestions.knowledgeQuestions) {
+          allQuestions.push({
+            id: q.id,
+            text: q.text,
+            type: q.type,
+            options: q.options ? JSON.parse(q.options) : null,
+            category: q.category,
+            correctAnswer: undefined, // Don't expose correct answer to candidate
+            order: q.order,
+            questionId: q.id,
+          })
+        }
+      }
+
       return NextResponse.json({
         step: 3,
         stepName: 'conocimientos',
         applicationId: application.id,
-        questions: vacancy.questions.map((q) => ({
-          id: q.id,
-          text: q.text,
-          type: q.type,
-          options: q.options ? JSON.parse(q.options) : null,
-          correctAnswer: undefined, // Don't expose correct answer to candidate
-          order: q.order,
-        })),
+        questions: allQuestions,
       })
     }
 
@@ -828,12 +883,18 @@ export async function POST(req: NextRequest) {
       if (nextStep === 1 && !vacancy.includePsicometrica) nextStep = 2
       if (nextStep === 2 && !vacancy.includePsicologica) nextStep = 3
 
-      // Check if there are knowledge questions
+      // Check if there are knowledge questions (from vacancy or position template)
       if (nextStep === 3) {
         const questionCount = await db.vacancyQuestion.count({
           where: { vacancyId: vacancy.id },
         })
-        if (questionCount === 0) nextStep = 4
+        if (questionCount === 0) {
+          // Also check if position has CONOCIMIENTOS template questions
+          const systemQuestions = await getSystemQuestions(vacancy.companyId)
+          if (systemQuestions.knowledgeQuestions.length === 0) {
+            nextStep = 4
+          }
+        }
       }
 
       // Step 5 is done
@@ -858,6 +919,92 @@ export async function POST(req: NextRequest) {
         where: { id: applicationId },
         data: updateData,
       })
+
+      // Create EvaluationResult bridge record for HR/Admin visibility when evaluation completes
+      if (completed) {
+        try {
+          const updatedApp = await db.vacancyApplication.findUnique({
+            where: { id: applicationId },
+            include: { vacancy: { include: { company: true } } },
+          })
+
+          if (updatedApp && updatedApp.vacancy) {
+            const companyId = updatedApp.vacancy.companyId
+
+            // Find or create User for candidate
+            let candidateUser = await db.user.findUnique({
+              where: { email: updatedApp.candidateEmail },
+            })
+
+            if (!candidateUser) {
+              const crypto = await import('crypto')
+              candidateUser = await db.user.create({
+                data: {
+                  email: updatedApp.candidateEmail,
+                  name: updatedApp.candidateName,
+                  password: crypto.createHash('sha256').update(`candidate_${Date.now()}`).digest('hex'),
+                  role: 'CANDIDATO',
+                  companyId,
+                  phone: updatedApp.candidatePhone,
+                  consentGiven: true,
+                  consentDate: updatedApp.startedAt || new Date(),
+                  active: true,
+                },
+              })
+            }
+
+            // Find matching Position
+            let position = await db.position.findFirst({
+              where: { companyId, sector: updatedApp.vacancy.sector, active: true },
+            })
+            if (!position) {
+              position = await db.position.findFirst({
+                where: { companyId, active: true },
+              })
+            }
+
+            if (position) {
+              const session = await db.evaluationSession.create({
+                data: {
+                  candidateId: candidateUser.id,
+                  positionId: position.id,
+                  companyId,
+                  status: 'COMPLETED',
+                  startedAt: updatedApp.startedAt || updatedApp.createdAt,
+                  completedAt: updatedApp.completedAt || new Date(),
+                },
+              })
+
+              await db.evaluationResult.create({
+                data: {
+                  sessionId: session.id,
+                  candidateId: candidateUser.id,
+                  candidateName: updatedApp.candidateName,
+                  positionId: position.id,
+                  positionTitle: position.title,
+                  companyId,
+                  openness: updatedApp.openness,
+                  conscientiousness: updatedApp.conscientiousness,
+                  extraversion: updatedApp.extraversion,
+                  agreeableness: updatedApp.agreeableness,
+                  neuroticism: updatedApp.neuroticism,
+                  stressLevel: updatedApp.stressLevel,
+                  empathy: updatedApp.empathy,
+                  adaptability: updatedApp.adaptability,
+                  leadership: updatedApp.leadership,
+                  teamwork: updatedApp.teamwork,
+                  knowledgeScore: updatedApp.knowledgeScore,
+                  overallScore: updatedApp.overallScore || 0,
+                  recommendation: updatedApp.recommendation || 'PENDIENTE',
+                  summary: updatedApp.summary,
+                },
+              })
+            }
+          }
+        } catch (bridgeError) {
+          console.error('Error creating EvaluationResult bridge record:', bridgeError)
+        }
+      }
 
       return NextResponse.json({
         nextStep: completed ? 5 : nextStep,

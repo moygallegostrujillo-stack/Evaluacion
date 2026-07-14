@@ -29,7 +29,7 @@ async function main() {
   // ============================================
   const restaurantCompany = await db.company.create({
     data: {
-      name: 'Restaurante El Sazón Chiapaneco',
+      name: 'Café de Chiapas',
       sector: 'RESTAURANT',
       plan: 'PRO',
       phone: '+52 961 123 4567',
@@ -42,7 +42,7 @@ async function main() {
 
   const retailCompany = await db.company.create({
     data: {
-      name: 'Moda Chiapas S.A. de C.V.',
+      name: 'Marlui',
       sector: 'RETAIL',
       plan: 'BASIC',
       phone: '+52 961 987 6543',
@@ -72,7 +72,7 @@ async function main() {
 
   const rhRestaurant = await db.user.create({
     data: {
-      email: 'rh@elsazon.com',
+      email: 'rh@cafedechiapas.com',
       name: 'María García López',
       password: simpleHash('rh1234'),
       role: 'RH',
@@ -83,7 +83,7 @@ async function main() {
 
   const gerenteRestaurant = await db.user.create({
     data: {
-      email: 'gerente@elsazon.com',
+      email: 'gerente@cafedechiapas.com',
       name: 'Carlos Méndez Ruiz',
       password: simpleHash('gerente1234'),
       role: 'GERENTE',
@@ -94,7 +94,7 @@ async function main() {
 
   const rhRetail = await db.user.create({
     data: {
-      email: 'rh@modachiapas.com',
+      email: 'rh@marlui.com',
       name: 'Ana López Díaz',
       password: simpleHash('rh1234'),
       role: 'RH',
@@ -198,7 +198,7 @@ async function main() {
       sector: 'RETAIL',
       category: 'VENDEDOR',
       description: 'Atención al cliente, venta de productos, asesoría de moda',
-      hasKnowledgeTest: false,
+      hasKnowledgeTest: true,
       companyId: retailCompany.id,
     },
   })
@@ -1012,9 +1012,9 @@ async function main() {
   console.log('')
   console.log('🔑 Login credentials:')
   console.log('   Super Admin: admin@evaluhr.com / admin123')
-  console.log('   RH Restaurant: rh@elsazon.com / rh1234')
-  console.log('   Gerente Restaurant: gerente@elsazon.com / gerente1234')
-  console.log('   RH Retail: rh@modachiapas.com / rh1234')
+  console.log('   RH Restaurant: rh@cafedechiapas.com / rh1234')
+  console.log('   Gerente Restaurant: gerente@cafedechiapas.com / gerente1234')
+  console.log('   RH Retail: rh@marlui.com / rh1234')
   console.log('   Candidate: juan.perez@email.com / candidato1234')
 }
 

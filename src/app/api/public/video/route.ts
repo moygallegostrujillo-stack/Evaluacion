@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import * as crypto from 'crypto'
+
+function hashPassword(password: string): string {
+  return crypto.createHash('sha256').update(password).digest('hex')
+}
 
 // ============================================
 // POST - Mark video step complete via WhatsApp (no file storage)
+// Also creates EvaluationResult bridge records for HR/Admin visibility
 // ============================================
 
 export async function POST(req: NextRequest) {
@@ -17,9 +23,16 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Verify application exists
+    // Verify application exists with vacancy and company info
     const application = await db.vacancyApplication.findUnique({
       where: { id: applicationId },
+      include: {
+        vacancy: {
+          include: {
+            company: true,
+          },
+        },
+      },
     })
 
     if (!application) {
@@ -113,6 +126,97 @@ export async function POST(req: NextRequest) {
       where: { id: applicationId },
       data: updateData,
     })
+
+    // ============================================
+    // Create EvaluationResult bridge record for HR/Admin visibility
+    // ============================================
+    try {
+      const vacancy = application.vacancy
+      const companyId = vacancy.companyId
+
+      // Find or create a User record for this candidate
+      let candidateUser = await db.user.findUnique({
+        where: { email: application.candidateEmail },
+      })
+
+      if (!candidateUser) {
+        candidateUser = await db.user.create({
+          data: {
+            email: application.candidateEmail,
+            name: application.candidateName,
+            password: hashPassword(`candidate_${Date.now()}`),
+            role: 'CANDIDATO',
+            companyId,
+            phone: application.candidatePhone,
+            consentGiven: true,
+            consentDate: application.startedAt || new Date(),
+            active: true,
+          },
+        })
+      }
+
+      // Find a Position matching the vacancy's sector for this company
+      let position = await db.position.findFirst({
+        where: {
+          companyId,
+          sector: vacancy.sector,
+          active: true,
+        },
+      })
+
+      // Fallback: any position from the company
+      if (!position) {
+        position = await db.position.findFirst({
+          where: {
+            companyId,
+            active: true,
+          },
+        })
+      }
+
+      if (position) {
+        // Create EvaluationSession
+        const session = await db.evaluationSession.create({
+          data: {
+            candidateId: candidateUser.id,
+            positionId: position.id,
+            companyId,
+            status: 'COMPLETED',
+            startedAt: application.startedAt || application.createdAt,
+            completedAt: application.completedAt || new Date(),
+          },
+        })
+
+        // Create EvaluationResult
+        await db.evaluationResult.create({
+          data: {
+            sessionId: session.id,
+            candidateId: candidateUser.id,
+            candidateName: application.candidateName,
+            positionId: position.id,
+            positionTitle: position.title,
+            companyId,
+            openness: application.openness,
+            conscientiousness: application.conscientiousness,
+            extraversion: application.extraversion,
+            agreeableness: application.agreeableness,
+            neuroticism: application.neuroticism,
+            stressLevel: application.stressLevel,
+            empathy: application.empathy,
+            adaptability: application.adaptability,
+            leadership: application.leadership,
+            teamwork: application.teamwork,
+            knowledgeScore: application.knowledgeScore,
+            overallScore: application.overallScore || 0,
+            recommendation: application.recommendation || 'PENDIENTE',
+            summary: application.summary,
+          },
+        })
+      }
+    } catch (bridgeError) {
+      // Log but don't fail the main flow
+      console.error('Error creating EvaluationResult bridge record:', bridgeError)
+    }
 
     return NextResponse.json({ success: true })
   } catch (error) {

@@ -157,9 +157,9 @@ export default function LoginView() {
                   <p className="text-xs font-semibold text-amber-800 mb-2">🔑 Credenciales de demo:</p>
                   <div className="space-y-1 text-xs text-amber-700">
                     <p><strong>Admin:</strong> admin@evaluhr.com / admin123</p>
-                    <p><strong>RH Restaurante:</strong> rh@elsazon.com / rh1234</p>
-                    <p><strong>Gerente:</strong> gerente@elsazon.com / gerente1234</p>
-                    <p><strong>RH Retail:</strong> rh@modachiapas.com / rh1234</p>
+                    <p><strong>RH Restaurante:</strong> rh@cafedechiapas.com / rh1234</p>
+                    <p><strong>Gerente:</strong> gerente@cafedechiapas.com / gerente1234</p>
+                    <p><strong>RH Retail:</strong> rh@marlui.com / rh1234</p>
                     <p><strong>Candidato:</strong> juan.perez@email.com / candidato1234</p>
                   </div>
                 </div>

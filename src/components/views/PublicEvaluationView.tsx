@@ -597,24 +597,21 @@ export default function PublicEvaluationView() {
                   </ol>
                 </div>
 
-                {vacancy?.companyPhone && (
-                  <a
-                    href={getWhatsAppLink(vacancy.companyPhone, `¡Hola! Soy ${candidateName || 'candidato'} y acabo de completar mi evaluación para la vacante de ${vacancy?.title || ''}. Adjunto mi video de presentación. ¡Gracias!`)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block"
+                {vacancy?.companyPhone ? (
+                  <Button
+                    className="w-full bg-green-600 hover:bg-green-700 text-white py-6 text-lg"
+                    onClick={() => {
+                      window.open(
+                        getWhatsAppLink(vacancy.companyPhone!, `¡Hola! Soy ${candidateName || 'candidato'} y acabo de completar mi evaluación para la vacante de ${vacancy?.title || ''}. Adjunto mi video de presentación. ¡Gracias!`),
+                        '_blank'
+                      )
+                      setVideoSentViaWhatsApp(true)
+                    }}
                   >
-                    <Button
-                      className="w-full bg-green-600 hover:bg-green-700 text-white py-6 text-lg"
-                      onClick={() => setVideoSentViaWhatsApp(true)}
-                    >
-                      <MessageCircle className="w-6 h-6 mr-2" />
-                      Enviar Video por WhatsApp
-                    </Button>
-                  </a>
-                )}
-
-                {!vacancy?.companyPhone && (
+                    <MessageCircle className="w-6 h-6 mr-2" />
+                    Enviar Video por WhatsApp
+                  </Button>
+                ) : (
                   <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-center">
                     <p className="text-sm text-amber-700">
                       La empresa aún no ha configurado un número de WhatsApp. 
@@ -623,25 +620,43 @@ export default function PublicEvaluationView() {
                   </div>
                 )}
 
-                <div className="flex gap-3">
-                  {videoSentViaWhatsApp && (
-                    <Button
-                      className="flex-1 bg-emerald-600 hover:bg-emerald-700"
-                      onClick={() => handleCompleteVideoStep(true)}
-                      disabled={loading}
-                    >
-                      {loading ? 'Guardando...' : '¡Video Enviado! Continuar'} <CheckCircle2 className="w-4 h-4 ml-1" />
-                    </Button>
-                  )}
+                {/* Confirmation after opening WhatsApp */}
+                {videoSentViaWhatsApp && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <p className="text-sm text-blue-800 mb-3">
+                      <strong>¿Ya enviaste tu video por WhatsApp?</strong>
+                    </p>
+                    <p className="text-xs text-blue-600 mb-3">
+                      Confirma que ya enviaste tu video para continuar. Si aún no lo envías, puedes hacerlo después.
+                    </p>
+                    <div className="flex gap-3">
+                      <Button
+                        className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+                        onClick={() => handleCompleteVideoStep(true)}
+                        disabled={loading}
+                      >
+                        {loading ? 'Guardando...' : 'Sí, ya envié mi video'} <CheckCircle2 className="w-4 h-4 ml-1" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => setVideoSentViaWhatsApp(false)}
+                      >
+                        Aún no
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {!videoSentViaWhatsApp && (
                   <Button
                     variant="outline"
-                    className={videoSentViaWhatsApp ? '' : 'w-full'}
+                    className="w-full"
                     onClick={() => handleCompleteVideoStep(false)}
                     disabled={loading}
                   >
                     {loading ? 'Guardando...' : 'Continuar sin video'}
                   </Button>
-                </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -678,20 +693,19 @@ export default function PublicEvaluationView() {
                   <p className="text-sm text-gray-600">
                     Ayuda a que la empresa vea tu aplicación más rápido. Notifícales por WhatsApp que ya completaste tu evaluación.
                   </p>
-                  <a
-                    href={getWhatsAppLink(vacancy.companyPhone, `¡Hola! Soy ${candidateName || 'un candidato'} y acabo de completar mi evaluación para la vacante de ${vacancy?.title || ''}. Mi correo es ${candidateEmail || ''}. ¡Quedo atento/a!`)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block"
+                  <Button
+                    className="w-full bg-green-600 hover:bg-green-700 text-white"
+                    onClick={() => {
+                      window.open(
+                        getWhatsAppLink(vacancy.companyPhone!, `¡Hola! Soy ${candidateName || 'un candidato'} y acabo de completar mi evaluación para la vacante de ${vacancy?.title || ''}. Mi correo es ${candidateEmail || ''}. ¡Quedo atento/a!`),
+                        '_blank'
+                      )
+                      setNotifySent(true)
+                    }}
                   >
-                    <Button
-                      className="w-full bg-green-600 hover:bg-green-700 text-white"
-                      onClick={() => setNotifySent(true)}
-                    >
-                      <MessageCircle className="w-5 h-5 mr-2" />
-                      Notificar por WhatsApp
-                    </Button>
-                  </a>
+                    <MessageCircle className="w-5 h-5 mr-2" />
+                    Notificar por WhatsApp
+                  </Button>
                 </CardContent>
               </Card>
             )}
