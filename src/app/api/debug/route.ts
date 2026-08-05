@@ -3,36 +3,58 @@ import { NextResponse } from 'next/server';
 export async function GET() {
   const dbUrl = process.env.DATABASE_URL || '';
   const directUrl = process.env.DIRECT_URL || '';
+  
+  const results: Record<string, unknown> = {};
 
-  // Extract password properly: between user:password@
-  const getPassword = (url: string) => {
-    // Format: postgresql://user:password@host
-    const match = url.match(/\/\/[^:]+:([^@]+)@/);
-    return match ? match[1] : 'NOT_FOUND';
-  };
+  // Test 1: Try Supabase REST API (uses the same password)
+  // The Supabase project ref is ulgrgxjryezkedruvhdb
+  try {
+    const supabaseUrl = 'https://ulgrgxjryezkedruvhdb.supabase.co';
+    // We need the anon key or service key to test REST API
+    // Let's try connecting to the health endpoint
+    const healthRes = await fetch(`${supabaseUrl}/rest/v1/`, {
+      headers: {
+        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9', // dummy - just testing connectivity
+      },
+      signal: AbortSignal.timeout(10000)
+    });
+    results.supabaseRestReachable = true;
+    results.supabaseRestStatus = healthRes.status;
+  } catch (e) {
+    results.supabaseRestReachable = false;
+    results.supabaseRestError = (e as Error).message;
+  }
 
-  const dbPassword = getPassword(dbUrl);
-  const directPassword = getPassword(directUrl);
+  // Test 2: Try Prisma with ONLY the pooler URL (no directUrl)
+  // This tests if the directUrl is causing the issue
+  try {
+    // Dynamically create a Prisma client with only the pooler URL
+    process.env.DIRECT_URL = ''; // Temporarily remove direct URL
+    const { PrismaClient } = await import('@prisma/client');
+    const prisma = new PrismaClient();
+    const res = await prisma.$queryRaw`SELECT 1 as test`;
+    results.prismaWithoutDirect = { success: true, result: res };
+    await prisma.$disconnect();
+  } catch (e) {
+    results.prismaWithoutDirect = { 
+      success: false, 
+      error: (e as Error).message.substring(0, 200) 
+    };
+  }
 
-  const expectedPassword = '9042Adiante0993';
+  // Test 3: Try Prisma normally (with both URLs)
+  try {
+    const { PrismaClient } = await import('@prisma/client');
+    const prisma = new PrismaClient();
+    const res = await prisma.$queryRaw`SELECT 1 as test`;
+    results.prismaNormal = { success: true, result: res };
+    await prisma.$disconnect();
+  } catch (e) {
+    results.prismaNormal = { 
+      success: false, 
+      error: (e as Error).message.substring(0, 300) 
+    };
+  }
 
-  return NextResponse.json({
-    // Password comparison (DO NOT show actual password in production - just compare)
-    dbPasswordCorrect: dbPassword === expectedPassword,
-    directPasswordCorrect: directPassword === expectedPassword,
-    dbPasswordLength: dbPassword.length,
-    directPasswordLength: directPassword.length,
-    expectedLength: expectedPassword.length,
-    // Check if passwords match each other
-    passwordsMatch: dbPassword === directPassword,
-    // Show first 4 and last 4 chars of each password for debugging
-    dbPwdHint: dbPassword.length > 8 ? `${dbPassword.substring(0,4)}...${dbPassword.substring(dbPassword.length-4)}` : 'TOO_SHORT',
-    directPwdHint: directPassword.length > 8 ? `${directPassword.substring(0,4)}...${directPassword.substring(directPassword.length-4)}` : 'TOO_SHORT',
-    expectedHint: `${expectedPassword.substring(0,4)}...${expectedPassword.substring(expectedPassword.length-4)}`,
-    // Full URL lengths
-    dbUrlLength: dbUrl.length,
-    directUrlLength: directUrl.length,
-    expectedDbLength: 126,
-    expectedDirectLength: 87,
-  });
+  return NextResponse.json(results);
 }
