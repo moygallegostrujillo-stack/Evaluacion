@@ -187,7 +187,12 @@ export async function POST(req: NextRequest) {
           },
         })
 
-        // Create EvaluationResult
+        // Create EvaluationResult - use updateData values which have the calculated scores
+        // (application.* still holds the OLD values from before the update)
+        const calculatedOverallScore = (updateData.overallScore as number) || application.overallScore || 0
+        const calculatedRecommendation = (updateData.recommendation as string) || application.recommendation || 'PENDIENTE'
+        const calculatedSummary = (updateData.summary as string) || application.summary
+
         await db.evaluationResult.create({
           data: {
             sessionId: session.id,
@@ -207,9 +212,9 @@ export async function POST(req: NextRequest) {
             leadership: application.leadership,
             teamwork: application.teamwork,
             knowledgeScore: application.knowledgeScore,
-            overallScore: application.overallScore || 0,
-            recommendation: application.recommendation || 'PENDIENTE',
-            summary: application.summary,
+            overallScore: calculatedOverallScore,
+            recommendation: calculatedRecommendation,
+            summary: calculatedSummary,
           },
         })
       }
