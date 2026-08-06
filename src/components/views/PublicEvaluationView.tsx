@@ -9,10 +9,11 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Briefcase, User, Mail, Phone, Calendar, ArrowRight,
-  Video, CheckCircle2, Clock, Brain, BookOpen, ClipboardList,
-  AlertCircle, MessageCircle, Send
+  CheckCircle2, Clock, Brain, BookOpen, ClipboardList,
+  AlertCircle, MessageCircle, Send, Shield, Info
 } from 'lucide-react'
 
 // ============================================
@@ -45,7 +46,7 @@ interface QuestionData {
   vacancyQuestionId?: string
 }
 
-type PublicStep = 'loading' | 'vacancy-info' | 'candidate-data' | 'psicometrica' | 'psicologica' | 'conocimientos' | 'video' | 'complete'
+type PublicStep = 'loading' | 'vacancy-info' | 'candidate-data' | 'consent' | 'psicometrica' | 'psicologica' | 'conocimientos' | 'complete'
 
 const LIKERT_OPTIONS = [
   { value: 1, label: 'Totalmente en desacuerdo' },
@@ -80,8 +81,10 @@ export default function PublicEvaluationView() {
   const [candidatePhone, setCandidatePhone] = useState('')
   const [candidateAge, setCandidateAge] = useState('')
 
+  // Consent state
+  const [consentAccepted, setConsentAccepted] = useState(false)
+
   // WhatsApp notification tracking
-  const [videoSentViaWhatsApp, setVideoSentViaWhatsApp] = useState(false)
   const [notifySent, setNotifySent] = useState(false)
 
   // ============================================
@@ -134,7 +137,7 @@ export default function PublicEvaluationView() {
       case 1: loadStepQuestions('psicometrica'); break
       case 2: loadStepQuestions('psicologica'); break
       case 3: loadStepQuestions('conocimientos'); break
-      case 4: setStep('video'); break
+      case 4: setStep('complete'); break
       case 5: setStep('complete'); break
       default: setStep('candidate-data')
     }
@@ -193,8 +196,8 @@ export default function PublicEvaluationView() {
       }
       const newAppId = data.applicationId
       setApplicationId(newAppId)
-      // Move to step 1 (psicometrica) - pass applicationId directly
-      await advanceStepWithId(0, newAppId)
+      // Move to consent step first
+      setStep('consent')
     } catch {
       alert('Error de conexión')
     } finally {
@@ -245,7 +248,6 @@ export default function PublicEvaluationView() {
       case 'psicometrica': return 1
       case 'psicologica': return 2
       case 'conocimientos': return 3
-      case 'video': return 4
       default: return 0
     }
   }
@@ -272,38 +274,10 @@ export default function PublicEvaluationView() {
         mapStepToView(data.nextStep, data)
       }
       if (data.completed) {
-        setStep('video')
+        setStep('complete')
       }
     } catch (e) {
       console.error('Error advancing step', e)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // ============================================
-  // Complete video step (WhatsApp or skip)
-  // ============================================
-  const handleCompleteVideoStep = async (videoSent: boolean) => {
-    if (!applicationId) return
-    setLoading(true)
-    try {
-      const res = await fetch('/api/public/video', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          applicationId,
-          videoSent,
-        }),
-      })
-      const data = await res.json()
-      if (data.success) {
-        setStep('complete')
-      } else {
-        alert(data.error || 'Error al completar')
-      }
-    } catch {
-      alert('Error de conexión')
     } finally {
       setLoading(false)
     }
@@ -333,7 +307,7 @@ export default function PublicEvaluationView() {
   // Calculate progress
   // ============================================
   const getProgressPercent = () => {
-    const steps = ['candidate-data', 'psicometrica', 'psicologica', 'conocimientos', 'video', 'complete']
+    const steps = ['candidate-data', 'consent', 'psicometrica', 'psicologica', 'conocimientos', 'complete']
     const idx = steps.indexOf(step)
     const questionProgress = questions.length > 0 ? currentQIndex / questions.length : 0
     return Math.round(((idx + questionProgress) / steps.length) * 100)
@@ -433,10 +407,6 @@ export default function PublicEvaluationView() {
                       <div><p className="text-sm font-medium">Conocimientos Técnicos</p><p className="text-xs text-gray-500">{vacancy.knowledgeQuestionCount} preguntas específicas</p></div>
                     </div>
                   )}
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-green-100 text-green-700 flex items-center justify-center"><MessageCircle className="w-4 h-4" /></div>
-                    <div><p className="text-sm font-medium">Video de Presentación</p><p className="text-xs text-gray-500">Envíalo por WhatsApp</p></div>
-                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -566,97 +536,86 @@ export default function PublicEvaluationView() {
           </div>
         )}
 
-        {/* ===================== VIDEO STEP (WhatsApp) ===================== */}
-        {step === 'video' && (
+        {/* ===================== CONSENT STEP ===================== */}
+        {step === 'consent' && (
           <div className="space-y-6">
             <div className="text-center">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-green-100 text-green-600 mb-4">
-                <MessageCircle className="w-8 h-8" />
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white mb-4">
+                <Shield className="w-8 h-8" />
               </div>
-              <h2 className="text-2xl font-bold">Video de Presentación</h2>
-              <p className="text-gray-500 mt-1">Envía tu video por WhatsApp para completar tu aplicación</p>
+              <h2 className="text-2xl font-bold">Consentimiento Informado</h2>
+              <p className="text-gray-500 mt-1">Antes de comenzar, necesitamos tu consentimiento</p>
             </div>
 
-            <Card className="shadow-lg border-0">
+            <Card className="shadow-lg border-0 border-2 border-emerald-200">
               <CardContent className="p-6 space-y-4">
-                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
-                  <h3 className="font-semibold text-emerald-800 mb-2">Instrucciones:</h3>
-                  <ol className="space-y-2 text-sm text-emerald-700">
-                    <li className="flex items-start gap-2">
-                      <span className="bg-emerald-200 text-emerald-800 rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">1</span>
-                      <span>Graba un video de máximo 1 minuto presentándote</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="bg-emerald-200 text-emerald-800 rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">2</span>
-                      <span>Dime tu nombre, experiencia y por qué te interesa el puesto</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="bg-emerald-200 text-emerald-800 rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">3</span>
-                      <span>Envíalo por WhatsApp usando el botón de abajo</span>
-                    </li>
-                  </ol>
+                <div className="bg-amber-50 p-4 rounded-lg border border-amber-200 space-y-3">
+                  <p className="text-sm text-amber-900 font-medium">
+                    Está a punto de realizar una evaluación que incluye pruebas psicométricas, psicológicas y de conocimientos.
+                  </p>
+                  <p className="text-sm text-amber-800">
+                    Los resultados serán utilizados exclusivamente para el proceso de selección laboral.
+                  </p>
+                  <div className="flex items-start gap-2 bg-amber-100/50 p-2 rounded-md">
+                    <Info className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-amber-700">
+                      Sus datos son considerados <strong>Datos Personales Sensibles</strong> conforme a la LFPDPPP y la NOM-035-STPS-2018.
+                    </p>
+                  </div>
                 </div>
 
-                {vacancy?.companyPhone ? (
-                  <Button
-                    className="w-full bg-green-600 hover:bg-green-700 text-white py-6 text-lg"
-                    onClick={() => {
-                      window.open(
-                        getWhatsAppLink(vacancy.companyPhone!, `¡Hola! Soy ${candidateName || 'candidato'} y acabo de completar mi evaluación para la vacante de ${vacancy?.title || ''}. Adjunto mi video de presentación. ¡Gracias!`),
-                        '_blank'
-                      )
-                      setVideoSentViaWhatsApp(true)
-                    }}
-                  >
-                    <MessageCircle className="w-6 h-6 mr-2" />
-                    Enviar Video por WhatsApp
-                  </Button>
-                ) : (
-                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-center">
-                    <p className="text-sm text-amber-700">
-                      La empresa aún no ha configurado un número de WhatsApp. 
-                      Puedes continuar y te contactarán por correo.
-                    </p>
-                  </div>
-                )}
+                <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-700 space-y-3 max-h-48 overflow-y-auto">
+                  <p className="font-semibold">AVISO DE PRIVACIDAD</p>
+                  <p>
+                    De conformidad con la LFPDPPP, se le informa que sus datos personales serán tratados de manera confidencial.
+                  </p>
+                  <p><strong>Datos que se recopilan:</strong></p>
+                  <ul className="list-disc list-inside space-y-1 ml-2">
+                    <li>Nombre completo y correo electrónico</li>
+                    <li>Respuestas a evaluaciones psicométricas y psicológicas</li>
+                    <li>Resultados de evaluaciones de conocimientos</li>
+                  </ul>
+                  <p><strong>Finalidad:</strong></p>
+                  <ul className="list-disc list-inside space-y-1 ml-2">
+                    <li>Realizar pre-evaluaciones para procesos de reclutamiento</li>
+                    <li>Generar perfiles de competencias y recomendaciones</li>
+                    <li>Facilitar el proceso de selección laboral</li>
+                  </ul>
+                  <p><strong>Sus derechos ARCO:</strong> Acceder, Rectificar, Cancelar y Oponerse al tratamiento de sus datos.</p>
+                  <p className="text-xs text-gray-500">
+                    Responsable: {vacancy?.companyName || 'La empresa correspondiente'} — Tuxtla Gutiérrez, Chiapas, México
+                  </p>
+                </div>
 
-                {/* Confirmation after opening WhatsApp */}
-                {videoSentViaWhatsApp && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <p className="text-sm text-blue-800 mb-3">
-                      <strong>¿Ya enviaste tu video por WhatsApp?</strong>
-                    </p>
-                    <p className="text-xs text-blue-600 mb-3">
-                      Confirma que ya enviaste tu video para continuar. Si aún no lo envías, puedes hacerlo después.
-                    </p>
-                    <div className="flex gap-3">
-                      <Button
-                        className="flex-1 bg-emerald-600 hover:bg-emerald-700"
-                        onClick={() => handleCompleteVideoStep(true)}
-                        disabled={loading}
-                      >
-                        {loading ? 'Guardando...' : 'Sí, ya envié mi video'} <CheckCircle2 className="w-4 h-4 ml-1" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => setVideoSentViaWhatsApp(false)}
-                      >
-                        Aún no
-                      </Button>
-                    </div>
-                  </div>
-                )}
+                <div className="flex items-start space-x-3 bg-emerald-50 p-3 rounded-lg border border-emerald-200">
+                  <Checkbox
+                    id="consent-public"
+                    checked={consentAccepted}
+                    onCheckedChange={(checked) => setConsentAccepted(checked as boolean)}
+                    className="mt-0.5"
+                  />
+                  <label htmlFor="consent-public" className="text-sm text-emerald-900 cursor-pointer leading-tight">
+                    Acepto que mis respuestas serán tratadas como datos personales sensibles y consiento someterme a esta evaluación de forma voluntaria.
+                  </label>
+                </div>
 
-                {!videoSentViaWhatsApp && (
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => handleCompleteVideoStep(false)}
-                    disabled={loading}
-                  >
-                    {loading ? 'Guardando...' : 'Continuar sin video'}
-                  </Button>
-                )}
+                <Button
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-lg py-6"
+                  disabled={!consentAccepted || loading}
+                  onClick={async () => {
+                    setLoading(true)
+                    try {
+                      // Advance to first evaluation step
+                      await advanceStepWithId(0, applicationId!)
+                    } catch {
+                      console.error('Error advancing after consent')
+                    } finally {
+                      setLoading(false)
+                    }
+                  }}
+                >
+                  Aceptar y Comenzar <ArrowRight className="w-5 h-5 ml-2" />
+                </Button>
               </CardContent>
             </Card>
           </div>
@@ -669,15 +628,18 @@ export default function PublicEvaluationView() {
               <CheckCircle2 className="w-10 h-10" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">¡Evaluación Completada!</h1>
+              <h1 className="text-2xl font-bold text-gray-900">¡Gracias por completar tu evaluación!</h1>
               <p className="text-gray-500 mt-2 max-w-md mx-auto">
-                Gracias por completar tu evaluación. La empresa revisará tu perfil y te contactará si eres seleccionado/a.
+                Evaluaremos tus resultados y nos pondremos en contacto contigo próximamente.
               </p>
             </div>
             <Card className="shadow-md border-0 bg-emerald-50/50">
-              <CardContent className="p-6">
+              <CardContent className="p-6 space-y-2">
                 <p className="text-sm text-emerald-800">
-                  <strong>Importante:</strong> Los resultados de tu evaluación son confidenciales y solo serán revisados por el equipo de Recursos Humanos de la empresa. No recibirás ninguna calificación ni retroalimentación automática.
+                  <strong>Importante:</strong> Los resultados de tu evaluación son confidenciales y solo serán revisados por el equipo de Recursos Humanos de la empresa.
+                </p>
+                <p className="text-xs text-emerald-600">
+                  Si tienes alguna duda, puedes contactar a Recursos Humanos.
                 </p>
               </CardContent>
             </Card>

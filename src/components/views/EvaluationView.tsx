@@ -8,9 +8,10 @@ import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   CheckCircle2, ChevronRight, Clock, ClipboardList, Brain, BookOpen,
-  Utensils, ShoppingBag, Briefcase, ArrowRight, Users
+  Utensils, ShoppingBag, Briefcase, ArrowRight, Users, Shield, Info
 } from 'lucide-react'
 
 const LIKERT_OPTIONS = [
@@ -43,7 +44,7 @@ interface CompletedSession {
   position: { id: string; title: string; category: string; sector: string }
 }
 
-type ViewPhase = 'LOADING' | 'SELECT_POSITION' | 'SESSION_READY' | 'IN_PROGRESS' | 'SESSIONS_OVERVIEW'
+type ViewPhase = 'LOADING' | 'SELECT_POSITION' | 'CONSENT' | 'SESSION_READY' | 'SECTION_TRANSITION' | 'IN_PROGRESS' | 'SESSIONS_OVERVIEW'
 
 export default function EvaluationView() {
   const user = useAppStore((s) => s.user)
@@ -56,6 +57,8 @@ export default function EvaluationView() {
   const [answers, setAnswers] = useState<Record<string, number | string>>({})
   const [loading, setLoading] = useState(false)
   const [positionTitle, setPositionTitle] = useState('')
+  const [consentAccepted, setConsentAccepted] = useState(false)
+  const [showSectionTransition, setShowSectionTransition] = useState(false)
 
   // Position selection state
   const [availablePositions, setAvailablePositions] = useState<AvailablePosition[]>([])
@@ -82,7 +85,7 @@ export default function EvaluationView() {
             setCurrentQuestionIndex(activeSession.currentQuestionIndex || 0)
             setPhase('IN_PROGRESS')
           } else if (activeSession.status === 'NOT_STARTED') {
-            setPhase('SESSION_READY')
+            setPhase('CONSENT')
           }
         } else if (data.completedSessions?.length > 0 && data.availablePositions?.length === 0) {
           // All evaluations completed, no more positions
@@ -154,14 +157,14 @@ export default function EvaluationView() {
           if (data.session.status === 'IN_PROGRESS') {
             setPhase('IN_PROGRESS')
           } else {
-            setPhase('SESSION_READY')
+            setPhase('CONSENT')
           }
         }
         return
       }
       setSessionId(data.session.id)
       setPositionTitle(data.session.positionTitle || '')
-      setPhase('SESSION_READY')
+      setPhase('CONSENT')
     } catch (e) {
       console.error('Error creating session', e)
     } finally {
@@ -181,9 +184,11 @@ export default function EvaluationView() {
       const data = await res.json()
       if (data.templates) {
         setTemplates(data.templates)
-        setPhase('IN_PROGRESS')
         setCurrentTemplateIndex(0)
         setCurrentQuestionIndex(0)
+        // Show section transition for the first section
+        setShowSectionTransition(true)
+        setPhase('SECTION_TRANSITION')
       }
     } catch (e) {
       console.error('Error starting evaluation', e)
@@ -232,6 +237,9 @@ export default function EvaluationView() {
         }
         setCurrentTemplateIndex(nextTemplateIdx)
         setCurrentQuestionIndex(0)
+        // Show section transition for the new section
+        setShowSectionTransition(true)
+        setPhase('SECTION_TRANSITION')
       } else {
         await handleComplete()
       }
@@ -271,6 +279,15 @@ export default function EvaluationView() {
       case 'PSICOLOGICA': return 'Psicológica'
       case 'CONOCIMIENTOS': return 'Conocimientos'
       default: return type
+    }
+  }
+
+  const getStepDescription = (type: string) => {
+    switch (type) {
+      case 'PSICOMETRICA': return 'Evalúa tu perfil de personalidad a través del modelo Big Five: apertura a la experiencia, responsabilidad, extraversión, amabilidad y neuroticismo.'
+      case 'PSICOLOGICA': return 'Evalúa aspectos psicológicos relevantes para el trabajo: manejo de estrés, empatía, adaptabilidad, liderazgo y trabajo en equipo.'
+      case 'CONOCIMIENTOS': return 'Evalúa tus conocimientos técnicos específicos para el puesto al que estás aplicando.'
+      default: return 'Evaluación de competencias para el puesto.'
     }
   }
 
@@ -547,6 +564,97 @@ export default function EvaluationView() {
   }
 
   // ============================================
+  // CONSENT: Show consent/terms screen before evaluation
+  // ============================================
+  if (phase === 'CONSENT') {
+    return (
+      <div className="max-w-lg mx-auto space-y-6">
+        <div className="text-center">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white mb-4">
+            <Shield className="w-8 h-8" />
+          </div>
+          <h1 className="text-2xl font-bold">Consentimiento Informado</h1>
+          <p className="text-gray-500 mt-1">Puesto: <strong>{positionTitle}</strong></p>
+        </div>
+
+        <Card className="shadow-sm border-2 border-emerald-200">
+          <CardContent className="p-6 space-y-4">
+            <div className="bg-amber-50 p-4 rounded-lg border border-amber-200 space-y-3">
+              <p className="text-sm text-amber-900 font-medium">
+                Está a punto de realizar una evaluación que incluye pruebas psicométricas, psicológicas y de conocimientos.
+              </p>
+              <p className="text-sm text-amber-800">
+                Los resultados serán utilizados exclusivamente para el proceso de selección laboral.
+              </p>
+              <div className="flex items-start gap-2 bg-amber-100/50 p-2 rounded-md">
+                <Info className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-amber-700">
+                  Sus datos son considerados <strong>Datos Personales Sensibles</strong> conforme a la Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP) y la NOM-035-STPS-2018.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-700 space-y-3 max-h-48 overflow-y-auto">
+              <p className="font-semibold">AVISO DE PRIVACIDAD</p>
+              <p>
+                De conformidad con la LFPDPPP, se le informa que sus datos personales serán tratados de manera confidencial.
+              </p>
+              <p><strong>Datos que se recopilan:</strong></p>
+              <ul className="list-disc list-inside space-y-1 ml-2">
+                <li>Nombre completo y correo electrónico</li>
+                <li>Respuestas a evaluaciones psicométricas y psicológicas</li>
+                <li>Resultados de evaluaciones de conocimientos</li>
+              </ul>
+              <p><strong>Finalidad:</strong></p>
+              <ul className="list-disc list-inside space-y-1 ml-2">
+                <li>Realizar pre-evaluaciones para procesos de reclutamiento</li>
+                <li>Generar perfiles de competencias y recomendaciones</li>
+                <li>Facilitar el proceso de selección laboral</li>
+              </ul>
+              <p><strong>Sus derechos ARCO:</strong> Acceder, Rectificar, Cancelar y Oponerse al tratamiento de sus datos.</p>
+              <p className="text-xs text-gray-500">
+                Responsable: {user?.companyName || 'La empresa correspondiente'} — Tuxtla Gutiérrez, Chiapas, México
+              </p>
+            </div>
+
+            <div className="flex items-start space-x-3 bg-emerald-50 p-3 rounded-lg border border-emerald-200">
+              <Checkbox
+                id="consent-eval"
+                checked={consentAccepted}
+                onCheckedChange={(checked) => setConsentAccepted(checked as boolean)}
+                className="mt-0.5"
+              />
+              <label htmlFor="consent-eval" className="text-sm text-emerald-900 cursor-pointer leading-tight">
+                Acepto que mis respuestas serán tratadas como datos personales sensibles y consiento someterme a esta evaluación de forma voluntaria.
+              </label>
+            </div>
+
+            <Button
+              className="w-full bg-emerald-600 hover:bg-emerald-700"
+              size="lg"
+              disabled={!consentAccepted || loading}
+              onClick={() => {
+                // Save consent to backend
+                if (user?.id) {
+                  fetch('/api/consent', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId: user.id }),
+                  }).catch(() => {})
+                }
+                setPhase('SESSION_READY')
+              }}
+            >
+              Aceptar y Continuar
+              <ChevronRight className="w-4 h-4 ml-1" />
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  // ============================================
   // SESSION READY: Show intro before starting
   // ============================================
   if (phase === 'SESSION_READY') {
@@ -562,6 +670,71 @@ export default function EvaluationView() {
         setCurrentTemplateIndex={setCurrentTemplateIndex}
         setCurrentQuestionIndex={setCurrentQuestionIndex}
       />
+    )
+  }
+
+  // ============================================
+  // SECTION TRANSITION: Show transition between sections
+  // ============================================
+  if (phase === 'SECTION_TRANSITION') {
+    const nextTemplate = templates[currentTemplateIndex]
+    const prevTemplate = currentTemplateIndex > 0 ? templates[currentTemplateIndex - 1] : null
+    const isFirstSection = currentTemplateIndex === 0
+
+    return (
+      <div className="max-w-lg mx-auto space-y-6">
+        {!isFirstSection && prevTemplate && (
+          <div className="text-center">
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-emerald-100 text-emerald-600 mb-3">
+              <CheckCircle2 className="w-7 h-7" />
+            </div>
+            <h2 className="text-xl font-bold text-emerald-700">
+              Has completado la sección de {getStepLabel(prevTemplate.type)}
+            </h2>
+          </div>
+        )}
+
+        {nextTemplate && (
+          <Card className="shadow-sm border-2 border-emerald-200">
+            <CardContent className="p-6 space-y-4">
+              <div className="text-center space-y-2">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white mb-2">
+                  {getStepIcon(nextTemplate.type)}
+                </div>
+                <h3 className="text-lg font-bold">
+                  {isFirstSection ? 'A continuación:' : 'A continuación:'}
+                </h3>
+                <p className="text-xl font-bold text-emerald-600">
+                  Evaluación {getStepLabel(nextTemplate.type)}
+                </p>
+              </div>
+
+              <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-200">
+                <p className="text-sm text-emerald-800">
+                  {getStepDescription(nextTemplate.type)}
+                </p>
+              </div>
+
+              <div className="flex items-center justify-center gap-2 text-sm text-gray-500">
+                <Clock className="w-4 h-4" />
+                <span>{nextTemplate.questions?.length || 0} preguntas</span>
+              </div>
+
+              <Button
+                className="w-full bg-emerald-600 hover:bg-emerald-700"
+                size="lg"
+                onClick={() => {
+                  setShowSectionTransition(false)
+                  setPhase('IN_PROGRESS')
+                }}
+              >
+                Comenzar sección
+                <ChevronRight className="w-4 h-4 ml-1" />
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+      </div>
     )
   }
 
@@ -604,12 +777,16 @@ export default function EvaluationView() {
         ))}
       </div>
 
-      {/* Current Template Badge */}
+      {/* Section-specific question counter badge */}
       {currentTemplate && (
-        <Badge variant="outline" className="text-sm">
-          {getStepIcon(currentTemplate.type)}
-          <span className="ml-1">Sección {currentTemplateIndex + 1}: {getStepLabel(currentTemplate.type)}</span>
-        </Badge>
+        <div className="flex items-center justify-center gap-3">
+          <Badge className="bg-emerald-100 text-emerald-700 border-emerald-300 text-sm px-3 py-1">
+            {getStepIcon(currentTemplate.type)}
+            <span className="ml-1.5">
+              Pregunta {currentQuestionIndex + 1} de {currentTemplate.questions?.length || 0} — {getStepLabel(currentTemplate.type)}
+            </span>
+          </Badge>
+        </div>
       )}
 
       {/* Question Card */}
@@ -746,7 +923,8 @@ function SessionReadyView({
         setTemplates(data.templates)
         setCurrentTemplateIndex(0)
         setCurrentQuestionIndex(0)
-        setPhase('IN_PROGRESS')
+        // Show section transition for the first section
+        setPhase('SECTION_TRANSITION')
       }
     } catch (e) {
       console.error('Error starting evaluation', e)

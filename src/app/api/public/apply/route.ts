@@ -632,13 +632,13 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    // Step 4: video
+    // Step 4: done (video step removed - evaluation goes directly to completion)
     if (currentStep === 4) {
       return NextResponse.json({
         step: 4,
-        stepName: 'video',
+        stepName: 'done',
         applicationId: application.id,
-        maxVideoSeconds: vacancy.maxVideoSeconds,
+        status: application.status,
       })
     }
 
@@ -732,7 +732,7 @@ export async function POST(req: NextRequest) {
       // Determine first step
       let firstStep = 0 // data step is step 0
       // After data, check which steps are included
-      // Steps: 0=data, 1=psicometrica, 2=psicologica, 3=conocimientos, 4=video, 5=done
+      // Steps: 0=data, 1=psicometrica, 2=psicologica, 3=conocimientos, 4=done (video step removed)
 
       const application = await db.vacancyApplication.create({
         data: {
@@ -901,7 +901,26 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // Step 5 is done
+      // Skip video step (step 4) - go directly to completion
+      // Step 4 is now completion (video step removed)
+      if (nextStep === 4) {
+        completed = true
+        updateData.status = 'COMPLETED'
+        updateData.completedAt = new Date()
+        updateData.currentStep = 4
+        updateData.videoType = 'SKIPPED'
+        updateData.videoUrl = null
+
+        // Calculate overall score
+        const overall = await calculateOverallScore(applicationId)
+        if (overall) {
+          updateData.overallScore = overall.overallScore
+          updateData.recommendation = overall.recommendation
+          updateData.summary = overall.summary
+        }
+      }
+
+      // Step 5 is also done (backward compat)
       if (nextStep >= 5) {
         completed = true
         updateData.status = 'COMPLETED'
@@ -915,7 +934,7 @@ export async function POST(req: NextRequest) {
           updateData.recommendation = overall.recommendation
           updateData.summary = overall.summary
         }
-      } else {
+      } else if (!completed) {
         updateData.currentStep = nextStep
       }
 

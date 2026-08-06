@@ -55,11 +55,47 @@ export default function EvaluationCompleteView() {
 
   if (!result) {
     return (
-      <div className="text-center py-12 space-y-4">
-        <CheckCircle2 className="w-16 h-16 text-emerald-500 mx-auto" />
-        <h1 className="text-2xl font-bold">¡Evaluación Completada!</h1>
-        <p className="text-gray-500">Tus resultados están siendo procesados. Recibirás información pronto.</p>
-        <p className="text-sm text-gray-400">Te contactaremos para los siguientes pasos del proceso.</p>
+      <div className="max-w-lg mx-auto space-y-6">
+        <div className="text-center py-8 space-y-4">
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-emerald-100 text-emerald-600 mb-2">
+            <CheckCircle2 className="w-10 h-10" />
+          </div>
+          <h1 className="text-2xl font-bold">¡Gracias por completar tu evaluación!</h1>
+          <p className="text-gray-600 max-w-md mx-auto">
+            Evaluaremos tus resultados y nos pondremos en contacto contigo próximamente.
+          </p>
+        </div>
+
+        <Card className="shadow-sm border-emerald-200 bg-emerald-50/50">
+          <CardContent className="p-6 text-center space-y-3">
+            <Mail className="w-6 h-6 text-emerald-600 mx-auto" />
+            <p className="text-sm text-emerald-800">
+              Si tienes alguna duda, puedes contactar a Recursos Humanos.
+            </p>
+            <p className="text-xs text-emerald-600">
+              Tus resultados son confidenciales y serán revisados únicamente por el equipo de selección.
+            </p>
+          </CardContent>
+        </Card>
+
+        {availablePositions.length > 0 && (
+          <Card className="shadow-sm border-emerald-200 bg-emerald-50/30">
+            <CardContent className="p-6 text-center space-y-4">
+              <div className="text-emerald-700">
+                <Briefcase className="w-8 h-8 mx-auto mb-2" />
+                <p className="font-semibold">¿Te interesa otro puesto?</p>
+              </div>
+              <Button
+                onClick={handleApplyAnother}
+                className="bg-emerald-600 hover:bg-emerald-700"
+                size="lg"
+              >
+                Aplicar a Otro Puesto
+                <ChevronRight className="w-4 h-4 ml-1" />
+              </Button>
+            </CardContent>
+          </Card>
+        )}
       </div>
     )
   }
@@ -113,6 +149,16 @@ export default function EvaluationCompleteView() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
+      {/* Friendly completion message - always shown at top */}
+      <Card className="shadow-sm border-emerald-200 bg-emerald-50/50">
+        <CardContent className="p-5 text-center space-y-2">
+          <p className="text-emerald-800 font-semibold">¡Gracias por completar tu evaluación!</p>
+          <p className="text-sm text-emerald-700">
+            Evaluaremos tus resultados y nos pondremos en contacto contigo próximamente.
+          </p>
+        </CardContent>
+      </Card>
+
       {/* Success Header */}
       <div className="text-center space-y-2">
         <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 mb-2">
