@@ -168,12 +168,12 @@ export default function PublicEvaluationView() {
   // Go to section intro (splash before questions)
   // ============================================
   const goToSectionIntro = useCallback(async (section: string, data?: any) => {
-    if (!applicationId && !data) return
+    if (!applicationId) return
     setLoading(true)
     try {
-      const res = data
-        ? { json: () => Promise.resolve(data) }
-        : await fetch(`/api/public/apply?applicationId=${applicationId}`)
+      // Always fetch questions fresh from the API using applicationId
+      // The `data` param may come from advanceStep and won't have questions
+      const res = await fetch(`/api/public/apply?applicationId=${applicationId}`)
       const sectionData = await res.json()
       if (sectionData.questions && sectionData.questions.length > 0) {
         const sectionQuestions = sectionData.questions.filter((q: QuestionData) => {
