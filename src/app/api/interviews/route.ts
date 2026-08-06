@@ -1,11 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { getAuthFromHeaders } from '@/lib/auth'
 
 export async function GET(req: NextRequest) {
   try {
-    const companyId = req.nextUrl.searchParams.get('companyId')
+    const auth = getAuthFromHeaders(req.headers)
+    if (!auth) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
-    // Super Admin (no companyId) sees all interviews
+    // Derive companyId from auth; SUPER_ADMIN can optionally override
+    const companyId = auth.role === 'SUPER_ADMIN'
+      ? (req.nextUrl.searchParams.get('companyId') || auth.companyId)
+      : auth.companyId
+
     const where = companyId ? { companyId } : {}
 
     const interviews = await db.interviewSchedule.findMany({
@@ -30,8 +38,18 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = getAuthFromHeaders(req.headers)
+    if (!auth) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const body = await req.json()
-    const { candidateId, companyId, positionId, scheduledAt, location, notes } = body
+    const { candidateId, positionId, scheduledAt, location, notes } = body
+
+    // Derive companyId from auth; SUPER_ADMIN can optionally override
+    const companyId = auth.role === 'SUPER_ADMIN'
+      ? (body.companyId || auth.companyId)
+      : auth.companyId
 
     if (!candidateId || !companyId || !scheduledAt) {
       return NextResponse.json({ error: 'candidateId, companyId, and scheduledAt are required' }, { status: 400 })
@@ -66,6 +84,11 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   try {
+    const auth = getAuthFromHeaders(req.headers)
+    if (!auth) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const body = await req.json()
     const { id, status } = body
 
@@ -75,6 +98,14 @@ export async function PATCH(req: NextRequest) {
 
     if (!['SCHEDULED', 'COMPLETED', 'CANCELLED'].includes(status)) {
       return NextResponse.json({ error: 'Invalid status. Must be SCHEDULED, COMPLETED, or CANCELLED' }, { status: 400 })
+    }
+
+    // Non-SUPER_ADMIN users can only update interviews in their own company
+    if (auth.role !== 'SUPER_ADMIN') {
+      const existingInterview = await db.interviewSchedule.findUnique({ where: { id } })
+      if (existingInterview && existingInterview.companyId !== auth.companyId) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
     }
 
     const interview = await db.interviewSchedule.update({

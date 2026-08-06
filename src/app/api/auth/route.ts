@@ -1,16 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-
-import crypto from 'crypto'
-
-function hashPassword(password: string): string {
-  return crypto.createHash('sha256').update(password).digest('hex')
-}
+import { hashPassword, verifyPassword, isLegacyHash } from '@/lib/password'
+import { generateToken } from '@/lib/auth'
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     const { action } = body
+
+    if (action === 'logout') {
+      const response = NextResponse.json({ success: true })
+      response.cookies.set('evaluhr_token', '', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 0, // Expire immediately
+        path: '/',
+      })
+      return response
+    }
 
     if (action === 'login') {
       const { email, password } = body
@@ -19,7 +27,14 @@ export async function POST(req: NextRequest) {
         include: { company: true },
       })
 
-      if (!user || user.password !== hashPassword(password)) {
+      if (!user) {
+        return NextResponse.json({ error: 'Credenciales inválidas' }, { status: 401 })
+      }
+
+      // Verify password (supports both bcrypt and legacy SHA-256)
+      const { valid, needsRehash } = await verifyPassword(password, user.password)
+
+      if (!valid) {
         return NextResponse.json({ error: 'Credenciales inválidas' }, { status: 401 })
       }
 
@@ -27,7 +42,28 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Cuenta desactivada' }, { status: 403 })
       }
 
-      return NextResponse.json({
+      // Transparent migration: re-hash with bcrypt if still on SHA-256
+      if (needsRehash) {
+        const newHash = await hashPassword(password)
+        await db.user.update({
+          where: { id: user.id },
+          data: { password: newHash },
+        })
+      }
+
+      // Generate real JWT token
+      const token = await generateToken({
+        sub: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        companyId: user.companyId || undefined,
+        companyName: user.company?.name || undefined,
+        companySector: user.company?.sector || undefined,
+      })
+
+      // Set token as httpOnly cookie for extra security
+      const response = NextResponse.json({
         user: {
           id: user.id,
           email: user.email,
@@ -38,8 +74,18 @@ export async function POST(req: NextRequest) {
           companySector: user.company?.sector,
           consentGiven: user.consentGiven,
         },
-        token: `token_${user.id}_${Date.now()}`,
+        token,
       })
+
+      response.cookies.set('evaluhr_token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 8, // 8 hours
+        path: '/',
+      })
+
+      return response
     }
 
     if (action === 'register') {
@@ -67,11 +113,12 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'El correo ya está registrado' }, { status: 400 })
       }
 
+      const hashedPassword = await hashPassword(password)
       const user = await db.user.create({
         data: {
           email,
           name,
-          password: hashPassword(password),
+          password: hashedPassword,
           role: 'CANDIDATO',
           phone,
           companyId: invitation.companyId,
@@ -92,7 +139,18 @@ export async function POST(req: NextRequest) {
         },
       })
 
-      return NextResponse.json({
+      // Generate real JWT token
+      const jwtToken = await generateToken({
+        sub: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        companyId: user.companyId || undefined,
+        companyName: invitation.company.name || undefined,
+        companySector: invitation.company.sector || undefined,
+      })
+
+      const response = NextResponse.json({
         user: {
           id: user.id,
           email: user.email,
@@ -103,8 +161,18 @@ export async function POST(req: NextRequest) {
           companySector: invitation.company.sector,
           consentGiven: false,
         },
-        token: `token_${user.id}_${Date.now()}`,
+        token: jwtToken,
       })
+
+      response.cookies.set('evaluhr_token', jwtToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 8, // 8 hours
+        path: '/',
+      })
+
+      return response
     }
 
     return NextResponse.json({ error: 'Acción no válida' }, { status: 400 })

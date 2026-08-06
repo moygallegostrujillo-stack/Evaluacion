@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { useAppStore } from '@/lib/store'
+import { apiFetch } from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
@@ -18,8 +19,8 @@ export default function EvaluationCompleteView() {
   useEffect(() => {
     if (!user?.id) return
     Promise.all([
-      fetch(`/api/interviews?candidateId=${user.id}`).then(r => r.json()),
-      fetch(`/api/evaluations?candidateId=${user.id}`).then(r => r.json()),
+      apiFetch(`/api/interviews?candidateId=${user.id}`).then(r => r.json()),
+      apiFetch(`/api/evaluations?candidateId=${user.id}`).then(r => r.json()),
     ])
       .then(([interviewData, sessionData]) => {
         setAvailablePositions(sessionData.availablePositions || [])

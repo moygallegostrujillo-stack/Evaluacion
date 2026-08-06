@@ -148,6 +148,12 @@ export const useAppStore = create<AppState>((set) => ({
     if (typeof window !== 'undefined') {
       localStorage.removeItem('evaluhr_token')
       localStorage.removeItem('evaluhr_user')
+      // Also clear the httpOnly auth cookie by making a request to the logout endpoint
+      fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'logout' }),
+      }).catch(() => {})
     }
     set({ user: null, token: null, currentView: 'login' })
   },

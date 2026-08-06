@@ -1,9 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { getAuthFromHeaders } from '@/lib/auth'
 
 export async function GET(req: NextRequest) {
   try {
-    const companyId = req.nextUrl.searchParams.get('companyId')
+    const auth = getAuthFromHeaders(req.headers)
+    if (!auth) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Derive companyId from auth; SUPER_ADMIN can optionally override
+    const companyId = auth.role === 'SUPER_ADMIN'
+      ? (req.nextUrl.searchParams.get('companyId') || auth.companyId)
+      : auth.companyId
     const sector = req.nextUrl.searchParams.get('sector')
     const all = req.nextUrl.searchParams.get('all')
 
@@ -67,8 +76,18 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = getAuthFromHeaders(req.headers)
+    if (!auth) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const body = await req.json()
-    const { title, sector, category, description, hasKnowledgeTest, companyId } = body
+    const { title, sector, category, description, hasKnowledgeTest } = body
+
+    // Derive companyId from auth; SUPER_ADMIN can optionally override
+    const companyId = auth.role === 'SUPER_ADMIN'
+      ? (body.companyId || auth.companyId)
+      : auth.companyId
 
     if (!title || !sector || !category || !companyId) {
       return NextResponse.json({ error: 'title, sector, category, and companyId are required' }, { status: 400 })

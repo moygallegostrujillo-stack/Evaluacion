@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { getAuthFromHeaders } from '@/lib/auth'
 
 // ============================================
 // GET - List all questions for a vacancy
@@ -10,6 +11,11 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = getAuthFromHeaders(req.headers)
+    if (!auth) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { id } = await params
 
     const vacancy = await db.vacancy.findUnique({
@@ -19,6 +25,11 @@ export async function GET(
 
     if (!vacancy) {
       return NextResponse.json({ error: 'Vacancy not found' }, { status: 404 })
+    }
+
+    // Non-SUPER_ADMIN users can only access vacancies in their own company
+    if (auth.role !== 'SUPER_ADMIN' && vacancy.companyId !== auth.companyId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const questions = vacancy.questions.map((q) => ({
@@ -53,6 +64,11 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = getAuthFromHeaders(req.headers)
+    if (!auth) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { id } = await params
     const body: CreateQuestionBody = await req.json()
     const { text, options, correctAnswer } = body
@@ -68,6 +84,11 @@ export async function POST(
 
     if (!vacancy) {
       return NextResponse.json({ error: 'Vacancy not found' }, { status: 404 })
+    }
+
+    // Non-SUPER_ADMIN users can only add questions to vacancies in their own company
+    if (auth.role !== 'SUPER_ADMIN' && vacancy.companyId !== auth.companyId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     // Auto-increment order based on existing max
@@ -119,6 +140,11 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = getAuthFromHeaders(req.headers)
+    if (!auth) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { id } = await params
     const body: UpdateQuestionBody = await req.json()
     const { questionId, text, options, correctAnswer } = body
@@ -133,6 +159,12 @@ export async function PUT(
 
     if (!existing) {
       return NextResponse.json({ error: 'Question not found in this vacancy' }, { status: 404 })
+    }
+
+    // Non-SUPER_ADMIN users can only update questions in vacancies from their own company
+    const vacancy = await db.vacancy.findUnique({ where: { id } })
+    if (auth.role !== 'SUPER_ADMIN' && vacancy?.companyId !== auth.companyId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const question = await db.vacancyQuestion.update({
@@ -170,6 +202,11 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = getAuthFromHeaders(req.headers)
+    if (!auth) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { id } = await params
     const questionId = req.nextUrl.searchParams.get('questionId')
 
@@ -183,6 +220,12 @@ export async function DELETE(
 
     if (!existing) {
       return NextResponse.json({ error: 'Question not found in this vacancy' }, { status: 404 })
+    }
+
+    // Non-SUPER_ADMIN users can only delete questions from vacancies in their own company
+    const vacancy = await db.vacancy.findUnique({ where: { id } })
+    if (auth.role !== 'SUPER_ADMIN' && vacancy?.companyId !== auth.companyId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     await db.vacancyQuestion.delete({

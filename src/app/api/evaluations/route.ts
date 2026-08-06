@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { getAuthFromHeaders } from '@/lib/auth'
 
 // ============================================
 // SCORING ALGORITHM
@@ -225,9 +226,15 @@ function generateSummary(
 
 export async function GET(req: NextRequest) {
   try {
+    const auth = getAuthFromHeaders(req.headers)
+    if (!auth) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // For CANDIDATO role, force candidateId to auth.userId (can only access own evaluations)
     const positionId = req.nextUrl.searchParams.get('positionId')
     const sessionId = req.nextUrl.searchParams.get('sessionId')
-    const candidateId = req.nextUrl.searchParams.get('candidateId')
+    const candidateId = auth.role === 'CANDIDATO' ? auth.userId : req.nextUrl.searchParams.get('candidateId')
 
     if (candidateId) {
       // Get evaluation sessions for a candidate
@@ -418,14 +425,24 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = getAuthFromHeaders(req.headers)
+    if (!auth) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const body = await req.json()
     const { sessionId, action } = body
+
+    // For CANDIDATO role, force candidateId to auth.userId
+    const deriveCandidateId = (bodyCandidateId?: string) =>
+      auth.role === 'CANDIDATO' ? auth.userId : (bodyCandidateId || auth.userId)
 
     // ============================================
     // CREATE-SESSION: Candidate creates a new evaluation session for a position
     // ============================================
     if (action === 'create-session') {
-      const { candidateId, positionId } = body
+      const candidateId = deriveCandidateId(body.candidateId)
+      const { positionId } = body
 
       if (!candidateId || !positionId) {
         return NextResponse.json({ error: 'candidateId and positionId are required' }, { status: 400 })

@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { apiFetch } from '@/lib/api'
 
 export default function LoginView() {
   const setAuth = useAppStore((s) => s.setAuth)
@@ -25,7 +26,7 @@ export default function LoginView() {
     setLoading(true)
     setError('')
     try {
-      const res = await fetch('/api/auth', {
+      const res = await apiFetch('/api/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'login', email, password }),
@@ -57,7 +58,7 @@ export default function LoginView() {
     setLoading(true)
     setError('')
     try {
-      const res = await fetch('/api/auth', {
+      const res = await apiFetch('/api/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -155,6 +156,7 @@ export default function LoginView() {
                   {loading ? 'Ingresando...' : 'Ingresar'}
                 </Button>
 
+                {process.env.NODE_ENV === 'development' && (
                 <div className="mt-6 p-4 bg-amber-50 rounded-lg border border-amber-200">
                   <p className="text-xs font-semibold text-amber-800 mb-2">🔑 Credenciales de demo:</p>
                   <div className="space-y-1 text-xs text-amber-700">
@@ -165,6 +167,7 @@ export default function LoginView() {
                     <p><strong>Candidato:</strong> juan.perez@email.com / candidato1234</p>
                   </div>
                 </div>
+                )}
               </form>
             ) : (
               <form onSubmit={handleRegister} className="space-y-4">

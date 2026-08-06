@@ -1,12 +1,8 @@
 import { db } from '@/lib/db'
-import * as crypto from 'crypto'
+import bcrypt from 'bcryptjs'
 
-function hashPassword(password: string): string {
-  // Simple hash for demo - in production use bcrypt
-  const encoder = new TextEncoder()
-  const data = encoder.encode(password)
-  const hashBuffer = hash('sha256', data) as unknown as Buffer
-  return hashBuffer.toString('hex') || Buffer.from(data).toString('base64')
+async function hashPassword(password: string): Promise<string> {
+  return bcrypt.hash(password, 12)
 }
 
 async function main() {
@@ -56,15 +52,11 @@ async function main() {
   // ============================================
   // CREATE USERS
   // ============================================
-  const simpleHash = (pw: string) => {
-    return crypto.createHash('sha256').update(pw).digest('hex')
-  }
-
   const superAdmin = await db.user.create({
     data: {
       email: 'admin@evaluhr.com',
       name: 'Administrador del Sistema',
-      password: simpleHash('admin123'),
+      password: await hashPassword('admin123'),
       role: 'SUPER_ADMIN',
       active: true,
     },
@@ -74,7 +66,7 @@ async function main() {
     data: {
       email: 'rh@cafedechiapas.com',
       name: 'María García López',
-      password: simpleHash('rh1234'),
+      password: await hashPassword('rh1234'),
       role: 'RH',
       companyId: restaurantCompany.id,
       active: true,
@@ -85,7 +77,7 @@ async function main() {
     data: {
       email: 'gerente@cafedechiapas.com',
       name: 'Carlos Méndez Ruiz',
-      password: simpleHash('gerente1234'),
+      password: await hashPassword('gerente1234'),
       role: 'GERENTE',
       companyId: restaurantCompany.id,
       active: true,
@@ -96,7 +88,7 @@ async function main() {
     data: {
       email: 'rh@marlui.com',
       name: 'Ana López Díaz',
-      password: simpleHash('rh1234'),
+      password: await hashPassword('rh1234'),
       role: 'RH',
       companyId: retailCompany.id,
       active: true,
@@ -108,7 +100,7 @@ async function main() {
     data: {
       email: 'juan.perez@email.com',
       name: 'Juan Pérez Hernández',
-      password: simpleHash('candidato1234'),
+      password: await hashPassword('candidato1234'),
       role: 'CANDIDATO',
       companyId: restaurantCompany.id,
       consentGiven: true,
@@ -121,7 +113,7 @@ async function main() {
     data: {
       email: 'lucia.martinez@email.com',
       name: 'Lucía Martínez Torres',
-      password: simpleHash('candidato1234'),
+      password: await hashPassword('candidato1234'),
       role: 'CANDIDATO',
       companyId: restaurantCompany.id,
       consentGiven: true,
@@ -134,7 +126,7 @@ async function main() {
     data: {
       email: 'pedro.sanchez@email.com',
       name: 'Pedro Sánchez Gómez',
-      password: simpleHash('candidato1234'),
+      password: await hashPassword('candidato1234'),
       role: 'CANDIDATO',
       companyId: retailCompany.id,
       consentGiven: true,

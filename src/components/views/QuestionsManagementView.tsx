@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react'
 import { useAppStore } from '@/lib/store'
+import { apiFetch } from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -155,8 +156,8 @@ export default function QuestionsManagementView() {
     if (user?.companyId) vacParams.set('companyId', user.companyId)
 
     Promise.all([
-      fetch(`/api/positions?${posParams.toString()}`).then(r => r.json()),
-      fetch(`/api/vacancies?${vacParams.toString()}`).then(r => r.json()),
+      apiFetch(`/api/positions?${posParams.toString()}`).then(r => r.json()),
+      apiFetch(`/api/vacancies?${vacParams.toString()}`).then(r => r.json()),
     ])
       .then(([posData, vacData]) => {
         setPositions(posData.positions || [])
@@ -176,7 +177,7 @@ export default function QuestionsManagementView() {
 
     if (selectedType === 'position') {
       // Load templates for position
-      fetch(`/api/questions?positionId=${selectedId}`)
+      apiFetch(`/api/questions?positionId=${selectedId}`)
         .then(res => res.json())
         .then(data => {
           setTemplates(data.templates || [])
@@ -190,7 +191,7 @@ export default function QuestionsManagementView() {
         .finally(() => setLoading(false))
     } else {
       // Load vacancy questions
-      fetch(`/api/vacancies/${selectedId}/questions`)
+      apiFetch(`/api/vacancies/${selectedId}/questions`)
         .then(res => res.json())
         .then(data => {
           setVacancyQuestions(data.questions || [])
@@ -284,7 +285,7 @@ export default function QuestionsManagementView() {
     }
     setSaving(true)
     try {
-      const res = await fetch('/api/questions', {
+      const res = await apiFetch('/api/questions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -301,7 +302,7 @@ export default function QuestionsManagementView() {
       toast({ title: 'Pregunta agregada', description: 'La pregunta se agregó exitosamente' })
       setShowAddDialog(false)
       // Reload
-      fetch(`/api/questions?positionId=${selectedId}`)
+      apiFetch(`/api/questions?positionId=${selectedId}`)
         .then(r => r.json())
         .then(data => setTemplates(data.templates || []))
     } catch {
@@ -324,7 +325,7 @@ export default function QuestionsManagementView() {
     if (!selectedQuestion || !selectedTemplateId || !formText.trim()) return
     setSaving(true)
     try {
-      const res = await fetch('/api/questions', {
+      const res = await apiFetch('/api/questions', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -338,7 +339,7 @@ export default function QuestionsManagementView() {
       toast({ title: 'Pregunta actualizada', description: 'Los cambios se guardaron exitosamente' })
       setShowEditDialog(false)
       setSelectedQuestion(null)
-      fetch(`/api/questions?positionId=${selectedId}`)
+      apiFetch(`/api/questions?positionId=${selectedId}`)
         .then(r => r.json())
         .then(data => setTemplates(data.templates || []))
     } catch {
@@ -357,12 +358,12 @@ export default function QuestionsManagementView() {
     if (!selectedQuestion) return
     setSaving(true)
     try {
-      const res = await fetch(`/api/questions?questionId=${selectedQuestion.id}`, { method: 'DELETE' })
+      const res = await apiFetch(`/api/questions?questionId=${selectedQuestion.id}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Error deleting')
       toast({ title: 'Pregunta eliminada', description: 'La pregunta fue eliminada exitosamente' })
       setShowDeleteDialog(false)
       setSelectedQuestion(null)
-      fetch(`/api/questions?positionId=${selectedId}`)
+      apiFetch(`/api/questions?positionId=${selectedId}`)
         .then(r => r.json())
         .then(data => setTemplates(data.templates || []))
     } catch {
@@ -391,7 +392,7 @@ export default function QuestionsManagementView() {
     }
     setSaving(true)
     try {
-      const res = await fetch(`/api/vacancies/${selectedId}/questions`, {
+      const res = await apiFetch(`/api/vacancies/${selectedId}/questions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -404,7 +405,7 @@ export default function QuestionsManagementView() {
       toast({ title: 'Pregunta agregada', description: 'La pregunta técnica se agregó a la vacante' })
       setShowAddDialog(false)
       // Reload vacancy questions
-      fetch(`/api/vacancies/${selectedId}/questions`)
+      apiFetch(`/api/vacancies/${selectedId}/questions`)
         .then(r => r.json())
         .then(data => setVacancyQuestions(data.questions || []))
     } catch {
@@ -436,7 +437,7 @@ export default function QuestionsManagementView() {
     if (!selectedQuestion || !selectedId || !formText.trim()) return
     setSaving(true)
     try {
-      const res = await fetch(`/api/vacancies/${selectedId}/questions`, {
+      const res = await apiFetch(`/api/vacancies/${selectedId}/questions`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -450,7 +451,7 @@ export default function QuestionsManagementView() {
       toast({ title: 'Pregunta actualizada', description: 'Los cambios se guardaron exitosamente' })
       setShowEditDialog(false)
       setSelectedQuestion(null)
-      fetch(`/api/vacancies/${selectedId}/questions`)
+      apiFetch(`/api/vacancies/${selectedId}/questions`)
         .then(r => r.json())
         .then(data => setVacancyQuestions(data.questions || []))
     } catch {
@@ -479,12 +480,12 @@ export default function QuestionsManagementView() {
     if (!selectedQuestion || !selectedId) return
     setSaving(true)
     try {
-      const res = await fetch(`/api/vacancies/${selectedId}/questions?questionId=${selectedQuestion.id}`, { method: 'DELETE' })
+      const res = await apiFetch(`/api/vacancies/${selectedId}/questions?questionId=${selectedQuestion.id}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Error deleting')
       toast({ title: 'Pregunta eliminada', description: 'La pregunta fue eliminada exitosamente' })
       setShowDeleteDialog(false)
       setSelectedQuestion(null)
-      fetch(`/api/vacancies/${selectedId}/questions`)
+      apiFetch(`/api/vacancies/${selectedId}/questions`)
         .then(r => r.json())
         .then(data => setVacancyQuestions(data.questions || []))
     } catch {

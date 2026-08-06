@@ -1,12 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { getAuthFromHeaders } from '@/lib/auth'
 
 import crypto from 'crypto'
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = getAuthFromHeaders(req.headers)
+    if (!auth) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const body = await req.json()
-    const { email, phone, companyId, positionId, invitedBy, channel } = body
+    const { email, phone, positionId, channel } = body
+
+    // Derive companyId from auth; SUPER_ADMIN can optionally override
+    const companyId = auth.role === 'SUPER_ADMIN'
+      ? (body.companyId || auth.companyId)
+      : auth.companyId
+
+    // Derive invitedBy from auth; SUPER_ADMIN can optionally override
+    const invitedBy = auth.role === 'SUPER_ADMIN'
+      ? (body.invitedBy || auth.userId)
+      : auth.userId
 
     if (!email || !companyId || !positionId || !invitedBy) {
       return NextResponse.json({ error: 'email, companyId, positionId, and invitedBy are required' }, { status: 400 })

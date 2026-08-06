@@ -1,10 +1,10 @@
 import { PrismaClient } from '@prisma/client'
-import crypto from 'crypto'
+import bcrypt from 'bcryptjs'
 
 const db = new PrismaClient()
 
-function hashPassword(password: string): string {
-  return crypto.createHash('sha256').update(password).digest('hex')
+async function hashPassword(password: string): Promise<string> {
+  return bcrypt.hash(password, 12)
 }
 
 async function main() {
@@ -13,7 +13,7 @@ async function main() {
   if (admin) {
     await db.user.update({
       where: { id: admin.id },
-      data: { role: 'SUPER_ADMIN', password: hashPassword('admin123') },
+      data: { role: 'SUPER_ADMIN', password: await hashPassword('admin123') },
     })
     console.log('✅ Admin role fixed to SUPER_ADMIN')
   } else {
@@ -27,7 +27,7 @@ async function main() {
       data: {
         email: 'admin@evaluhr.com',
         name: 'Administrador EvaluHR',
-        password: hashPassword('admin123'),
+        password: await hashPassword('admin123'),
         role: 'SUPER_ADMIN',
         phone: '+52 961 000 0000',
         companyId: company.id,

@@ -1,13 +1,26 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { hashPassword } from '@/lib/password'
 
-import crypto from 'crypto'
+export async function GET(req: NextRequest) {
+  // SECURITY: Seed endpoint is completely disabled in production
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json(
+      { error: 'Seed endpoint is disabled in production' },
+      { status: 403 }
+    )
+  }
 
-function hashPassword(password: string): string {
-  return crypto.createHash('sha256').update(password).digest('hex')
-}
+  // SECURITY: Require seed secret in development
+  const seedSecret = process.env.SEED_SECRET
+  const providedSecret = req.headers.get('x-seed-secret') || req.nextUrl.searchParams.get('secret')
+  if (seedSecret && providedSecret !== seedSecret) {
+    return NextResponse.json(
+      { error: 'Invalid seed secret' },
+      { status: 403 }
+    )
+  }
 
-export async function GET() {
   try {
     // Clean existing data
     await db.vacancyApplicationResponse.deleteMany()
@@ -61,7 +74,7 @@ export async function GET() {
       data: {
         email: 'admin@evaluhr.com',
         name: 'Administrador del Sistema',
-        password: hashPassword('admin123'),
+        password: await hashPassword('admin123'),
         role: 'SUPER_ADMIN',
         active: true,
       },
@@ -72,7 +85,7 @@ export async function GET() {
         email: 'rh@cafedechiapas.com',
         name: 'María García López',
         phone: '+52 961 111 2222',
-        password: hashPassword('rh1234'),
+        password: await hashPassword('rh1234'),
         role: 'RH',
         companyId: restaurantCompany.id,
         active: true,
@@ -84,7 +97,7 @@ export async function GET() {
         email: 'gerente@cafedechiapas.com',
         name: 'Carlos Méndez Ruiz',
         phone: '+52 961 333 4444',
-        password: hashPassword('gerente1234'),
+        password: await hashPassword('gerente1234'),
         role: 'GERENTE',
         companyId: restaurantCompany.id,
         active: true,
@@ -96,7 +109,7 @@ export async function GET() {
         email: 'rh@marlui.com',
         name: 'Ana López Díaz',
         phone: '+52 961 555 6666',
-        password: hashPassword('rh1234'),
+        password: await hashPassword('rh1234'),
         role: 'RH',
         companyId: retailCompany.id,
         active: true,
@@ -108,7 +121,7 @@ export async function GET() {
         email: 'juan.perez@email.com',
         name: 'Juan Pérez Hernández',
         phone: '+52 961 234 5678',
-        password: hashPassword('candidato1234'),
+        password: await hashPassword('candidato1234'),
         role: 'CANDIDATO',
         companyId: restaurantCompany.id,
         consentGiven: true,
@@ -122,7 +135,7 @@ export async function GET() {
         email: 'lucia.martinez@email.com',
         name: 'Lucía Martínez Torres',
         phone: '+52 961 345 6789',
-        password: hashPassword('candidato1234'),
+        password: await hashPassword('candidato1234'),
         role: 'CANDIDATO',
         companyId: restaurantCompany.id,
         consentGiven: true,
@@ -136,7 +149,7 @@ export async function GET() {
         email: 'pedro.sanchez@email.com',
         name: 'Pedro Sánchez Gómez',
         phone: '+52 961 456 7890',
-        password: hashPassword('candidato1234'),
+        password: await hashPassword('candidato1234'),
         role: 'CANDIDATO',
         companyId: retailCompany.id,
         consentGiven: true,

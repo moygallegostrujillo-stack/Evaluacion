@@ -1,16 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { getAuthFromHeaders } from '@/lib/auth'
 
-import crypto from 'crypto'
-
-function hashPassword(password: string): string {
-  return crypto.createHash('sha256').update(password).digest('hex')
-}
+import { hashPassword } from '@/lib/password'
 
 export async function GET(req: NextRequest) {
   try {
-    const companyId = req.nextUrl.searchParams.get('companyId')
-    const role = req.nextUrl.searchParams.get('role')
+    const auth = getAuthFromHeaders(req.headers)
+    if (!auth) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Derive companyId from auth; SUPER_ADMIN can optionally override
+    const companyId = auth.role === 'SUPER_ADMIN'
+      ? (req.nextUrl.searchParams.get('companyId') || auth.companyId)
+      : auth.companyId
 
     // Always filter for CANDIDATO role - the candidates tab shows candidates, not RH/GERENTE users
     const where: Record<string, unknown> = { ...(companyId ? { companyId } : {}), active: true, role: 'CANDIDATO' }
@@ -58,8 +62,18 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = getAuthFromHeaders(req.headers)
+    if (!auth) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const body = await req.json()
-    const { email, name, password, companyId, positionId } = body
+    const { email, name, password, positionId } = body
+
+    // Derive companyId from auth; SUPER_ADMIN can optionally override
+    const companyId = auth.role === 'SUPER_ADMIN'
+      ? (body.companyId || auth.companyId)
+      : auth.companyId
 
     if (!email || !name || !password || !companyId || !positionId) {
       return NextResponse.json({ error: 'All fields are required' }, { status: 400 })
@@ -74,7 +88,7 @@ export async function POST(req: NextRequest) {
       data: {
         email,
         name,
-        password: hashPassword(password),
+        password: await hashPassword(password),
         role: 'CANDIDATO',
         companyId,
         consentGiven: true,

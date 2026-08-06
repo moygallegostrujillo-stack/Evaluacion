@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { getAuthFromHeaders } from '@/lib/auth'
 
 // ============================================
 // SECTOR-SPECIFIC QUESTION BANKS
@@ -105,6 +106,11 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = getAuthFromHeaders(req.headers)
+    if (!auth) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { id } = await params
 
     const vacancy = await db.vacancy.findUnique({
@@ -114,6 +120,11 @@ export async function POST(
 
     if (!vacancy) {
       return NextResponse.json({ error: 'Vacancy not found' }, { status: 404 })
+    }
+
+    // Non-SUPER_ADMIN users can only generate questions for vacancies in their own company
+    if (auth.role !== 'SUPER_ADMIN' && vacancy.companyId !== auth.companyId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const sectorLabels: Record<string, string> = {

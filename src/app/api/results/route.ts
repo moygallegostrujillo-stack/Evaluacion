@@ -1,9 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { getAuthFromHeaders } from '@/lib/auth'
 
 export async function GET(req: NextRequest) {
   try {
-    const companyId = req.nextUrl.searchParams.get('companyId')
+    const auth = getAuthFromHeaders(req.headers)
+    if (!auth) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Derive companyId from auth; SUPER_ADMIN can optionally override
+    const companyId = auth.role === 'SUPER_ADMIN'
+      ? (req.nextUrl.searchParams.get('companyId') || auth.companyId)
+      : auth.companyId
     const candidateId = req.nextUrl.searchParams.get('candidateId')
     const resultId = req.nextUrl.searchParams.get('resultId')
     const compareIds = req.nextUrl.searchParams.get('compareIds')

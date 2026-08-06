@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { useAppStore, type EvaluationQuestion, type EvaluationTemplate } from '@/lib/store'
+import { apiFetch } from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
@@ -69,7 +70,7 @@ export default function EvaluationView() {
   useEffect(() => {
     if (!user?.id) return
     setLoading(true)
-    fetch(`/api/evaluations?candidateId=${user.id}`)
+    apiFetch(`/api/evaluations?candidateId=${user.id}`)
       .then(res => res.json())
       .then(data => {
         const activeSession = data.activeSession
@@ -112,7 +113,7 @@ export default function EvaluationView() {
   useEffect(() => {
     if (!sessionId || phase !== 'IN_PROGRESS') return
     const fetchTemplates = async () => {
-      const res = await fetch(`/api/evaluations?sessionId=${sessionId}`)
+      const res = await apiFetch(`/api/evaluations?sessionId=${sessionId}`)
       const data = await res.json()
       if (data.templates) {
         setTemplates(data.templates)
@@ -139,7 +140,7 @@ export default function EvaluationView() {
     if (!selectedPositionId || !user?.id) return
     setLoading(true)
     try {
-      const res = await fetch('/api/evaluations', {
+      const res = await apiFetch('/api/evaluations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -176,7 +177,7 @@ export default function EvaluationView() {
     if (!sessionId) return
     setLoading(true)
     try {
-      const res = await fetch('/api/evaluations', {
+      const res = await apiFetch('/api/evaluations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId, action: 'start' }),
@@ -204,7 +205,7 @@ export default function EvaluationView() {
 
     setLoading(true)
     try {
-      await fetch('/api/evaluations', {
+      await apiFetch('/api/evaluations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -221,7 +222,7 @@ export default function EvaluationView() {
       } else if (currentTemplateIndex < templates.length - 1) {
         const nextTemplateIdx = currentTemplateIndex + 1
         try {
-          const stepRes = await fetch('/api/evaluations', {
+          const stepRes = await apiFetch('/api/evaluations', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ sessionId, action: 'next-step' }),
@@ -253,7 +254,7 @@ export default function EvaluationView() {
   const handleComplete = async () => {
     if (!sessionId) return
     try {
-      await fetch('/api/evaluations', {
+      await apiFetch('/api/evaluations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId, action: 'complete' }),
@@ -636,7 +637,7 @@ export default function EvaluationView() {
               onClick={() => {
                 // Save consent to backend
                 if (user?.id) {
-                  fetch('/api/consent', {
+                  apiFetch('/api/consent', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ userId: user.id }),
@@ -882,7 +883,7 @@ function SessionReadyView({
 
   useEffect(() => {
     if (!sessionId) return
-    fetch(`/api/evaluations?sessionId=${sessionId}`)
+    apiFetch(`/api/evaluations?sessionId=${sessionId}`)
       .then(res => res.json())
       .then(data => {
         if (data.templates) {
@@ -913,7 +914,7 @@ function SessionReadyView({
   const handleStart = async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/evaluations', {
+      const res = await apiFetch('/api/evaluations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId, action: 'start' }),

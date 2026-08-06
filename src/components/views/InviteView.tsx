@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { useAppStore, type Position } from '@/lib/store'
+import { apiFetch } from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -37,7 +38,7 @@ export default function InviteView() {
   useEffect(() => {
     const params = new URLSearchParams()
     if (user?.companyId) params.set('companyId', user.companyId)
-    fetch(`/api/positions?${params.toString()}`)
+    apiFetch(`/api/positions?${params.toString()}`)
       .then(res => res.json())
       .then(data => setPositions(data.positions || []))
       .catch(console.error)
@@ -49,7 +50,7 @@ export default function InviteView() {
     setLoading(true)
     setSent(false)
     try {
-      const res = await fetch('/api/invite', {
+      const res = await apiFetch('/api/invite', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

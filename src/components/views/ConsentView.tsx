@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react'
 import { useAppStore } from '@/lib/store'
+import { apiFetch } from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -17,7 +18,7 @@ export default function ConsentView() {
     if (!accepted || !user) return
     setLoading(true)
     try {
-      await fetch('/api/consent', {
+      await apiFetch('/api/consent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user.id }),

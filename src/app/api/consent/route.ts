@@ -1,10 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { getAuthFromHeaders } from '@/lib/auth'
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = getAuthFromHeaders(req.headers)
+    if (!auth) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Derive userId from auth; SUPER_ADMIN can optionally specify a userId from body
     const body = await req.json()
-    const { userId } = body
+    const userId = auth.role === 'SUPER_ADMIN'
+      ? (body.userId || auth.userId)
+      : auth.userId
 
     if (!userId) {
       return NextResponse.json({ error: 'userId is required' }, { status: 400 })

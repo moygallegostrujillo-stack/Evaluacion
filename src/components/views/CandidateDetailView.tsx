@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { useAppStore, type CandidateResult } from '@/lib/store'
+import { apiFetch } from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -41,7 +42,7 @@ export default function CandidateDetailView() {
       return
     }
     setLoading(true)
-    fetch(`/api/results?resultId=${selectedResultId}`)
+    apiFetch(`/api/results?resultId=${selectedResultId}`)
       .then(res => res.json())
       .then(data => {
         const r = data.result || data
@@ -132,7 +133,7 @@ export default function CandidateDetailView() {
     setScheduleError('')
     setScheduleSuccess(false)
     try {
-      const res = await fetch('/api/interviews', {
+      const res = await apiFetch('/api/interviews', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

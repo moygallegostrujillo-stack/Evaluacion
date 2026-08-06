@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { getAuthFromHeaders } from '@/lib/auth'
 
 // ============================================
 // SLUG GENERATION
@@ -37,9 +38,16 @@ async function generateUniqueSlug(title: string): Promise<string> {
 
 export async function GET(req: NextRequest) {
   try {
-    const companyId = req.nextUrl.searchParams.get('companyId')
+    const auth = getAuthFromHeaders(req.headers)
+    if (!auth) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
-    // Super Admin (no companyId) sees all vacancies
+    // Derive companyId from auth; SUPER_ADMIN can optionally override
+    const companyId = auth.role === 'SUPER_ADMIN'
+      ? (req.nextUrl.searchParams.get('companyId') || auth.companyId)
+      : auth.companyId
+
     const where = companyId ? { companyId } : {}
 
     const vacancies = await db.vacancy.findMany({
@@ -107,8 +115,18 @@ interface CreateVacancyBody {
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = getAuthFromHeaders(req.headers)
+    if (!auth) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const body: CreateVacancyBody = await req.json()
-    const { title, description, sector, companyId, includePsicometrica, includePsicologica, maxVideoSeconds, questions } = body
+    const { title, description, sector, includePsicometrica, includePsicologica, maxVideoSeconds, questions } = body
+
+    // Derive companyId from auth; SUPER_ADMIN can optionally override
+    const companyId = auth.role === 'SUPER_ADMIN'
+      ? (body.companyId || auth.companyId)
+      : auth.companyId
 
     if (!title || !companyId) {
       return NextResponse.json({ error: 'title and companyId are required' }, { status: 400 })

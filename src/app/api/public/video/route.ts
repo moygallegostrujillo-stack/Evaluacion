@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import * as crypto from 'crypto'
-
-function hashPassword(password: string): string {
-  return crypto.createHash('sha256').update(password).digest('hex')
-}
+import { hashPassword } from '@/lib/password'
 
 // ============================================
 // POST - Mark video step complete via WhatsApp (no file storage)
@@ -144,7 +140,7 @@ export async function POST(req: NextRequest) {
           data: {
             email: application.candidateEmail,
             name: application.candidateName,
-            password: hashPassword(`candidate_${Date.now()}`),
+            password: await hashPassword(`candidate_${Date.now()}`),
             role: 'CANDIDATO',
             companyId,
             phone: application.candidatePhone,

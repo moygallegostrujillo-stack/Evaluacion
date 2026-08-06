@@ -979,12 +979,12 @@ export async function POST(req: NextRequest) {
             })
 
             if (!candidateUser) {
-              const crypto = await import('crypto')
+              const { hashPassword } = await import('@/lib/password')
               candidateUser = await db.user.create({
                 data: {
                   email: updatedApp.candidateEmail,
                   name: updatedApp.candidateName,
-                  password: crypto.createHash('sha256').update(`candidate_${Date.now()}`).digest('hex'),
+                  password: await hashPassword(`candidate_${Date.now()}`),
                   role: 'CANDIDATO',
                   companyId,
                   phone: updatedApp.candidatePhone,

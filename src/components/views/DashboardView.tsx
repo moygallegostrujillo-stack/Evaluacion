@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react'
 import { useAppStore, type CandidateResult } from '@/lib/store'
+import { apiFetch } from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -104,7 +105,7 @@ export default function DashboardView() {
       const params = new URLSearchParams()
       if (user?.companyId) params.set('companyId', user.companyId)
       if (user?.role) params.set('role', user.role)
-      const res = await fetch(`/api/dashboard?${params.toString()}`)
+      const res = await apiFetch(`/api/dashboard?${params.toString()}`)
       if (!res.ok) {
         console.error('Dashboard API error:', res.status)
         setData(null)

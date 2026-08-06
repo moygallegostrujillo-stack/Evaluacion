@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { useAppStore, type CandidateResult } from '@/lib/store'
+import { apiFetch } from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -23,7 +24,7 @@ export default function CompareView() {
   useEffect(() => {
     if (compareIds.length === 0) return
     let cancelled = false
-    fetch(`/api/results?compareIds=${compareIds.join(',')}`)
+    apiFetch(`/api/results?compareIds=${compareIds.join(',')}`)
       .then(res => res.json())
       .then(data => {
         if (!cancelled) {

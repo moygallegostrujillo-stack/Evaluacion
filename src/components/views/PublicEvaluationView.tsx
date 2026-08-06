@@ -16,6 +16,7 @@ import {
   AlertCircle, MessageCircle, Send, Shield, Info,
   ChevronRight, ListChecks
 } from 'lucide-react'
+import { apiFetch } from '@/lib/api'
 
 // ============================================
 // Types
@@ -130,7 +131,7 @@ export default function PublicEvaluationView() {
   useEffect(() => {
     if (!slug) return
     setLoading(true)
-    fetch(`/api/public/vacancy?slug=${encodeURIComponent(slug)}`)
+    apiFetch(`/api/public/vacancy?slug=${encodeURIComponent(slug)}`, { skipAuth: true })
       .then(res => res.json())
       .then(data => {
         if (data.error) {
@@ -163,7 +164,8 @@ export default function PublicEvaluationView() {
     const completedStep = sectionStepMap[currentSection]
     if (completedStep && applicationId) {
       try {
-        const res = await fetch('/api/public/apply', {
+        const res = await apiFetch('/api/public/apply', {
+          skipAuth: true,
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -209,7 +211,7 @@ export default function PublicEvaluationView() {
     try {
       // Always fetch questions fresh from the API using applicationId
       // The `data` param may come from advanceStep and won't have questions
-      const res = await fetch(`/api/public/apply?applicationId=${applicationId}`)
+      const res = await apiFetch(`/api/public/apply?applicationId=${applicationId}`, { skipAuth: true })
       const sectionData = await res.json()
 
       // If API returned an error, skip this section
@@ -254,7 +256,7 @@ export default function PublicEvaluationView() {
     if (!applicationId) return
     setLoading(true)
     try {
-      const res = await fetch(`/api/public/apply?applicationId=${applicationId}`)
+      const res = await apiFetch(`/api/public/apply?applicationId=${applicationId}`, { skipAuth: true })
       const data = await res.json()
       if (data.questions && data.questions.length > 0) {
         const sectionQuestions = data.questions.filter((q: QuestionData) => {
@@ -286,7 +288,7 @@ export default function PublicEvaluationView() {
   // ============================================
   const resumeApplication = useCallback(async (appId: string) => {
     try {
-      const res = await fetch(`/api/public/apply?applicationId=${appId}`)
+      const res = await apiFetch(`/api/public/apply?applicationId=${appId}`, { skipAuth: true })
       const data = await res.json()
       if (data.error) {
         setStep('vacancy-info')
@@ -315,7 +317,8 @@ export default function PublicEvaluationView() {
     if (!candidateName.trim() || !candidateEmail.trim() || !slug) return
     setLoading(true)
     try {
-      const res = await fetch('/api/public/apply', {
+      const res = await apiFetch('/api/public/apply', {
+        skipAuth: true,
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -351,7 +354,8 @@ export default function PublicEvaluationView() {
     // Save to backend
     if (applicationId) {
       const currentQuestion = questions[currentQIndex]
-      await fetch('/api/public/apply', {
+      await apiFetch('/api/public/apply', {
+        skipAuth: true,
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -398,7 +402,8 @@ export default function PublicEvaluationView() {
   const advanceStepWithId = async (completedStep: number, appId: string) => {
     setLoading(true)
     try {
-      const res = await fetch('/api/public/apply', {
+      const res = await apiFetch('/api/public/apply', {
+        skipAuth: true,
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

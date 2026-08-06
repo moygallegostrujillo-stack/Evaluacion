@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { useAppStore } from '@/lib/store'
+import { apiFetch } from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -38,7 +39,7 @@ export default function InterviewsView() {
     try {
       const params = new URLSearchParams()
       if (user?.companyId) params.set('companyId', user.companyId)
-      const res = await fetch(`/api/interviews?${params.toString()}`)
+      const res = await apiFetch(`/api/interviews?${params.toString()}`)
       const data = await res.json()
       const mapped = (data.interviews || []).map((int: any) => ({
         id: int.id,
@@ -69,7 +70,7 @@ export default function InterviewsView() {
   const handleStatusUpdate = async (interviewId: string, newStatus: string) => {
     setUpdatingId(interviewId)
     try {
-      const res = await fetch('/api/interviews', {
+      const res = await apiFetch('/api/interviews', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: interviewId, status: newStatus }),
@@ -89,7 +90,7 @@ export default function InterviewsView() {
   const handleViewCandidate = async (candidateId: string) => {
     // Find the latest evaluation result for this candidate
     try {
-      const res = await fetch(`/api/results?candidateId=${candidateId}`)
+      const res = await apiFetch(`/api/results?candidateId=${candidateId}`)
       const data = await res.json()
       const results = data.results || []
       if (results.length > 0) {

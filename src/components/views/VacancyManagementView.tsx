@@ -41,6 +41,7 @@ import {
   RefreshCw, ExternalLink, Sparkles, Loader2
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { apiFetch } from '@/lib/api'
 
 // ============================================
 // Types
@@ -181,7 +182,7 @@ export default function VacancyManagementView() {
     try {
       const params = new URLSearchParams()
       if (user?.companyId) params.set('companyId', user.companyId)
-      const res = await fetch(`/api/vacancies?${params.toString()}`)
+      const res = await apiFetch(`/api/vacancies?${params.toString()}`)
       const data = await res.json()
       if (data.vacancies) {
         setVacancies(data.vacancies)
@@ -213,8 +214,8 @@ export default function VacancyManagementView() {
     setDetailLoading(true)
     try {
       const [vacRes, appRes] = await Promise.all([
-        fetch(`/api/vacancies/${vacancyId}`),
-        fetch(`/api/vacancies/${vacancyId}/applications`),
+        apiFetch(`/api/vacancies/${vacancyId}`),
+        apiFetch(`/api/vacancies/${vacancyId}/applications`),
       ])
       const vacData = await vacRes.json()
       const appData = await appRes.json()
@@ -244,7 +245,7 @@ export default function VacancyManagementView() {
   const fetchCompanies = useCallback(async () => {
     if (user?.companyId) return // Not needed for regular users
     try {
-      const res = await fetch('/api/companies')
+      const res = await apiFetch('/api/companies')
       const data = await res.json()
       if (data.companies) {
         setCompanies(data.companies)
@@ -266,7 +267,7 @@ export default function VacancyManagementView() {
       return
     }
     try {
-      const res = await fetch('/api/vacancies', {
+      const res = await apiFetch('/api/vacancies', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -303,7 +304,7 @@ export default function VacancyManagementView() {
   const handleStatusChange = async (newStatus: string) => {
     if (!selectedVacancyId) return
     try {
-      const res = await fetch(`/api/vacancies/${selectedVacancyId}`, {
+      const res = await apiFetch(`/api/vacancies/${selectedVacancyId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),
@@ -365,7 +366,7 @@ export default function VacancyManagementView() {
     try {
       if (editingQuestion) {
         // Update
-        const res = await fetch(`/api/vacancies/${selectedVacancyId}/questions`, {
+        const res = await apiFetch(`/api/vacancies/${selectedVacancyId}/questions`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -383,7 +384,7 @@ export default function VacancyManagementView() {
         }
       } else {
         // Create
-        const res = await fetch(`/api/vacancies/${selectedVacancyId}/questions`, {
+        const res = await apiFetch(`/api/vacancies/${selectedVacancyId}/questions`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -409,7 +410,7 @@ export default function VacancyManagementView() {
   const handleDeleteQuestion = async () => {
     if (!selectedVacancyId || !deletingQuestionId) return
     try {
-      const res = await fetch(`/api/vacancies/${selectedVacancyId}/questions?questionId=${deletingQuestionId}&vacancyId=${selectedVacancyId}`, {
+      const res = await apiFetch(`/api/vacancies/${selectedVacancyId}/questions?questionId=${deletingQuestionId}&vacancyId=${selectedVacancyId}`, {
         method: 'DELETE',
       })
       const data = await res.json()
@@ -433,7 +434,7 @@ export default function VacancyManagementView() {
     if (!selectedVacancyId) return
     setGeneratingQuestions(true)
     try {
-      const res = await fetch(`/api/vacancies/${selectedVacancyId}/generate-questions`, {
+      const res = await apiFetch(`/api/vacancies/${selectedVacancyId}/generate-questions`, {
         method: 'POST',
       })
       const data = await res.json()
