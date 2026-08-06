@@ -80,11 +80,22 @@ async function main() {
   // ============================================
   // CREATE USERS
   // ============================================
+  const adminUser = await db.user.create({
+    data: {
+      email: 'admin@evaluhr.com',
+      name: 'Administrador EvaluHR',
+      password: hashPassword('admin123'),
+      role: 'SUPER_ADMIN',
+      phone: '+52 961 000 0000',
+      companyId: restaurantCompany.id,
+    },
+  })
+
   const rhUser = await db.user.create({
     data: {
       email: 'rh@cafedechiapas.com',
       name: 'Carolina Rivera',
-      password: hashPassword('demo123'),
+      password: hashPassword('rh1234'),
       role: 'RH',
       phone: '+52 961 111 2222',
       companyId: restaurantCompany.id,
@@ -95,7 +106,7 @@ async function main() {
     data: {
       email: 'gerente@cafedechiapas.com',
       name: 'Roberto Mendoza',
-      password: hashPassword('demo123'),
+      password: hashPassword('gerente1234'),
       role: 'GERENTE',
       phone: '+52 961 333 4444',
       companyId: restaurantCompany.id,
@@ -106,7 +117,7 @@ async function main() {
     data: {
       email: 'rh@marlui.com',
       name: 'Ana López',
-      password: hashPassword('demo123'),
+      password: hashPassword('rh1234'),
       role: 'RH',
       phone: '+52 961 555 6666',
       companyId: retailCompany.id,
@@ -118,7 +129,7 @@ async function main() {
     data: {
       email: 'juan.perez@email.com',
       name: 'Juan Pérez Hernández',
-      password: hashPassword('demo123'),
+      password: hashPassword('candidato1234'),
       role: 'CANDIDATO',
       phone: '+52 961 234 5678',
       companyId: restaurantCompany.id,
@@ -129,7 +140,7 @@ async function main() {
     data: {
       email: 'lucia.martinez@email.com',
       name: 'Lucía Martínez Torres',
-      password: hashPassword('demo123'),
+      password: hashPassword('candidato1234'),
       role: 'CANDIDATO',
       phone: '+52 961 345 6789',
       companyId: restaurantCompany.id,
@@ -140,7 +151,7 @@ async function main() {
     data: {
       email: 'pedro.sanchez@email.com',
       name: 'Pedro Sánchez Gómez',
-      password: hashPassword('demo123'),
+      password: hashPassword('candidato1234'),
       role: 'CANDIDATO',
       phone: '+52 961 456 7890',
       companyId: restaurantCompany.id,
@@ -151,7 +162,7 @@ async function main() {
     data: {
       email: 'maria.garcia@email.com',
       name: 'María García Ruiz',
-      password: hashPassword('demo123'),
+      password: hashPassword('candidato1234'),
       role: 'CANDIDATO',
       phone: '+52 961 567 8901',
       companyId: restaurantCompany.id,
@@ -162,7 +173,7 @@ async function main() {
     data: {
       email: 'carlos.lopez@email.com',
       name: 'Carlos López Díaz',
-      password: hashPassword('demo123'),
+      password: hashPassword('candidato1234'),
       role: 'CANDIDATO',
       phone: '+52 961 678 9012',
       companyId: restaurantCompany.id,
@@ -174,7 +185,7 @@ async function main() {
     data: {
       email: 'rosa.torres@email.com',
       name: 'Rosa Torres Vázquez',
-      password: hashPassword('demo123'),
+      password: hashPassword('candidato1234'),
       role: 'CANDIDATO',
       phone: '+52 961 789 0123',
       companyId: retailCompany.id,
@@ -185,13 +196,13 @@ async function main() {
     data: {
       email: 'miguel.hernandez@email.com',
       name: 'Miguel Hernández Flores',
-      password: hashPassword('demo123'),
+      password: hashPassword('candidato1234'),
       role: 'CANDIDATO',
       phone: '+52 961 890 1234',
       companyId: retailCompany.id,
     },
   })
-  console.log('✅ Users created (3 staff + 7 candidates)')
+  console.log('✅ Users created (1 admin + 3 staff + 7 candidates)')
 
   // ============================================
   // CREATE EVALUATION TEMPLATES + QUESTIONS

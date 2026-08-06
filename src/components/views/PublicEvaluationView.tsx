@@ -13,7 +13,8 @@ import { Checkbox } from '@/components/ui/checkbox'
 import {
   Briefcase, User, Mail, Phone, Calendar, ArrowRight,
   CheckCircle2, Clock, Brain, BookOpen, ClipboardList,
-  AlertCircle, MessageCircle, Send, Shield, Info
+  AlertCircle, MessageCircle, Send, Shield, Info,
+  ChevronRight, ListChecks
 } from 'lucide-react'
 
 // ============================================
@@ -46,7 +47,7 @@ interface QuestionData {
   vacancyQuestionId?: string
 }
 
-type PublicStep = 'loading' | 'vacancy-info' | 'candidate-data' | 'consent' | 'psicometrica' | 'psicologica' | 'conocimientos' | 'complete'
+type PublicStep = 'loading' | 'vacancy-info' | 'candidate-data' | 'consent' | 'section-intro' | 'psicometrica' | 'psicologica' | 'conocimientos' | 'complete'
 
 const LIKERT_OPTIONS = [
   { value: 1, label: 'Totalmente en desacuerdo' },
@@ -56,10 +57,28 @@ const LIKERT_OPTIONS = [
   { value: 5, label: 'Totalmente de acuerdo' },
 ]
 
-const STEP_LABELS: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
-  psicometrica: { label: 'Evaluación Psicométrica', icon: <Brain className="w-5 h-5" />, color: 'bg-violet-100 text-violet-700' },
-  psicologica: { label: 'Evaluación Psicológica', icon: <ClipboardList className="w-5 h-5" />, color: 'bg-sky-100 text-sky-700' },
-  conocimientos: { label: 'Conocimientos Técnicos', icon: <BookOpen className="w-5 h-5" />, color: 'bg-amber-100 text-amber-700' },
+const STEP_LABELS: Record<string, { label: string; icon: React.ReactNode; color: string; bgGradient: string; description: string }> = {
+  psicometrica: {
+    label: 'Evaluación Psicométrica',
+    icon: <Brain className="w-5 h-5" />,
+    color: 'bg-violet-100 text-violet-700',
+    bgGradient: 'from-violet-500 to-purple-600',
+    description: 'Test de personalidad Big Five — mide tu perfil de competencias y rasgos de personalidad.'
+  },
+  psicologica: {
+    label: 'Evaluación Psicológica',
+    icon: <ClipboardList className="w-5 h-5" />,
+    color: 'bg-sky-100 text-sky-700',
+    bgGradient: 'from-sky-500 to-blue-600',
+    description: 'Evalúa factores como estrés, empatía, adaptabilidad, liderazgo y trabajo en equipo.'
+  },
+  conocimientos: {
+    label: 'Conocimientos Técnicos',
+    icon: <BookOpen className="w-5 h-5" />,
+    color: 'bg-amber-100 text-amber-700',
+    bgGradient: 'from-amber-500 to-orange-600',
+    description: 'Preguntas específicas sobre el puesto para evaluar tu conocimiento técnico.'
+  },
 }
 
 export default function PublicEvaluationView() {
@@ -74,6 +93,8 @@ export default function PublicEvaluationView() {
   const [questions, setQuestions] = useState<QuestionData[]>([])
   const [currentQIndex, setCurrentQIndex] = useState(0)
   const [loading, setLoading] = useState(false)
+  // Track which section is being introduced (for section-intro step)
+  const [introSection, setIntroSection] = useState<string>('psicometrica')
 
   // Candidate data form
   const [candidateName, setCandidateName] = useState('')
@@ -134,9 +155,9 @@ export default function PublicEvaluationView() {
   const mapStepToView = (stepNum: number, data?: any) => {
     switch (stepNum) {
       case 0: setStep('candidate-data'); break
-      case 1: loadStepQuestions('psicometrica'); break
-      case 2: loadStepQuestions('psicologica'); break
-      case 3: loadStepQuestions('conocimientos'); break
+      case 1: goToSectionIntro('psicometrica', data); break
+      case 2: goToSectionIntro('psicologica', data); break
+      case 3: goToSectionIntro('conocimientos', data); break
       case 4: setStep('complete'); break
       case 5: setStep('complete'); break
       default: setStep('candidate-data')
@@ -144,7 +165,37 @@ export default function PublicEvaluationView() {
   }
 
   // ============================================
-  // Load questions for a step
+  // Go to section intro (splash before questions)
+  // ============================================
+  const goToSectionIntro = useCallback(async (section: string, data?: any) => {
+    if (!applicationId && !data) return
+    setLoading(true)
+    try {
+      const res = data
+        ? { json: () => Promise.resolve(data) }
+        : await fetch(`/api/public/apply?applicationId=${applicationId}`)
+      const sectionData = await res.json()
+      if (sectionData.questions && sectionData.questions.length > 0) {
+        const sectionQuestions = sectionData.questions.filter((q: QuestionData) => {
+          if (section === 'psicometrica') return q.category !== 'KNOWLEDGE' && (q.category === 'OPENNESS' || q.category === 'CONSCIENTIOUSNESS' || q.category === 'EXTRAVERSION' || q.category === 'AGREEABLENESS' || q.category === 'NEUROTICISM')
+          if (section === 'psicologica') return q.category === 'STRESS' || q.category === 'EMPATHY' || q.category === 'ADAPTABILITY' || q.category === 'LEADERSHIP' || q.category === 'TEAMWORK'
+          if (section === 'conocimientos') return q.category === 'KNOWLEDGE'
+          return false
+        })
+        setQuestions(sectionQuestions.length > 0 ? sectionQuestions : sectionData.questions)
+        setCurrentQIndex(0)
+        setIntroSection(section)
+        setStep('section-intro')
+      }
+    } catch (e) {
+      console.error('Error loading section intro', e)
+    } finally {
+      setLoading(false)
+    }
+  }, [applicationId])
+
+  // ============================================
+  // Load questions for a step (actual questions)
   // ============================================
   const loadStepQuestions = useCallback(async (section: string) => {
     if (!applicationId) return
@@ -313,6 +364,12 @@ export default function PublicEvaluationView() {
     return Math.round(((idx + questionProgress) / steps.length) * 100)
   }
 
+  // Get current evaluation section from step
+  const getCurrentSection = (): string => {
+    if (step === 'psicometrica' || step === 'psicologica' || step === 'conocimientos') return step
+    return ''
+  }
+
   // ============================================
   // RENDER
   // ============================================
@@ -359,13 +416,37 @@ export default function PublicEvaluationView() {
         </div>
       </div>
 
-      {/* Progress bar */}
-      {step !== 'vacancy-info' && step !== 'loading' && step !== 'complete' && (
-        <div className="max-w-2xl mx-auto px-4 mt-4">
-          <Progress value={getProgressPercent()} className="h-2" />
-          <div className="flex justify-between mt-1">
-            <span className="text-xs text-gray-400">Progreso</span>
-            <span className="text-xs text-gray-400">{getProgressPercent()}%</span>
+      {/* Progress bar - show during evaluation steps */}
+      {(getCurrentSection() || step === 'section-intro') && questions.length > 0 && (
+        <div className="bg-white border-b border-gray-100">
+          <div className="max-w-2xl mx-auto px-4 py-3">
+            {/* Evaluation type badge */}
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${STEP_LABELS[introSection || getCurrentSection()]?.color || 'bg-gray-100'}`}>
+                  {STEP_LABELS[introSection || getCurrentSection()]?.icon || <BookOpen className="w-4 h-4" />}
+                </div>
+                <span className="text-sm font-semibold text-gray-800">
+                  {STEP_LABELS[introSection || getCurrentSection()]?.label || 'Evaluación'}
+                </span>
+              </div>
+              {getCurrentSection() && (
+                <span className="text-sm font-bold text-emerald-600">
+                  {currentQIndex + 1} de {questions.length}
+                </span>
+              )}
+            </div>
+            {/* Progress bar */}
+            <Progress
+              value={getCurrentSection() ? ((currentQIndex + 1) / questions.length) * 100 : 0}
+              className="h-2"
+            />
+            {getCurrentSection() && (
+              <div className="flex justify-between mt-1">
+                <span className="text-xs text-gray-400">Pregunta {currentQIndex + 1}</span>
+                <span className="text-xs text-gray-400">{Math.round(((currentQIndex + 1) / questions.length) * 100)}% de esta sección</span>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -374,6 +455,24 @@ export default function PublicEvaluationView() {
         {/* ===================== VACANCY INFO ===================== */}
         {step === 'vacancy-info' && vacancy && (
           <div className="space-y-6">
+            {/* Intro message about what this link is about */}
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-5 space-y-3">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                  <Info className="w-5 h-5 text-emerald-600" />
+                </div>
+                <div>
+                  <h2 className="font-bold text-emerald-900 text-lg">Proceso de Evaluación Laboral</h2>
+                  <p className="text-sm text-emerald-700 mt-1">
+                    Has sido invitado/a a participar en el proceso de evaluación para el puesto de <strong>{vacancy.title}</strong> en <strong>{vacancy.company || vacancy.companyName}</strong>.
+                  </p>
+                </div>
+              </div>
+              <p className="text-sm text-emerald-800 pl-13">
+                Este proceso incluye evaluaciones que nos ayudan a conocer tu perfil profesional. Tus respuestas son <strong>confidenciales</strong> y serán utilizadas exclusivamente para el proceso de selección.
+              </p>
+            </div>
+
             <div className="text-center">
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white mb-4">
                 <Briefcase className="w-8 h-8" />
@@ -387,7 +486,7 @@ export default function PublicEvaluationView() {
 
             <Card className="shadow-lg border-0">
               <CardContent className="p-6">
-                <h3 className="font-semibold mb-4">Proceso de evaluación</h3>
+                <h3 className="font-semibold mb-4">¿Qué incluye la evaluación?</h3>
                 <div className="space-y-3">
                   {vacancy.includePsicometrica !== false && (
                     <div className="flex items-center gap-3">
@@ -458,17 +557,185 @@ export default function PublicEvaluationView() {
           </Card>
         )}
 
+        {/* ===================== CONSENT STEP ===================== */}
+        {step === 'consent' && (
+          <div className="space-y-6">
+            <div className="text-center">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white mb-4">
+                <Shield className="w-8 h-8" />
+              </div>
+              <h2 className="text-2xl font-bold">Consentimiento Informado</h2>
+              <p className="text-gray-500 mt-1">Antes de comenzar, necesitamos tu consentimiento</p>
+            </div>
+
+            <Card className="shadow-lg border-0 border-2 border-emerald-200">
+              <CardContent className="p-6 space-y-4">
+                <div className="bg-amber-50 p-4 rounded-lg border border-amber-200 space-y-3">
+                  <p className="text-sm text-amber-900 font-medium">
+                    Está a punto de realizar una evaluación que incluye pruebas psicométricas, psicológicas y de conocimientos.
+                  </p>
+                  <p className="text-sm text-amber-800">
+                    Los resultados serán utilizados exclusivamente para el proceso de selección laboral.
+                  </p>
+                  <div className="flex items-start gap-2 bg-amber-100/50 p-2 rounded-md">
+                    <Info className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-amber-700">
+                      Sus datos son considerados <strong>Datos Personales Sensibles</strong> conforme a la LFPDPPP (Ley Federal de Protección de Datos Personales en Posesión de los Particulares) y la NOM-035-STPS-2018.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-700 space-y-3 max-h-48 overflow-y-auto">
+                  <p className="font-semibold">AVISO DE PRIVACIDAD Y CONSENTIMIENTO</p>
+                  <p>
+                    De conformidad con la Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP), se le informa que sus datos personales serán tratados de manera confidencial.
+                  </p>
+                  <p><strong>Datos que se recopilan:</strong></p>
+                  <ul className="list-disc list-inside space-y-1 ml-2">
+                    <li>Nombre completo y correo electrónico</li>
+                    <li>Respuestas a evaluaciones psicométricas y psicológicas</li>
+                    <li>Resultados de evaluaciones de conocimientos</li>
+                  </ul>
+                  <p><strong>Finalidad:</strong></p>
+                  <ul className="list-disc list-inside space-y-1 ml-2">
+                    <li>Realizar pre-evaluaciones para procesos de reclutamiento</li>
+                    <li>Generar perfiles de competencias y recomendaciones</li>
+                    <li>Facilitar el proceso de selección laboral</li>
+                  </ul>
+                  <p><strong>Base legal:</strong></p>
+                  <ul className="list-disc list-inside space-y-1 ml-2">
+                    <li>LFPDPPP Art. 8: Consentimiento expreso para datos sensibles</li>
+                    <li>NOM-035-STPS-2018: Factores de riesgo psicosocial</li>
+                    <li>LFT Art. 132: Obligaciones del patrón</li>
+                  </ul>
+                  <p><strong>Sus derechos ARCO:</strong> Acceder, Rectificar, Cancelar y Oponerse al tratamiento de sus datos.</p>
+                  <p className="text-xs text-gray-500">
+                    Responsable: {vacancy?.companyName || 'La empresa correspondiente'} — Tuxtla Gutiérrez, Chiapas, México
+                  </p>
+                </div>
+
+                <div className="flex items-start space-x-3 bg-emerald-50 p-3 rounded-lg border border-emerald-200">
+                  <Checkbox
+                    id="consent-public"
+                    checked={consentAccepted}
+                    onCheckedChange={(checked) => setConsentAccepted(checked as boolean)}
+                    className="mt-0.5"
+                  />
+                  <label htmlFor="consent-public" className="text-sm text-emerald-900 cursor-pointer leading-tight">
+                    Acepto que mis respuestas serán tratadas como datos personales sensibles y consiento someterme a esta evaluación de forma voluntaria. Entiendo que los resultados serán confidenciales y utilizados solo para el proceso de selección.
+                  </label>
+                </div>
+
+                <Button
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-lg py-6"
+                  disabled={!consentAccepted || loading}
+                  onClick={async () => {
+                    setLoading(true)
+                    try {
+                      // Advance to first evaluation step
+                      await advanceStepWithId(0, applicationId!)
+                    } catch {
+                      console.error('Error advancing after consent')
+                    } finally {
+                      setLoading(false)
+                    }
+                  }}
+                >
+                  Aceptar y Comenzar <ArrowRight className="w-5 h-5 ml-2" />
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* ===================== SECTION INTRO ===================== */}
+        {step === 'section-intro' && questions.length > 0 && (
+          <div className="space-y-6">
+            <div className="text-center">
+              <div className={`inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br ${STEP_LABELS[introSection]?.bgGradient || 'from-emerald-500 to-teal-600'} text-white mb-4 shadow-lg`}>
+                {STEP_LABELS[introSection]?.icon || <BookOpen className="w-10 h-10" />}
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900">
+                {STEP_LABELS[introSection]?.label || 'Evaluación'}
+              </h2>
+              <p className="text-gray-500 mt-2 max-w-md mx-auto">
+                {STEP_LABELS[introSection]?.description || ''}
+              </p>
+            </div>
+
+            <Card className="shadow-lg border-0">
+              <CardContent className="p-6 space-y-4">
+                {/* Question count highlight */}
+                <div className="bg-gray-50 rounded-xl p-5 text-center space-y-2">
+                  <div className="flex items-center justify-center gap-2 mb-1">
+                    <ListChecks className="w-5 h-5 text-emerald-600" />
+                    <span className="text-sm font-semibold text-gray-700">Total de preguntas</span>
+                  </div>
+                  <div className="text-4xl font-bold text-emerald-600">
+                    {questions.length}
+                  </div>
+                  <p className="text-sm text-gray-500">
+                    {questions.length === 1 ? 'pregunta' : 'preguntas'} a responder
+                  </p>
+                </div>
+
+                {/* Info about the evaluation */}
+                <div className="bg-amber-50 rounded-lg p-4 border border-amber-200 space-y-2">
+                  <div className="flex items-start gap-2">
+                    <Info className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                    <div className="text-sm text-amber-800 space-y-1">
+                      <p><strong>Responde con honestidad.</strong> No hay respuestas correctas o incorrectas en las evaluaciones psicométricas y psicológicas.</p>
+                      {introSection === 'conocimientos' && (
+                        <p>En esta sección, selecciona la respuesta que consideres correcta para cada pregunta.</p>
+                      )}
+                      <p>Tus respuestas son <strong>confidenciales</strong> y solo serán revisadas por Recursos Humanos.</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Type of questions */}
+                <div className="flex items-center gap-3 text-sm text-gray-600">
+                  <Badge variant="outline" className="text-xs">
+                    {questions[0]?.type === 'LIKERT' ? 'Escala Likert (1-5)' : questions[0]?.type === 'MULTIPLE_CHOICE' ? 'Opción múltiple' : questions[0]?.type}
+                  </Badge>
+                  <span>•</span>
+                  <span>Avanza a tu ritmo</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Button
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-lg py-6"
+              onClick={() => {
+                setStep(introSection as PublicStep)
+              }}
+              disabled={loading}
+            >
+              Comenzar <ArrowRight className="w-5 h-5 ml-2" />
+            </Button>
+          </div>
+        )}
+
         {/* ===================== EVALUATION STEPS ===================== */}
         {(step === 'psicometrica' || step === 'psicologica' || step === 'conocimientos') && questions.length > 0 && (
           <div className="space-y-6">
-            {/* Step header */}
-            <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${STEP_LABELS[step]?.color || 'bg-gray-100'}`}>
-                {STEP_LABELS[step]?.icon || <BookOpen className="w-5 h-5" />}
+            {/* Step header with prominent counter */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${STEP_LABELS[step]?.color || 'bg-gray-100'}`}>
+                  {STEP_LABELS[step]?.icon || <BookOpen className="w-5 h-5" />}
+                </div>
+                <div>
+                  <h2 className="font-bold text-lg">{STEP_LABELS[step]?.label || 'Evaluación'}</h2>
+                  <p className="text-xs text-gray-500">Responde con honestidad</p>
+                </div>
               </div>
-              <div>
-                <h2 className="font-bold text-lg">{STEP_LABELS[step]?.label || 'Evaluación'}</h2>
-                <p className="text-xs text-gray-500">Pregunta {currentQIndex + 1} de {questions.length}</p>
+              {/* Prominent question counter badge */}
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2 text-center">
+                <p className="text-xs text-emerald-600 font-medium">Pregunta</p>
+                <p className="text-lg font-bold text-emerald-700">
+                  {currentQIndex + 1}<span className="text-emerald-400 font-normal">/{questions.length}</span>
+                </p>
               </div>
             </div>
 
@@ -533,91 +800,6 @@ export default function PublicEvaluationView() {
               {loading ? 'Guardando...' : currentQIndex < questions.length - 1 ? 'Siguiente' : 'Continuar'}
               <ArrowRight className="w-4 h-4 ml-1" />
             </Button>
-          </div>
-        )}
-
-        {/* ===================== CONSENT STEP ===================== */}
-        {step === 'consent' && (
-          <div className="space-y-6">
-            <div className="text-center">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white mb-4">
-                <Shield className="w-8 h-8" />
-              </div>
-              <h2 className="text-2xl font-bold">Consentimiento Informado</h2>
-              <p className="text-gray-500 mt-1">Antes de comenzar, necesitamos tu consentimiento</p>
-            </div>
-
-            <Card className="shadow-lg border-0 border-2 border-emerald-200">
-              <CardContent className="p-6 space-y-4">
-                <div className="bg-amber-50 p-4 rounded-lg border border-amber-200 space-y-3">
-                  <p className="text-sm text-amber-900 font-medium">
-                    Está a punto de realizar una evaluación que incluye pruebas psicométricas, psicológicas y de conocimientos.
-                  </p>
-                  <p className="text-sm text-amber-800">
-                    Los resultados serán utilizados exclusivamente para el proceso de selección laboral.
-                  </p>
-                  <div className="flex items-start gap-2 bg-amber-100/50 p-2 rounded-md">
-                    <Info className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                    <p className="text-xs text-amber-700">
-                      Sus datos son considerados <strong>Datos Personales Sensibles</strong> conforme a la LFPDPPP y la NOM-035-STPS-2018.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-700 space-y-3 max-h-48 overflow-y-auto">
-                  <p className="font-semibold">AVISO DE PRIVACIDAD</p>
-                  <p>
-                    De conformidad con la LFPDPPP, se le informa que sus datos personales serán tratados de manera confidencial.
-                  </p>
-                  <p><strong>Datos que se recopilan:</strong></p>
-                  <ul className="list-disc list-inside space-y-1 ml-2">
-                    <li>Nombre completo y correo electrónico</li>
-                    <li>Respuestas a evaluaciones psicométricas y psicológicas</li>
-                    <li>Resultados de evaluaciones de conocimientos</li>
-                  </ul>
-                  <p><strong>Finalidad:</strong></p>
-                  <ul className="list-disc list-inside space-y-1 ml-2">
-                    <li>Realizar pre-evaluaciones para procesos de reclutamiento</li>
-                    <li>Generar perfiles de competencias y recomendaciones</li>
-                    <li>Facilitar el proceso de selección laboral</li>
-                  </ul>
-                  <p><strong>Sus derechos ARCO:</strong> Acceder, Rectificar, Cancelar y Oponerse al tratamiento de sus datos.</p>
-                  <p className="text-xs text-gray-500">
-                    Responsable: {vacancy?.companyName || 'La empresa correspondiente'} — Tuxtla Gutiérrez, Chiapas, México
-                  </p>
-                </div>
-
-                <div className="flex items-start space-x-3 bg-emerald-50 p-3 rounded-lg border border-emerald-200">
-                  <Checkbox
-                    id="consent-public"
-                    checked={consentAccepted}
-                    onCheckedChange={(checked) => setConsentAccepted(checked as boolean)}
-                    className="mt-0.5"
-                  />
-                  <label htmlFor="consent-public" className="text-sm text-emerald-900 cursor-pointer leading-tight">
-                    Acepto que mis respuestas serán tratadas como datos personales sensibles y consiento someterme a esta evaluación de forma voluntaria.
-                  </label>
-                </div>
-
-                <Button
-                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-lg py-6"
-                  disabled={!consentAccepted || loading}
-                  onClick={async () => {
-                    setLoading(true)
-                    try {
-                      // Advance to first evaluation step
-                      await advanceStepWithId(0, applicationId!)
-                    } catch {
-                      console.error('Error advancing after consent')
-                    } finally {
-                      setLoading(false)
-                    }
-                  }}
-                >
-                  Aceptar y Comenzar <ArrowRight className="w-5 h-5 ml-2" />
-                </Button>
-              </CardContent>
-            </Card>
           </div>
         )}
 
