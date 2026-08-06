@@ -108,19 +108,19 @@ function calculateScores(
     }
   }
 
-  // Overall score
+  // Overall score (unified weights: 30/30/40 with knowledge, 50/50 without)
   let overallScore: number
   if (hasKnowledgeTest && knowledgeScore !== null) {
-    overallScore = 0.25 * avgBigFive + 0.40 * avgPsychological + 0.35 * knowledgeScore
+    overallScore = 0.30 * avgBigFive + 0.30 * avgPsychological + 0.40 * knowledgeScore
   } else {
-    overallScore = 0.40 * avgBigFive + 0.60 * avgPsychological
+    overallScore = 0.50 * avgBigFive + 0.50 * avgPsychological
   }
 
-  // Recommendation
+  // Recommendation (unified thresholds: ≥70 APTO, ≥50 ENTREVISTA, <50 NO_RECOMENDADO)
   let recommendation: string
   if (overallScore >= 70) {
     recommendation = 'APTO'
-  } else if (overallScore >= 40) {
+  } else if (overallScore >= 50) {
     recommendation = 'ENTREVISTA_ADICIONAL'
   } else {
     recommendation = 'NO_RECOMENDADO'

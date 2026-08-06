@@ -550,10 +550,12 @@ export async function GET(req: NextRequest) {
         applicationId: application.id,
         questions: systemQuestions.bigFiveQuestions.map((q) => ({
           id: q.id,
+          questionId: q.id,  // Include questionId so frontend can pass it back for proper upsert
           text: q.text,
           type: q.type,
           category: q.category,
           reverseScored: q.reverseScored,
+          order: q.order,
           options: [
             'Totalmente en desacuerdo',
             'En desacuerdo',
@@ -574,10 +576,12 @@ export async function GET(req: NextRequest) {
         applicationId: application.id,
         questions: systemQuestions.psychologicalQuestions.map((q) => ({
           id: q.id,
+          questionId: q.id,  // Include questionId so frontend can pass it back for proper upsert
           text: q.text,
           type: q.type,
           category: q.category,
           reverseScored: q.reverseScored,
+          order: q.order,
           options: [
             'Totalmente en desacuerdo',
             'En desacuerdo',

@@ -213,6 +213,56 @@ export default function CandidateDetailView() {
         </CardContent>
       </Card>
 
+      {/* Scoring Criteria Explanation */}
+      <Card className="shadow-sm border-blue-200 bg-blue-50/30">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg">📋 Criterios de Evaluación</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm space-y-3">
+          <div>
+            <p className="font-semibold text-gray-700 mb-1">Puntaje General se calcula con:</p>
+            {result.knowledgeScore !== null && result.knowledgeScore > 0 ? (
+              <ul className="list-disc pl-5 text-gray-600 space-y-0.5">
+                <li><strong>30%</strong> Evaluación Psicométrica (Big Five)</li>
+                <li><strong>30%</strong> Evaluación Psicológica</li>
+                <li><strong>40%</strong> Prueba de Conocimientos</li>
+              </ul>
+            ) : (
+              <ul className="list-disc pl-5 text-gray-600 space-y-0.5">
+                <li><strong>50%</strong> Evaluación Psicométrica (Big Five)</li>
+                <li><strong>50%</strong> Evaluación Psicológica</li>
+              </ul>
+            )}
+          </div>
+          <Separator />
+          <div>
+            <p className="font-semibold text-gray-700 mb-1">Recomendación según puntaje:</p>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                <span><strong>≥ 70</strong> → <Badge className="bg-emerald-100 text-emerald-700">Apto</Badge> Aceptado directamente</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-amber-500" />
+                <span><strong>50 - 69</strong> → <Badge className="bg-amber-100 text-amber-700">Entrevista Adicional</Badge> Requiere entrevista presencial</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-red-500" />
+                <span><strong>&lt; 50</strong> → <Badge className="bg-red-100 text-red-700">No Recomendado</Badge> No se recomienda para el puesto</span>
+              </div>
+            </div>
+          </div>
+          <Separator />
+          <div>
+            <p className="font-semibold text-gray-700 mb-1">Reglas especiales:</p>
+            <ul className="list-disc pl-5 text-gray-600 space-y-0.5">
+              <li>Roles de servicio (Mesero, Bartender, Vendedor): Si <strong>Empatía &lt; 40</strong> y <strong>Trabajo en Equipo &lt; 40</strong> → No Recomendado</li>
+              <li>Estrés alto (&gt;80): Si era Apto → baja a Entrevista Adicional</li>
+            </ul>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Radar Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Big Five */}
