@@ -12,11 +12,8 @@ export async function GET(req: NextRequest) {
     const companyId = req.nextUrl.searchParams.get('companyId')
     const role = req.nextUrl.searchParams.get('role')
 
-    // Super Admin (no companyId) sees all candidates
-    const where: Record<string, unknown> = { ...(companyId ? { companyId } : {}), active: true }
-    if (role) {
-      where.role = role
-    }
+    // Always filter for CANDIDATO role - the candidates tab shows candidates, not RH/GERENTE users
+    const where: Record<string, unknown> = { ...(companyId ? { companyId } : {}), active: true, role: 'CANDIDATO' }
 
     const candidates = await db.user.findMany({
       where,

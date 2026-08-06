@@ -67,7 +67,7 @@ export default function CandidateDetailView() {
 
   const scoresBarData = [
     { name: 'Big Five', puntaje: Math.round((result.openness + result.conscientiousness + result.extraversion + result.agreeableness + (100 - result.neuroticism)) / 5) },
-    { name: 'Psicológica', puntaje: Math.round(((100 - result.stressLevel) + result.empathy + result.adaptability + result.leadership + result.teamwork) / 5) },
+    { name: 'Psicológica', puntaje: Math.round((result.stressLevel + result.empathy + result.adaptability + result.leadership + result.teamwork) / 5) },
     ...(result.knowledgeScore !== null && result.knowledgeScore !== undefined
       ? [{ name: 'Conocimientos', puntaje: Math.round(result.knowledgeScore) }]
       : []),

@@ -27,7 +27,14 @@ export default function CompareView() {
       .then(res => res.json())
       .then(data => {
         if (!cancelled) {
-          setResults(data.results || [])
+          // API returns { comparison: { candidates: [...] } } with scores nested inside
+          const candidates = data.comparison?.candidates || []
+          // Flatten scores from nested object to top-level for component compatibility
+          const flattened = candidates.map((c: any) => ({
+            ...c,
+            ...(c.scores || {}),
+          }))
+          setResults(flattened)
           setLoading(false)
         }
       })
