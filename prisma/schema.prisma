@@ -3,9 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
+  provider  = "sqlite"
   url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
 }
 
 model Company {
@@ -70,6 +69,7 @@ model Position {
   invitations         CandidateInvitation[]
   sessions            EvaluationSession[]
   results             EvaluationResult[]
+  interviews          InterviewSchedule[]
 }
 
 model EvaluationTemplate {
@@ -210,8 +210,9 @@ model InterviewSchedule {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  candidate User    @relation("InterviewCandidate", fields: [candidateId], references: [id])
-  company   Company @relation(fields: [companyId], references: [id])
+  candidate User     @relation("InterviewCandidate", fields: [candidateId], references: [id])
+  company   Company  @relation(fields: [companyId], references: [id])
+  position  Position? @relation(fields: [positionId], references: [id])
 }
 
 model Vacancy {

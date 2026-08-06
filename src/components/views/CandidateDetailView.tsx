@@ -9,22 +9,31 @@ import { Progress } from '@/components/ui/progress'
 import { Separator } from '@/components/ui/separator'
 import {
   ArrowLeft, CheckCircle2, AlertTriangle, XCircle,
-  Calendar, MapPin, FileText
+  Calendar, MapPin, FileText, Mail, Phone, User
 } from 'lucide-react'
 import {
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip
 } from 'recharts'
 
+interface CandidateContact {
+  email?: string
+  phone?: string
+}
+
 export default function CandidateDetailView() {
   const selectedResultId = useAppStore((s) => s.selectedResultId)
   const setCurrentView = useAppStore((s) => s.setCurrentView)
   const user = useAppStore((s) => s.user)
+  const setSelectedResultId = useAppStore((s) => s.setSelectedResultId)
   const [result, setResult] = useState<CandidateResult | null>(null)
+  const [candidateContact, setCandidateContact] = useState<CandidateContact>({})
   const [loading, setLoading] = useState(true)
   const [interviewDate, setInterviewDate] = useState('')
   const [interviewLocation, setInterviewLocation] = useState('')
   const [scheduling, setScheduling] = useState(false)
+  const [scheduleSuccess, setScheduleSuccess] = useState(false)
+  const [scheduleError, setScheduleError] = useState('')
 
   useEffect(() => {
     if (!selectedResultId) {
@@ -35,7 +44,15 @@ export default function CandidateDetailView() {
     fetch(`/api/results?resultId=${selectedResultId}`)
       .then(res => res.json())
       .then(data => {
-        setResult(data.result || data)
+        const r = data.result || data
+        setResult(r)
+        // Extract candidate contact info from the API response
+        if (r.candidate) {
+          setCandidateContact({
+            email: r.candidate.email || '',
+            phone: r.candidate.phone || '',
+          })
+        }
       })
       .catch(console.error)
       .finally(() => setLoading(false))
@@ -107,10 +124,15 @@ export default function CandidateDetailView() {
   }
 
   const handleScheduleInterview = async () => {
-    if (!interviewDate || !user?.companyId) return
+    if (!interviewDate || !user?.companyId) {
+      setScheduleError('Fecha y empresa son requeridas')
+      return
+    }
     setScheduling(true)
+    setScheduleError('')
+    setScheduleSuccess(false)
     try {
-      await fetch('/api/interviews', {
+      const res = await fetch('/api/interviews', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -118,15 +140,21 @@ export default function CandidateDetailView() {
           companyId: user.companyId,
           positionId: result.positionId,
           scheduledAt: interviewDate,
-          location: interviewLocation,
+          location: interviewLocation || 'Oficina principal',
           notes: '',
         }),
       })
+      const data = await res.json()
+      if (!res.ok) {
+        setScheduleError(data.error || 'Error al programar la entrevista')
+        return
+      }
+      setScheduleSuccess(true)
       setInterviewDate('')
       setInterviewLocation('')
-      alert('Entrevista programada exitosamente. El candidato será notificado.')
     } catch (e) {
       console.error('Error scheduling interview', e)
+      setScheduleError('Error de conexión al programar la entrevista')
     } finally {
       setScheduling(false)
     }
@@ -156,18 +184,33 @@ export default function CandidateDetailView() {
         </Button>
       </div>
 
-      {/* Profile Card */}
+      {/* Profile Card with Contact Info */}
       <Card className="shadow-sm">
         <CardContent className="p-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-2xl">
+            <div className="flex items-start gap-4">
+              <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-2xl shrink-0">
                 {result.candidateName?.charAt(0) || '?'}
               </div>
-              <div>
+              <div className="space-y-1">
                 <h1 className="text-xl font-bold">{result.candidateName}</h1>
                 <p className="text-gray-500">Postulación: {result.positionTitle}</p>
                 <p className="text-xs text-gray-400">{new Date(result.createdAt).toLocaleDateString('es-MX')}</p>
+                {/* Contact Info */}
+                <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
+                  {candidateContact.email && (
+                    <div className="flex items-center gap-1 text-sm text-gray-600">
+                      <Mail className="w-3.5 h-3.5 text-gray-400" />
+                      <span>{candidateContact.email}</span>
+                    </div>
+                  )}
+                  {candidateContact.phone && (
+                    <div className="flex items-center gap-1 text-sm text-gray-600">
+                      <Phone className="w-3.5 h-3.5 text-gray-400" />
+                      <span>{candidateContact.phone}</span>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
             <div className={`p-3 rounded-lg border ${getRecColor(result.recommendation)}`}>
@@ -180,6 +223,46 @@ export default function CandidateDetailView() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Prospect Contact Card */}
+      {(candidateContact.email || candidateContact.phone) && (
+        <Card className="shadow-sm border-emerald-200 bg-emerald-50/30">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <User className="w-5 h-5 text-emerald-600" /> Datos de Contacto del Prospecto
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {candidateContact.email && (
+                <div className="flex items-center gap-3 p-3 bg-white rounded-lg border">
+                  <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
+                    <Mail className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Correo electrónico</p>
+                    <p className="font-medium text-sm">{candidateContact.email}</p>
+                  </div>
+                </div>
+              )}
+              {candidateContact.phone && (
+                <div className="flex items-center gap-3 p-3 bg-white rounded-lg border">
+                  <div className="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center">
+                    <Phone className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Teléfono</p>
+                    <p className="font-medium text-sm">{candidateContact.phone}</p>
+                  </div>
+                </div>
+              )}
+              {!candidateContact.phone && !candidateContact.email && (
+                <p className="text-sm text-gray-500 col-span-2">No hay datos de contacto registrados para este prospecto.</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Summary */}
       {result.summary && (
@@ -343,12 +426,31 @@ export default function CandidateDetailView() {
             <p className="text-sm text-gray-500 mb-4">
               Este candidato requiere una entrevista adicional. Programe una fecha y se le notificará.
             </p>
+
+            {/* Show prospect info for the interview */}
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+              <p className="text-sm font-medium text-amber-800 mb-2">Datos del prospecto:</p>
+              <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-amber-700">
+                <span className="font-medium">{result.candidateName}</span>
+                {candidateContact.email && (
+                  <span className="flex items-center gap-1">
+                    <Mail className="w-3.5 h-3.5" /> {candidateContact.email}
+                  </span>
+                )}
+                {candidateContact.phone && (
+                  <span className="flex items-center gap-1">
+                    <Phone className="w-3.5 h-3.5" /> {candidateContact.phone}
+                  </span>
+                )}
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="text-sm font-medium text-gray-700 block mb-1">Fecha y hora</label>
                 <input
                   type="datetime-local"
-                  className="w-full p-2 border rounded-lg text-sm"
+                  className="w-full p-2 border rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
                   value={interviewDate}
                   onChange={(e) => setInterviewDate(e.target.value)}
                 />
@@ -360,13 +462,30 @@ export default function CandidateDetailView() {
                   <input
                     type="text"
                     placeholder="Ej: Oficina principal, sala 3"
-                    className="w-full p-2 pl-8 border rounded-lg text-sm"
+                    className="w-full p-2 pl-8 border rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
                     value={interviewLocation}
                     onChange={(e) => setInterviewLocation(e.target.value)}
                   />
                 </div>
               </div>
             </div>
+
+            {/* Success message */}
+            {scheduleSuccess && (
+              <div className="mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-2 text-sm text-emerald-700">
+                <CheckCircle2 className="w-4 h-4" />
+                Entrevista programada exitosamente. El candidato será notificado.
+              </div>
+            )}
+
+            {/* Error message */}
+            {scheduleError && (
+              <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-sm text-red-700">
+                <XCircle className="w-4 h-4" />
+                {scheduleError}
+              </div>
+            )}
+
             <Button
               className="mt-4 bg-amber-600 hover:bg-amber-700"
               onClick={handleScheduleInterview}

@@ -15,6 +15,9 @@ export async function GET(req: NextRequest) {
         candidate: {
           select: { id: true, name: true, email: true, phone: true },
         },
+        position: {
+          select: { id: true, title: true, category: true },
+        },
       },
     })
 
@@ -46,7 +49,10 @@ export async function POST(req: NextRequest) {
       },
       include: {
         candidate: {
-          select: { id: true, name: true, email: true },
+          select: { id: true, name: true, email: true, phone: true },
+        },
+        position: {
+          select: { id: true, title: true, category: true },
         },
       },
     })
@@ -55,5 +61,38 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error('Interviews POST error:', error)
     return NextResponse.json({ error: 'Error creating interview' }, { status: 500 })
+  }
+}
+
+export async function PATCH(req: NextRequest) {
+  try {
+    const body = await req.json()
+    const { id, status } = body
+
+    if (!id || !status) {
+      return NextResponse.json({ error: 'id and status are required' }, { status: 400 })
+    }
+
+    if (!['SCHEDULED', 'COMPLETED', 'CANCELLED'].includes(status)) {
+      return NextResponse.json({ error: 'Invalid status. Must be SCHEDULED, COMPLETED, or CANCELLED' }, { status: 400 })
+    }
+
+    const interview = await db.interviewSchedule.update({
+      where: { id },
+      data: { status },
+      include: {
+        candidate: {
+          select: { id: true, name: true, email: true, phone: true },
+        },
+        position: {
+          select: { id: true, title: true, category: true },
+        },
+      },
+    })
+
+    return NextResponse.json({ interview })
+  } catch (error) {
+    console.error('Interviews PATCH error:', error)
+    return NextResponse.json({ error: 'Error updating interview' }, { status: 500 })
   }
 }
