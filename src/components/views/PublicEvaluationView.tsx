@@ -134,40 +134,60 @@ export default function PublicEvaluationView() {
   }, [slug])
 
   // ============================================
-  // Resume existing application
+  // Navigation helpers (regular functions to avoid circular useCallback deps)
   // ============================================
-  const resumeApplication = useCallback(async (appId: string) => {
-    try {
-      const res = await fetch(`/api/public/apply?applicationId=${appId}`)
-      const data = await res.json()
-      if (data.error) {
-        setStep('vacancy-info')
-        return
-      }
-      // Determine which step to resume to
-      const currentStep = data.currentStep || 0
-      mapStepToView(currentStep, data)
-    } catch {
-      setStep('vacancy-info')
-    }
-  }, [])
 
-  const mapStepToView = (stepNum: number, data?: any) => {
+  // Skip to next section when current has no questions
+  const skipToNextSection = async (currentSection: string) => {
+    const sectionStepMap: Record<string, number> = {
+      psicometrica: 1,
+      psicologica: 2,
+      conocimientos: 3,
+    }
+    const completedStep = sectionStepMap[currentSection]
+    if (completedStep && applicationId) {
+      try {
+        const res = await fetch('/api/public/apply', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            step: 'advance',
+            applicationId,
+            completedStep,
+          }),
+        })
+        const data = await res.json()
+        if (data.completed) {
+          setStep('complete')
+        } else if (data.nextStep !== undefined) {
+          await mapStepToView(data.nextStep, data)
+        } else {
+          setStep('complete')
+        }
+      } catch (e) {
+        console.error('Error skipping section', e)
+        setStep('complete')
+      }
+    } else {
+      setStep('complete')
+    }
+  }
+
+  // Map a step number to the corresponding view
+  const mapStepToView = async (stepNum: number, data?: any) => {
     switch (stepNum) {
       case 0: setStep('candidate-data'); break
-      case 1: goToSectionIntro('psicometrica', data); break
-      case 2: goToSectionIntro('psicologica', data); break
-      case 3: goToSectionIntro('conocimientos', data); break
+      case 1: await goToSectionIntro('psicometrica', data); break
+      case 2: await goToSectionIntro('psicologica', data); break
+      case 3: await goToSectionIntro('conocimientos', data); break
       case 4: setStep('complete'); break
       case 5: setStep('complete'); break
       default: setStep('candidate-data')
     }
   }
 
-  // ============================================
   // Go to section intro (splash before questions)
-  // ============================================
-  const goToSectionIntro = useCallback(async (section: string, data?: any) => {
+  const goToSectionIntro = async (section: string, data?: any) => {
     if (!applicationId) return
     setLoading(true)
     try {
@@ -175,6 +195,14 @@ export default function PublicEvaluationView() {
       // The `data` param may come from advanceStep and won't have questions
       const res = await fetch(`/api/public/apply?applicationId=${applicationId}`)
       const sectionData = await res.json()
+
+      // If API returned an error, skip this section
+      if (sectionData.error) {
+        console.error('API error loading section:', sectionData.error)
+        await skipToNextSection(section)
+        return
+      }
+
       if (sectionData.questions && sectionData.questions.length > 0) {
         const sectionQuestions = sectionData.questions.filter((q: QuestionData) => {
           if (section === 'psicometrica') return q.category !== 'KNOWLEDGE' && (q.category === 'OPENNESS' || q.category === 'CONSCIENTIOUSNESS' || q.category === 'EXTRAVERSION' || q.category === 'AGREEABLENESS' || q.category === 'NEUROTICISM')
@@ -182,22 +210,31 @@ export default function PublicEvaluationView() {
           if (section === 'conocimientos') return q.category === 'KNOWLEDGE'
           return false
         })
-        setQuestions(sectionQuestions.length > 0 ? sectionQuestions : sectionData.questions)
-        setCurrentQIndex(0)
-        setIntroSection(section)
-        setStep('section-intro')
+
+        if (sectionQuestions.length > 0) {
+          setQuestions(sectionQuestions)
+          setCurrentQIndex(0)
+          setIntroSection(section)
+          setStep('section-intro')
+        } else {
+          // Questions exist but none match this section's category — skip to next
+          await skipToNextSection(section)
+        }
+      } else {
+        // No questions returned for this section — skip to next
+        await skipToNextSection(section)
       }
     } catch (e) {
       console.error('Error loading section intro', e)
+      // On fetch error, try to skip to next section
+      await skipToNextSection(section)
     } finally {
       setLoading(false)
     }
-  }, [applicationId])
+  }
 
-  // ============================================
   // Load questions for a step (actual questions)
-  // ============================================
-  const loadStepQuestions = useCallback(async (section: string) => {
+  const loadStepQuestions = async (section: string) => {
     if (!applicationId) return
     setLoading(true)
     try {
@@ -210,16 +247,50 @@ export default function PublicEvaluationView() {
           if (section === 'conocimientos') return q.category === 'KNOWLEDGE'
           return false
         })
-        setQuestions(sectionQuestions.length > 0 ? sectionQuestions : data.questions)
-        setCurrentQIndex(0)
-        setStep(section as PublicStep)
+        if (sectionQuestions.length > 0) {
+          setQuestions(sectionQuestions)
+          setCurrentQIndex(0)
+          setStep(section as PublicStep)
+        } else {
+          await skipToNextSection(section)
+        }
+      } else {
+        await skipToNextSection(section)
       }
     } catch (e) {
       console.error('Error loading questions', e)
+      await skipToNextSection(section)
     } finally {
       setLoading(false)
     }
-  }, [applicationId])
+  }
+
+  // ============================================
+  // Resume existing application
+  // ============================================
+  const resumeApplication = useCallback(async (appId: string) => {
+    try {
+      const res = await fetch(`/api/public/apply?applicationId=${appId}`)
+      const data = await res.json()
+      if (data.error) {
+        setStep('vacancy-info')
+        return
+      }
+      // Determine which step to resume to
+      // API returns `step` not `currentStep`
+      const currentStep = data.step ?? data.currentStep ?? 0
+      // Step 4/5 means done; step 0 means data entry (show consent if not yet accepted)
+      if (currentStep === 0) {
+        setStep('candidate-data')
+      } else if (currentStep >= 4) {
+        setStep('complete')
+      } else {
+        await mapStepToView(currentStep, data)
+      }
+    } catch {
+      setStep('vacancy-info')
+    }
+  }, [])
 
   // ============================================
   // Start application (submit candidate data)
@@ -321,11 +392,10 @@ export default function PublicEvaluationView() {
         }),
       })
       const data = await res.json()
-      if (data.nextStep !== undefined) {
-        mapStepToView(data.nextStep, data)
-      }
       if (data.completed) {
         setStep('complete')
+      } else if (data.nextStep !== undefined) {
+        await mapStepToView(data.nextStep, data)
       }
     } catch (e) {
       console.error('Error advancing step', e)

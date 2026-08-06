@@ -542,54 +542,72 @@ export async function GET(req: NextRequest) {
     }
 
     // Step 1: psicometrica (Big Five from system questions)
-    if (currentStep === 1 && vacancy.includePsicometrica) {
-      const systemQuestions = await getSystemQuestions(vacancy.companyId)
+    if (currentStep === 1) {
+      if (vacancy.includePsicometrica) {
+        const systemQuestions = await getSystemQuestions(vacancy.companyId)
+        return NextResponse.json({
+          step: 1,
+          stepName: 'psicometrica',
+          applicationId: application.id,
+          questions: systemQuestions.bigFiveQuestions.map((q) => ({
+            id: q.id,
+            questionId: q.id,  // Include questionId so frontend can pass it back for proper upsert
+            text: q.text,
+            type: q.type,
+            category: q.category,
+            reverseScored: q.reverseScored,
+            order: q.order,
+            options: [
+              'Totalmente en desacuerdo',
+              'En desacuerdo',
+              'Neutral',
+              'De acuerdo',
+              'Totalmente de acuerdo',
+            ],
+          })),
+        })
+      }
+      // includePsicometrica is false — return empty questions so frontend can skip
       return NextResponse.json({
         step: 1,
         stepName: 'psicometrica',
         applicationId: application.id,
-        questions: systemQuestions.bigFiveQuestions.map((q) => ({
-          id: q.id,
-          questionId: q.id,  // Include questionId so frontend can pass it back for proper upsert
-          text: q.text,
-          type: q.type,
-          category: q.category,
-          reverseScored: q.reverseScored,
-          order: q.order,
-          options: [
-            'Totalmente en desacuerdo',
-            'En desacuerdo',
-            'Neutral',
-            'De acuerdo',
-            'Totalmente de acuerdo',
-          ],
-        })),
+        questions: [],
       })
     }
 
     // Step 2: psicologica
-    if (currentStep === 2 && vacancy.includePsicologica) {
-      const systemQuestions = await getSystemQuestions(vacancy.companyId)
+    if (currentStep === 2) {
+      if (vacancy.includePsicologica) {
+        const systemQuestions = await getSystemQuestions(vacancy.companyId)
+        return NextResponse.json({
+          step: 2,
+          stepName: 'psicologica',
+          applicationId: application.id,
+          questions: systemQuestions.psychologicalQuestions.map((q) => ({
+            id: q.id,
+            questionId: q.id,  // Include questionId so frontend can pass it back for proper upsert
+            text: q.text,
+            type: q.type,
+            category: q.category,
+            reverseScored: q.reverseScored,
+            order: q.order,
+            options: [
+              'Totalmente en desacuerdo',
+              'En desacuerdo',
+              'Neutral',
+              'De acuerdo',
+              'Totalmente de acuerdo',
+            ],
+          })),
+        })
+      }
+      // includePsicologica is false — return empty questions so frontend can skip
       return NextResponse.json({
         step: 2,
         stepName: 'psicologica',
         applicationId: application.id,
-        questions: systemQuestions.psychologicalQuestions.map((q) => ({
-          id: q.id,
-          questionId: q.id,  // Include questionId so frontend can pass it back for proper upsert
-          text: q.text,
-          type: q.type,
-          category: q.category,
-          reverseScored: q.reverseScored,
-          order: q.order,
-          options: [
-            'Totalmente en desacuerdo',
-            'En desacuerdo',
-            'Neutral',
-            'De acuerdo',
-            'Totalmente de acuerdo',
-          ],
-        })),
+        questions: [],
       })
     }
 
