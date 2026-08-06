@@ -37,6 +37,8 @@ export interface CandidateResult {
   id: string
   candidateId: string
   candidateName: string
+  candidateEmail?: string
+  candidatePhone?: string
   positionId: string
   positionTitle: string
   overallScore: number

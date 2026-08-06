@@ -71,6 +71,7 @@ export async function GET() {
       data: {
         email: 'rh@cafedechiapas.com',
         name: 'María García López',
+        phone: '+52 961 111 2222',
         password: hashPassword('rh1234'),
         role: 'RH',
         companyId: restaurantCompany.id,
@@ -82,6 +83,7 @@ export async function GET() {
       data: {
         email: 'gerente@cafedechiapas.com',
         name: 'Carlos Méndez Ruiz',
+        phone: '+52 961 333 4444',
         password: hashPassword('gerente1234'),
         role: 'GERENTE',
         companyId: restaurantCompany.id,
@@ -93,6 +95,7 @@ export async function GET() {
       data: {
         email: 'rh@marlui.com',
         name: 'Ana López Díaz',
+        phone: '+52 961 555 6666',
         password: hashPassword('rh1234'),
         role: 'RH',
         companyId: retailCompany.id,
@@ -104,6 +107,7 @@ export async function GET() {
       data: {
         email: 'juan.perez@email.com',
         name: 'Juan Pérez Hernández',
+        phone: '+52 961 234 5678',
         password: hashPassword('candidato1234'),
         role: 'CANDIDATO',
         companyId: restaurantCompany.id,
@@ -117,6 +121,7 @@ export async function GET() {
       data: {
         email: 'lucia.martinez@email.com',
         name: 'Lucía Martínez Torres',
+        phone: '+52 961 345 6789',
         password: hashPassword('candidato1234'),
         role: 'CANDIDATO',
         companyId: restaurantCompany.id,
@@ -130,6 +135,7 @@ export async function GET() {
       data: {
         email: 'pedro.sanchez@email.com',
         name: 'Pedro Sánchez Gómez',
+        phone: '+52 961 456 7890',
         password: hashPassword('candidato1234'),
         role: 'CANDIDATO',
         companyId: retailCompany.id,

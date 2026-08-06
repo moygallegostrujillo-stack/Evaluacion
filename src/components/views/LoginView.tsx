@@ -15,6 +15,7 @@ export default function LoginView() {
   const [password, setPassword] = useState('')
   const [inviteToken, setInviteToken] = useState('')
   const [name, setName] = useState('')
+  const [phone, setPhone] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [mode, setMode] = useState<'login' | 'register'>('login')
@@ -63,6 +64,7 @@ export default function LoginView() {
           action: 'register',
           email,
           name,
+          phone: phone || undefined,
           password,
           token: inviteToken,
         }),
@@ -194,6 +196,17 @@ export default function LoginView() {
                     placeholder="correo@ejemplo.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="reg-phone">Teléfono <span className="text-red-500">*</span></Label>
+                  <Input
+                    id="reg-phone"
+                    type="tel"
+                    placeholder="+52 961 123 4567"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
                     required
                   />
                 </div>

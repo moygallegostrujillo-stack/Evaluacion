@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import {
   Users, ClipboardCheck, TrendingUp, AlertTriangle,
   CheckCircle2, XCircle, UserPlus, BarChart3, Calendar,
-  ArrowRight, RefreshCw
+  ArrowRight, RefreshCw, Phone, Mail
 } from 'lucide-react'
 
 interface DashboardData {
@@ -290,6 +290,18 @@ export default function DashboardView() {
                     <div>
                       <p className="font-medium text-sm">{r.candidateName}</p>
                       <p className="text-xs text-gray-500">{r.positionTitle}</p>
+                      <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
+                        {r.candidate?.email && (
+                          <span className="text-xs text-gray-400 flex items-center gap-1">
+                            <Mail className="w-3 h-3" /> {r.candidate.email}
+                          </span>
+                        )}
+                        {r.candidate?.phone && (
+                          <span className="text-xs text-green-600 font-medium flex items-center gap-1">
+                            <Phone className="w-3 h-3" /> {r.candidate.phone}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">

@@ -165,14 +165,16 @@ export default function InviteView() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="inv-phone">Teléfono (opcional)</Label>
+                <Label htmlFor="inv-phone">Teléfono <span className="text-red-500">*</span></Label>
                 <Input
                   id="inv-phone"
                   type="tel"
                   placeholder="+52 961 123 4567"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
+                  required
                 />
+                <p className="text-xs text-gray-400">Necesario para contactar al prospecto</p>
               </div>
 
               {sent && (
@@ -215,6 +217,11 @@ export default function InviteView() {
                       <p className="font-medium text-sm">{inv.email}</p>
                       {getStatusBadge(inv.status)}
                     </div>
+                    {inv.phone && (
+                      <p className="text-xs text-green-600 font-medium mb-1 flex items-center gap-1">
+                        📞 {inv.phone}
+                      </p>
+                    )}
                     <div className="flex items-center justify-between">
                       <div className="text-xs text-gray-500">
                         <span>Canal: {inv.channel === 'EMAIL' ? '📧 Correo' : '📱 WhatsApp'}</span>

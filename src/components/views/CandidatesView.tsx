@@ -9,13 +9,14 @@ import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
   Search, CheckCircle2, AlertTriangle, XCircle,
-  ArrowLeft, RefreshCw, UserPlus, BarChart3
+  ArrowLeft, RefreshCw, UserPlus, BarChart3, Phone, Mail
 } from 'lucide-react'
 
 interface CandidateWithResult {
   id: string
   name: string
   email: string
+  phone?: string | null
   role: string
   createdAt: string
   result?: CandidateResult
@@ -55,7 +56,8 @@ export default function CandidatesView() {
 
   const filtered = candidates.filter(c => {
     const matchSearch = c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.email.toLowerCase().includes(search.toLowerCase())
+      c.email.toLowerCase().includes(search.toLowerCase()) ||
+      (c.phone && c.phone.includes(search))
     const matchRec = filterRec === 'ALL' || c.result?.recommendation === filterRec
     return matchSearch && matchRec
   })
@@ -108,7 +110,7 @@ export default function CandidatesView() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <Input
-            placeholder="Buscar por nombre o correo..."
+            placeholder="Buscar por nombre, correo o teléfono..."
             className="pl-9"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -177,7 +179,16 @@ export default function CandidatesView() {
                     </div>
                     <div>
                       <p className="font-medium">{c.name}</p>
-                      <p className="text-xs text-gray-500">{c.email}</p>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                        <p className="text-xs text-gray-500 flex items-center gap-1">
+                          <Mail className="w-3 h-3" /> {c.email}
+                        </p>
+                        {c.phone && (
+                          <p className="text-xs text-green-600 font-medium flex items-center gap-1">
+                            <Phone className="w-3 h-3" /> {c.phone}
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
