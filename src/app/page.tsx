@@ -37,6 +37,13 @@ function useAuthRestore() {
   useEffect(() => {
     if (hasRestored.current) return
     if (user) return // Already authenticated, don't override
+    // Don't restore auth if we're in a public evaluation flow
+    if (currentView === 'public-evaluation') return
+    // Also check if URL or localStorage indicates a public evaluation
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('v')) return
+    if (localStorage.getItem('evaluhr_vacancy_slug')) return
+
     const token = localStorage.getItem('evaluhr_token')
     const userStr = localStorage.getItem('evaluhr_user')
     if (token && userStr) {
@@ -74,19 +81,43 @@ function useInvitationCheck() {
   }, [])
 }
 
-// Check for public vacancy link in URL (?v=slug)
+// Check for public vacancy link in URL (?v=slug) or localStorage resume
 function useVacancyLinkCheck() {
   const setVacancySlug = useAppStore((s) => s.setVacancySlug)
+  const setVacancyApplicationId = useAppStore((s) => s.setVacancyApplicationId)
   const setCurrentView = useAppStore((s) => s.setCurrentView)
 
   useEffect(() => {
+    // Priority 1: Check URL for ?v=slug
     const params = new URLSearchParams(window.location.search)
-    const vacancySlug = params.get('v')
-    if (vacancySlug) {
-      setVacancySlug(vacancySlug)
+    const vacancySlugFromUrl = params.get('v')
+
+    if (vacancySlugFromUrl) {
+      setVacancySlug(vacancySlugFromUrl)
       setCurrentView('public-evaluation')
-      // Clean URL but keep the slug in store
-      window.history.replaceState({}, '', '/')
+      // Save slug to localStorage for reload recovery
+      localStorage.setItem('evaluhr_vacancy_slug', vacancySlugFromUrl)
+      // Check if there's a saved applicationId for this slug
+      const savedAppId = localStorage.getItem('evaluhr_vacancy_app_id')
+      if (savedAppId) {
+        setVacancyApplicationId(savedAppId)
+      }
+      // Do NOT strip the URL — keep ?v=slug so reload works
+      return
+    }
+
+    // Priority 2: Check localStorage for saved evaluation state (page reload)
+    const savedSlug = localStorage.getItem('evaluhr_vacancy_slug')
+    const savedAppId = localStorage.getItem('evaluhr_vacancy_app_id')
+
+    if (savedSlug) {
+      setVacancySlug(savedSlug)
+      if (savedAppId) {
+        setVacancyApplicationId(savedAppId)
+      }
+      setCurrentView('public-evaluation')
+      // Restore URL to include the slug
+      window.history.replaceState({}, '', `/?v=${encodeURIComponent(savedSlug)}`)
     }
   }, [])
 }

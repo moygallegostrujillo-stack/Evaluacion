@@ -620,6 +620,7 @@ export async function GET(req: NextRequest) {
         id: q.id,
         text: q.text,
         type: q.type,
+        category: 'KNOWLEDGE' as const,  // VacancyQuestion has no category field — default to KNOWLEDGE
         options: q.options ? JSON.parse(q.options) : null,
         correctAnswer: undefined, // Don't expose correct answer to candidate
         order: q.order,

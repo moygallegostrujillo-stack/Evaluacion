@@ -84,7 +84,15 @@ const STEP_LABELS: Record<string, { label: string; icon: React.ReactNode; color:
 export default function PublicEvaluationView() {
   const slug = useAppStore((s) => s.vacancySlug)
   const applicationId = useAppStore((s) => s.vacancyApplicationId)
-  const setApplicationId = useAppStore((s) => s.setVacancyApplicationId)
+  const setApplicationId = (id: string | null) => {
+    useAppStore.getState().setVacancyApplicationId(id)
+    if (id) {
+      localStorage.setItem('evaluhr_vacancy_app_id', id)
+    } else {
+      localStorage.removeItem('evaluhr_vacancy_app_id')
+      localStorage.removeItem('evaluhr_vacancy_slug')
+    }
+  }
   const answers = useAppStore((s) => s.vacancyAnswers)
   const setAnswer = useAppStore((s) => s.setVacancyAnswer)
 
@@ -107,6 +115,14 @@ export default function PublicEvaluationView() {
 
   // WhatsApp notification tracking
   const [notifySent, setNotifySent] = useState(false)
+
+  // Clean up localStorage when evaluation completes
+  useEffect(() => {
+    if (step === 'complete') {
+      localStorage.removeItem('evaluhr_vacancy_app_id')
+      localStorage.removeItem('evaluhr_vacancy_slug')
+    }
+  }, [step])
 
   // ============================================
   // Load vacancy info
