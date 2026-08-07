@@ -43,6 +43,8 @@ export default function LoginView() {
         } else {
           setCurrentView('take-evaluation')
         }
+      } else if (data.user.role === 'SUPER_ADMIN') {
+        setCurrentView('companies')
       } else {
         setCurrentView('dashboard')
       }

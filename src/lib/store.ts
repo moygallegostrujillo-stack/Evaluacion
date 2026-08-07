@@ -18,6 +18,7 @@ export type ViewType =
   | 'interviews'
   | 'questions'
   | 'vacancies'
+  | 'companies'
   | 'public-evaluation'
   | 'public-evaluation-complete'
   | 'settings'

@@ -15,6 +15,7 @@ import InterviewsView from '@/components/views/InterviewsView'
 import QuestionsManagementView from '@/components/views/QuestionsManagementView'
 import VacancyManagementView from '@/components/views/VacancyManagementView'
 import PublicEvaluationView from '@/components/views/PublicEvaluationView'
+import CompanyManagementView from '@/components/views/CompanyManagementView'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -23,7 +24,7 @@ import { Separator } from '@/components/ui/separator'
 import {
   LayoutDashboard, Users, ClipboardCheck, UserPlus,
   BarChart3, Calendar, LogOut, Menu, X, ChevronRight, HelpCircle, Briefcase,
-  CheckCircle2
+  CheckCircle2, Building2, Shield
 } from 'lucide-react'
 
 // Restore auth from localStorage
@@ -54,6 +55,8 @@ function useAuthRestore() {
         if (currentView === 'login') {
           if (userData.role === 'CANDIDATO') {
             setCurrentView(userData.consentGiven ? 'take-evaluation' : 'consent')
+          } else if (userData.role === 'SUPER_ADMIN') {
+            setCurrentView('companies')
           } else {
             setCurrentView('dashboard')
           }
@@ -133,7 +136,10 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
   const isRH = user.role === 'RH' || user.role === 'SUPER_ADMIN'
   const isGerente = user.role === 'GERENTE'
 
+  const isSuperAdmin = user.role === 'SUPER_ADMIN'
+
   const menuItems: { view: ViewType; label: string; icon: React.ReactNode; show: boolean }[] = [
+    { view: 'companies', label: 'Empresas', icon: <Building2 className="w-5 h-5" />, show: isSuperAdmin },
     { view: 'dashboard', label: 'Panel', icon: <LayoutDashboard className="w-5 h-5" />, show: true },
     { view: 'candidates', label: 'Candidatos', icon: <Users className="w-5 h-5" />, show: isRH || isGerente },
     { view: 'vacancies', label: 'Vacantes', icon: <Briefcase className="w-5 h-5" />, show: isRH || isGerente },
@@ -196,7 +202,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
             <p className="text-sm font-medium text-gray-900 truncate">{user.name}</p>
             <p className="text-xs text-gray-500 truncate">{user.companyName}</p>
             <Badge variant="outline" className="mt-1 text-xs">
-              {user.role === 'RH' ? 'Recursos Humanos' : user.role === 'GERENTE' ? 'Gerente' : user.role === 'SUPER_ADMIN' ? 'Admin' : user.role}
+              {user.role === 'SUPER_ADMIN' ? 'Super Admin' : user.role === 'RH' ? 'Recursos Humanos' : user.role === 'GERENTE' ? 'Gerente' : user.role}
             </Badge>
           </div>
         )}
@@ -266,6 +272,8 @@ function renderView(view: ViewType) {
       return <QuestionsManagementView />
     case 'interviews':
       return <InterviewsView />
+    case 'companies':
+      return <CompanyManagementView />
     case 'public-evaluation':
       return <PublicEvaluationView />
     case 'public-evaluation-complete':
