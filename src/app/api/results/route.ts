@@ -79,7 +79,7 @@ export async function GET(req: NextRequest) {
         where: { id: resultId },
         include: {
           candidate: {
-            select: { id: true, name: true, email: true, phone: true },
+            select: { id: true, name: true, email: true, phone: true, consentGiven: true, consentDate: true },
           },
           position: {
             select: { id: true, title: true, category: true, sector: true },

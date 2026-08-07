@@ -10,7 +10,8 @@ import { Progress } from '@/components/ui/progress'
 import { Separator } from '@/components/ui/separator'
 import {
   ArrowLeft, CheckCircle2, AlertTriangle, XCircle,
-  Calendar, MapPin, FileText, Mail, Phone, User
+  Calendar, MapPin, FileText, Mail, Phone, User,
+  ShieldCheck, ShieldX, Scale
 } from 'lucide-react'
 import {
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
@@ -20,6 +21,8 @@ import {
 interface CandidateContact {
   email?: string
   phone?: string
+  consentGiven?: boolean
+  consentDate?: string | null
 }
 
 export default function CandidateDetailView() {
@@ -52,6 +55,8 @@ export default function CandidateDetailView() {
           setCandidateContact({
             email: r.candidate.email || '',
             phone: r.candidate.phone || '',
+            consentGiven: r.candidate.consentGiven || false,
+            consentDate: r.candidate.consentDate || null,
           })
         }
       })
@@ -222,6 +227,49 @@ export default function CandidateDetailView() {
               <p className="text-2xl font-bold mt-1">{Math.round(result.overallScore)}/100</p>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Consent & Legal Card */}
+      <Card className={`shadow-sm ${candidateContact.consentGiven ? 'border-emerald-200 bg-emerald-50/30' : 'border-red-200 bg-red-50/30'}`}>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Scale className="w-5 h-5 text-emerald-600" /> Consentimiento Legal
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {candidateContact.consentGiven ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="font-medium text-emerald-700">Aceptó términos y condiciones</p>
+                  <p className="font-medium text-emerald-700">Aceptó aviso de privacidad</p>
+                </div>
+              </div>
+              {candidateContact.consentDate && (
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <Calendar className="w-4 h-4 text-gray-400" />
+                  <span>Aceptado el {new Date(candidateContact.consentDate).toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} a las {new Date(candidateContact.consentDate).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</span>
+                </div>
+              )}
+              <p className="text-xs text-gray-500 italic">
+                El prospecto aceptó los términos y condiciones de uso del sistema, así como el aviso de privacidad para el tratamiento de datos personales, conforme a la Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP) y el Reglamento de la Ley Federal de Protección de Datos Personales.
+              </p>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center">
+                <ShieldX className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="font-medium text-red-600">No ha aceptado los términos y condiciones</p>
+                <p className="text-sm text-gray-500">El prospecto aún no ha dado su consentimiento legal</p>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

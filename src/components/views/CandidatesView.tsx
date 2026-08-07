@@ -10,7 +10,8 @@ import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
   Search, CheckCircle2, AlertTriangle, XCircle,
-  ArrowLeft, RefreshCw, UserPlus, BarChart3, Phone, Mail
+  ArrowLeft, RefreshCw, UserPlus, BarChart3, Phone, Mail,
+  ShieldCheck, ShieldX
 } from 'lucide-react'
 
 interface CandidateWithResult {
@@ -19,6 +20,8 @@ interface CandidateWithResult {
   email: string
   phone?: string | null
   role: string
+  consentGiven?: boolean
+  consentDate?: string | null
   createdAt: string
   result?: CandidateResult
   sessionStatus?: string
@@ -193,6 +196,16 @@ export default function CandidatesView() {
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
+                    {/* Consent indicator */}
+                    {c.consentGiven ? (
+                      <div className="flex items-center gap-1" title={`Aceptó términos y privacidad${c.consentDate ? ' el ' + new Date(c.consentDate).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}`}>
+                        <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1" title="No ha aceptado términos y privacidad">
+                        <ShieldX className="w-4 h-4 text-red-400" />
+                      </div>
+                    )}
                     {c.result && (
                       <>
                         <div className="text-right hidden sm:block">
