@@ -1,10 +1,23 @@
 -- ============================================
--- EVALUACION - Creación de tablas para Supabase
+-- EVALUHR - Schema para Supabase (PostgreSQL)
 -- Ejecutar en: Supabase → SQL Editor → New query
 -- ============================================
 
--- CreateSchema
-CREATE SCHEMA IF NOT EXISTS "public";
+-- Drop existing tables in dependency order (safe to re-run)
+DROP TABLE IF EXISTS "VacancyApplicationResponse" CASCADE;
+DROP TABLE IF EXISTS "VacancyApplication" CASCADE;
+DROP TABLE IF EXISTS "VacancyQuestion" CASCADE;
+DROP TABLE IF EXISTS "Vacancy" CASCADE;
+DROP TABLE IF EXISTS "EvaluationResponse" CASCADE;
+DROP TABLE IF EXISTS "EvaluationResult" CASCADE;
+DROP TABLE IF EXISTS "InterviewSchedule" CASCADE;
+DROP TABLE IF EXISTS "EvaluationSession" CASCADE;
+DROP TABLE IF EXISTS "CandidateInvitation" CASCADE;
+DROP TABLE IF EXISTS "Question" CASCADE;
+DROP TABLE IF EXISTS "EvaluationTemplate" CASCADE;
+DROP TABLE IF EXISTS "Position" CASCADE;
+DROP TABLE IF EXISTS "User" CASCADE;
+DROP TABLE IF EXISTS "Company" CASCADE;
 
 -- CreateTable: Company
 CREATE TABLE "Company" (
@@ -208,6 +221,7 @@ CREATE TABLE "VacancyQuestion" (
 CREATE TABLE "VacancyApplication" (
     "id" TEXT NOT NULL,
     "vacancyId" TEXT NOT NULL,
+    "companyId" TEXT NOT NULL,
     "candidateName" TEXT NOT NULL,
     "candidateEmail" TEXT NOT NULL,
     "candidatePhone" TEXT,
@@ -280,5 +294,6 @@ ALTER TABLE "InterviewSchedule" ADD CONSTRAINT "InterviewSchedule_companyId_fkey
 ALTER TABLE "Vacancy" ADD CONSTRAINT "Vacancy_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 ALTER TABLE "VacancyQuestion" ADD CONSTRAINT "VacancyQuestion_vacancyId_fkey" FOREIGN KEY ("vacancyId") REFERENCES "Vacancy"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "VacancyApplication" ADD CONSTRAINT "VacancyApplication_vacancyId_fkey" FOREIGN KEY ("vacancyId") REFERENCES "Vacancy"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "VacancyApplication" ADD CONSTRAINT "VacancyApplication_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 ALTER TABLE "VacancyApplicationResponse" ADD CONSTRAINT "VacancyApplicationResponse_applicationId_fkey" FOREIGN KEY ("applicationId") REFERENCES "VacancyApplication"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "VacancyApplicationResponse" ADD CONSTRAINT "VacancyApplicationResponse_vacancyQuestionId_fkey" FOREIGN KEY ("vacancyQuestionId") REFERENCES "VacancyQuestion"("id") ON DELETE SET NULL ON UPDATE CASCADE;
