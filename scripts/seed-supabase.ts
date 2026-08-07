@@ -87,7 +87,7 @@ async function main() {
       password: await hashPassword('admin123'),
       role: 'SUPER_ADMIN',
       phone: '+52 961 000 0000',
-      companyId: restaurantCompany.id,
+      companyId: null, // Tenant-free: SUPER_ADMIN has no company
     },
   })
 
@@ -518,11 +518,12 @@ async function main() {
   // ============================================
   console.log('\n🎉 Seed completed successfully!')
   console.log('===================================')
+  console.log(`SUPER_ADMIN: ${adminUser.email} / admin123 (tenant-free)`)
   console.log(`Company: ${restaurantCompany.name} (${restaurantCompany.id})`)
   console.log(`Company: ${retailCompany.name} (${retailCompany.id})`)
-  console.log(`RH User: ${rhUser.email} / demo123`)
-  console.log(`RH User: ${rhRetail.email} / demo123`)
-  console.log(`Gerente: ${gerenteUser.email} / demo123`)
+  console.log(`RH User: ${rhUser.email} / rh1234`)
+  console.log(`RH User: ${rhRetail.email} / rh1234`)
+  console.log(`Gerente: ${gerenteUser.email} / gerente1234`)
   console.log('===================================')
 
   await db.$disconnect()

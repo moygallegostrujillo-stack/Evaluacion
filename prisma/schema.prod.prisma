@@ -1,0 +1,310 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Company {
+  id                    String   @id @default(cuid())
+  name                  String
+  sector                String   @default("RESTAURANT") // RESTAURANT, RETAIL
+  plan                  String   @default("BASIC")
+  maxCandidatesPerMonth Int      @default(150)
+  phone                 String?
+  address               String?
+  city                  String   @default("Tuxtla Gutiérrez")
+  state                 String   @default("Chiapas")
+  country               String   @default("México")
+  active                Boolean  @default(true)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  users       User[]
+  positions   Position[]
+  invitations CandidateInvitation[]
+  results     EvaluationResult[]
+  interviews  InterviewSchedule[]
+  questions   Question[]
+  vacancies   Vacancy[]
+  vacancyApplications VacancyApplication[]
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  name         String
+  password     String
+  role         String    @default("CANDIDATO") // SUPER_ADMIN, RH, GERENTE, CANDIDATO
+  phone        String?
+  companyId    String?
+  active       Boolean   @default(true)
+  consentGiven Boolean   @default(false)
+  consentDate  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  company          Company?              @relation(fields: [companyId], references: [id])
+  sessions         EvaluationSession[]
+  results          EvaluationResult[]
+  sentInvitations  CandidateInvitation[] @relation("InvitationSender")
+  interviews       InterviewSchedule[]   @relation("InterviewCandidate")
+}
+
+model Position {
+  id               String   @id @default(cuid())
+  title            String
+  sector           String   @default("RESTAURANT") // RESTAURANT, RETAIL
+  category         String   // MESERO, COCINERO, BARTENDER, GERENTE_PISO, VENDEDOR
+  description      String?
+  hasKnowledgeTest Boolean  @default(false)
+  companyId        String
+  active           Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  company             Company               @relation(fields: [companyId], references: [id])
+  evaluationTemplates EvaluationTemplate[]
+  invitations         CandidateInvitation[]
+  sessions            EvaluationSession[]
+  results             EvaluationResult[]
+  interviews          InterviewSchedule[]
+}
+
+model EvaluationTemplate {
+  id          String   @id @default(cuid())
+  name        String
+  type        String   // PSICOMETRICA, PSICOLOGICA, CONOCIMIENTOS
+  description String?
+  order       Int      @default(1)
+  active      Boolean  @default(true)
+  positionId  String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  position  Position   @relation(fields: [positionId], references: [id])
+  questions Question[]
+}
+
+model Question {
+  id                   String   @id @default(cuid())
+  text                 String
+  type                 String   // LIKERT, MULTIPLE_CHOICE, YES_NO
+  options              String?  // JSON para opciones de multiple choice
+  category             String   // OPENNESS, CONSCIENTIOUSNESS, EXTRAVERSION, AGREEABLENESS, NEUROTICISM, STRESS, EMPATHY, ADAPTABILITY, LEADERSHIP, TEAMWORK, KNOWLEDGE
+  reverseScored        Boolean  @default(false)
+  order                Int
+  evaluationTemplateId String
+  isCustom             Boolean  @default(false)  // true = pregunta personalizada por la empresa
+  correctAnswer        Int?     // Índice de la respuesta correcta (0-based) para MULTIPLE_CHOICE
+  companyId            String?  // Empresa que creó la pregunta personalizada (null = sistema)
+  createdAt            DateTime @default(now())
+
+  evaluationTemplate EvaluationTemplate @relation(fields: [evaluationTemplateId], references: [id], onDelete: Cascade)
+  responses          EvaluationResponse[]
+  company            Company?           @relation(fields: [companyId], references: [id])
+}
+
+model CandidateInvitation {
+  id         String   @id @default(cuid())
+  email      String
+  phone      String?
+  token      String   @unique
+  status     String   @default("PENDING") // PENDING, REGISTERED, COMPLETED, EXPIRED
+  channel    String   @default("EMAIL") // EMAIL, WHATSAPP
+  companyId  String
+  positionId String
+  invitedBy  String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  company  Company  @relation(fields: [companyId], references: [id])
+  position Position @relation(fields: [positionId], references: [id])
+  sender   User     @relation("InvitationSender", fields: [invitedBy], references: [id])
+}
+
+model EvaluationSession {
+  id                   String    @id @default(cuid())
+  candidateId          String
+  positionId           String
+  companyId            String
+  status               String    @default("NOT_STARTED") // NOT_STARTED, IN_PROGRESS, COMPLETED
+  currentStep          Int       @default(1) // 1=psicométrica, 2=psicológica, 3=conocimientos
+  currentQuestionIndex Int       @default(0)
+  startedAt            DateTime?
+  completedAt          DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  candidate User                @relation(fields: [candidateId], references: [id])
+  position  Position            @relation(fields: [positionId], references: [id])
+  responses EvaluationResponse[]
+  result    EvaluationResult?
+}
+
+model EvaluationResponse {
+  id           String   @id @default(cuid())
+  sessionId    String
+  questionId   String
+  value        String
+  numericValue Int?
+  createdAt    DateTime @default(now())
+
+  session  EvaluationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  question Question          @relation(fields: [questionId], references: [id])
+
+  @@unique([sessionId, questionId])
+}
+
+model EvaluationResult {
+  id                String   @id @default(cuid())
+  sessionId         String   @unique
+  candidateId       String
+  candidateName     String
+  positionId        String
+  positionTitle     String
+  companyId         String
+
+  // Big Five (0-100)
+  openness          Float    @default(0)
+  conscientiousness Float    @default(0)
+  extraversion      Float    @default(0)
+  agreeableness     Float    @default(0)
+  neuroticism       Float    @default(0)
+
+  // Psicológica (0-100)
+  stressLevel       Float    @default(0)
+  empathy           Float    @default(0)
+  adaptability      Float    @default(0)
+  leadership        Float    @default(0)
+  teamwork          Float    @default(0)
+
+  // Conocimientos (0-100, null si no aplica)
+  knowledgeScore    Float?
+
+  // General
+  overallScore      Float    @default(0)
+  recommendation    String   @default("PENDIENTE") // APTO, ENTREVISTA_ADICIONAL, NO_RECOMENDADO, PENDIENTE
+  summary           String?
+
+  createdAt         DateTime @default(now())
+
+  session           EvaluationSession @relation(fields: [sessionId], references: [id])
+  candidate         User              @relation(fields: [candidateId], references: [id])
+  position          Position          @relation(fields: [positionId], references: [id])
+  company           Company           @relation(fields: [companyId], references: [id])
+}
+
+model InterviewSchedule {
+  id          String   @id @default(cuid())
+  candidateId String
+  companyId   String
+  positionId  String?
+  scheduledAt DateTime
+  status      String   @default("SCHEDULED") // SCHEDULED, COMPLETED, CANCELLED
+  location    String?
+  notes       String?
+  notified    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  candidate User     @relation("InterviewCandidate", fields: [candidateId], references: [id])
+  company   Company  @relation(fields: [companyId], references: [id])
+  position  Position? @relation(fields: [positionId], references: [id])
+}
+
+model Vacancy {
+  id                  String   @id @default(cuid())
+  title               String
+  slug                String   @unique
+  description         String?
+  sector              String   @default("GENERAL") // RESTAURANT, RETAIL, GENERAL, etc.
+  status              String   @default("ACTIVE") // ACTIVE, PAUSED, CLOSED
+  includePsicometrica Boolean  @default(true)
+  includePsicologica  Boolean  @default(true)
+  maxVideoSeconds     Int      @default(60)
+  companyId           String
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  company       Company                @relation(fields: [companyId], references: [id])
+  questions     VacancyQuestion[]
+  applications  VacancyApplication[]
+}
+
+model VacancyQuestion {
+  id             String   @id @default(cuid())
+  text           String
+  type           String   // MULTIPLE_CHOICE only for now
+  options        String?  // JSON array of options, e.g., '["Opción A","Opción B","Opción C","Opción D"]'
+  correctAnswer  Int?     // 0-based index of correct answer
+  order          Int
+  vacancyId      String
+  createdAt      DateTime @default(now())
+
+  vacancy    Vacancy                       @relation(fields: [vacancyId], references: [id], onDelete: Cascade)
+  responses  VacancyApplicationResponse[]
+}
+
+model VacancyApplication {
+  id                 String    @id @default(cuid())
+  vacancyId          String
+  companyId          String
+  candidateName      String
+  candidateEmail     String
+  candidatePhone     String?
+  candidateAge       Int?
+  videoUrl           String?
+  videoType          String?   // RECORDED or UPLOADED
+  status             String    @default("IN_PROGRESS") // IN_PROGRESS, COMPLETED
+  currentStep        Int       @default(0) // 0=data, 1=psicométrica, 2=psicológica, 3=conocimientos, 4=video, 5=done
+  currentQuestionIndex Int     @default(0)
+  startedAt          DateTime?
+  completedAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  // Big Five scores (0-100)
+  openness           Float     @default(0)
+  conscientiousness  Float     @default(0)
+  extraversion       Float     @default(0)
+  agreeableness      Float     @default(0)
+  neuroticism        Float     @default(0)
+
+  // Psychological scores (0-100)
+  stressLevel        Float     @default(0)
+  empathy            Float     @default(0)
+  adaptability       Float     @default(0)
+  leadership         Float     @default(0)
+  teamwork           Float     @default(0)
+
+  // Knowledge score (0-100, null if no questions)
+  knowledgeScore     Float?
+
+  // Overall
+  overallScore       Float     @default(0)
+  recommendation     String    @default("PENDIENTE")
+  summary            String?
+
+  vacancy    Vacancy                      @relation(fields: [vacancyId], references: [id])
+  company    Company                      @relation(fields: [companyId], references: [id])
+  responses  VacancyApplicationResponse[]
+}
+
+model VacancyApplicationResponse {
+  id               String   @id @default(cuid())
+  applicationId    String
+  questionId       String?  // for system questions from EvaluationTemplate
+  vacancyQuestionId String? // for custom vacancy questions
+  section          String   // PSICOMETRICA, PSICOLOGICA, CONOCIMIENTOS
+  value            String
+  numericValue     Int?
+  createdAt        DateTime @default(now())
+
+  application     VacancyApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  vacancyQuestion VacancyQuestion?   @relation(fields: [vacancyQuestionId], references: [id])
+}
