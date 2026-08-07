@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { getUnscopedClient } from '@/lib/rls'
+
+const db = getUnscopedClient()
 
 // ============================================
 // SCORING ALGORITHM (same as evaluations/route.ts)

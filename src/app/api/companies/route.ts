@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { getUnscopedClient } from '@/lib/rls'
 import { getAuthFromHeaders } from '@/lib/auth'
 
 export async function GET(req: NextRequest) {
@@ -9,7 +9,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const db = getUnscopedClient()
+
     // SUPER_ADMIN can see all companies; others only see their own
+    // Company is the tenant root — not scoped by companyId
     if (auth.role === 'SUPER_ADMIN') {
       const companies = await db.company.findMany({
         where: { active: true },

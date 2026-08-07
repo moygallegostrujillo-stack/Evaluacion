@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { getUnscopedClient } from '@/lib/rls'
 import { hashPassword, verifyPassword, isLegacyHash } from '@/lib/password'
 import { generateToken } from '@/lib/auth'
+
+const db = getUnscopedClient()
 
 export async function POST(req: NextRequest) {
   try {

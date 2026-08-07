@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { createRLSClient, getUnscopedClient } from '@/lib/rls'
 import { getAuthFromHeaders, canAccessCompany } from '@/lib/auth'
 
 // GET: List questions for a position, optionally filtered by company
@@ -15,19 +15,27 @@ export async function GET(req: NextRequest) {
     const companyIdParam = req.nextUrl.searchParams.get('companyId')
     const templateId = req.nextUrl.searchParams.get('templateId')
 
-    // Derive companyId from JWT; SUPER_ADMIN may override via query param
-    const companyId = auth.role === 'SUPER_ADMIN' && companyIdParam
+    // For SUPER_ADMIN with a specific target companyId from query param, scope to that company
+    const targetCompanyId = auth.role === 'SUPER_ADMIN' && companyIdParam
       ? companyIdParam
-      : auth.companyId
+      : null
+    const { client: rlsDb } = targetCompanyId
+      ? createRLSClient({ ...auth, companyId: targetCompanyId })
+      : createRLSClient(auth)
 
     if (templateId) {
       // Get questions for a specific template
-      const questions = await db.question.findMany({
+      // RLS auto-filters by companyId for non-SUPER_ADMIN (including null companyId = global questions)
+      // Note: Question has optional companyId (null = global). RLS filters to companyId only,
+      // which would exclude global (null) questions. We need unscoped for this query to get all
+      // global + company questions.
+      const unscopedDb = getUnscopedClient()
+      const questions = await unscopedDb.question.findMany({
         where: { evaluationTemplateId: templateId },
         orderBy: { order: 'asc' },
       })
 
-      // Enforce company access: if user is not SUPER_ADMIN, filter to only their company's questions
+      // Enforce company access: if user is not SUPER_ADMIN, filter to only their company's questions + global
       const filtered = auth.role === 'SUPER_ADMIN'
         ? questions
         : questions.filter(q => !q.companyId || q.companyId === auth.companyId)
@@ -45,7 +53,9 @@ export async function GET(req: NextRequest) {
     }
 
     // Get all templates for this position
-    const templates = await db.evaluationTemplate.findMany({
+    // Use unscoped client for questions since they have optional companyId (null = global)
+    const unscopedDb = getUnscopedClient()
+    const templates = await unscopedDb.evaluationTemplate.findMany({
       where: { positionId, active: true },
       orderBy: { order: 'asc' },
       include: {
@@ -107,17 +117,22 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const { templateId, text, type, options, category, correctAnswer, companyId: bodyCompanyId } = body
 
-    // Derive companyId from JWT; SUPER_ADMIN may override via body
-    const companyId = auth.role === 'SUPER_ADMIN' && bodyCompanyId
+    // For SUPER_ADMIN with a specific target companyId from body, scope to that company
+    const targetCompanyId = auth.role === 'SUPER_ADMIN' && bodyCompanyId
       ? bodyCompanyId
-      : auth.companyId
+      : null
+    const { client: rlsDb } = targetCompanyId
+      ? createRLSClient({ ...auth, companyId: targetCompanyId })
+      : createRLSClient(auth)
+    const companyId = targetCompanyId || auth.companyId
 
     if (!templateId || !text || !type || !companyId) {
       return NextResponse.json({ error: 'templateId, text, type, and companyId are required' }, { status: 400 })
     }
 
     // Verify the template exists and belongs to a position of this company
-    const template = await db.evaluationTemplate.findUnique({
+    const unscopedDb = getUnscopedClient()
+    const template = await unscopedDb.evaluationTemplate.findUnique({
       where: { id: templateId },
       include: { position: true },
     })
@@ -131,7 +146,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Get the current max order for this template
-    const maxOrderQuestion = await db.question.findFirst({
+    const maxOrderQuestion = await rlsDb.question.findFirst({
       where: { evaluationTemplateId: templateId },
       orderBy: { order: 'desc' },
       select: { order: true },
@@ -139,7 +154,7 @@ export async function POST(req: NextRequest) {
 
     const nextOrder = (maxOrderQuestion?.order || 0) + 1
 
-    const question = await db.question.create({
+    const question = await rlsDb.question.create({
       data: {
         text,
         type,
@@ -148,7 +163,8 @@ export async function POST(req: NextRequest) {
         order: nextOrder,
         isCustom: true,
         correctAnswer: correctAnswer ?? null,
-        companyId,
+        // companyId auto-injected by RLS for non-SUPER_ADMIN; SUPER_ADMIN must specify
+        ...(companyId ? { companyId } : {}),
         evaluationTemplateId: templateId,
       },
     })
@@ -184,17 +200,23 @@ export async function PUT(req: NextRequest) {
     const body = await req.json()
     const { questionId, text, type, options, category, correctAnswer, companyId: bodyCompanyId } = body
 
-    // Derive companyId from JWT; SUPER_ADMIN may override via body
-    const companyId = auth.role === 'SUPER_ADMIN' && bodyCompanyId
+    // For SUPER_ADMIN with a specific target companyId from body, scope to that company
+    const targetCompanyId = auth.role === 'SUPER_ADMIN' && bodyCompanyId
       ? bodyCompanyId
-      : auth.companyId
+      : null
+    const { client: rlsDb } = targetCompanyId
+      ? createRLSClient({ ...auth, companyId: targetCompanyId })
+      : createRLSClient(auth)
+    const companyId = targetCompanyId || auth.companyId
 
     if (!questionId || !companyId) {
       return NextResponse.json({ error: 'questionId and companyId are required' }, { status: 400 })
     }
 
     // Verify the question exists and belongs to this company
-    const existing = await db.question.findUnique({
+    // Use unscoped for findUnique since Question has optional companyId
+    const unscopedDb = getUnscopedClient()
+    const existing = await unscopedDb.question.findUnique({
       where: { id: questionId },
     })
 
@@ -206,7 +228,7 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'No puedes editar preguntas predeterminadas del sistema' }, { status: 403 })
     }
 
-    // Enforce company access via canAccessCompany utility
+    // Enforce company access via canAccessCompany utility (defense-in-depth)
     if (!canAccessCompany(auth.role, auth.companyId, existing.companyId || '')) {
       return NextResponse.json({ error: 'No tienes permiso para editar esta pregunta' }, { status: 403 })
     }
@@ -218,7 +240,7 @@ export async function PUT(req: NextRequest) {
     if (category !== undefined) updateData.category = category
     if (correctAnswer !== undefined) updateData.correctAnswer = correctAnswer
 
-    const question = await db.question.update({
+    const question = await rlsDb.question.update({
       where: { id: questionId },
       data: updateData,
     })
@@ -254,16 +276,22 @@ export async function DELETE(req: NextRequest) {
     const questionId = req.nextUrl.searchParams.get('questionId')
     const companyIdParam = req.nextUrl.searchParams.get('companyId')
 
-    // Derive companyId from JWT; SUPER_ADMIN may override via query param
-    const companyId = auth.role === 'SUPER_ADMIN' && companyIdParam
+    // For SUPER_ADMIN with a specific target companyId from query param, scope to that company
+    const targetCompanyId = auth.role === 'SUPER_ADMIN' && companyIdParam
       ? companyIdParam
-      : auth.companyId
+      : null
+    const { client: rlsDb } = targetCompanyId
+      ? createRLSClient({ ...auth, companyId: targetCompanyId })
+      : createRLSClient(auth)
+    const companyId = targetCompanyId || auth.companyId
 
     if (!questionId || !companyId) {
       return NextResponse.json({ error: 'questionId and companyId are required' }, { status: 400 })
     }
 
-    const existing = await db.question.findUnique({
+    // Use unscoped for findUnique since Question has optional companyId
+    const unscopedDb = getUnscopedClient()
+    const existing = await unscopedDb.question.findUnique({
       where: { id: questionId },
     })
 
@@ -275,12 +303,12 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'No puedes eliminar preguntas predeterminadas del sistema' }, { status: 403 })
     }
 
-    // Enforce company access via canAccessCompany utility
+    // Enforce company access via canAccessCompany utility (defense-in-depth)
     if (!canAccessCompany(auth.role, auth.companyId, existing.companyId || '')) {
       return NextResponse.json({ error: 'No tienes permiso para eliminar esta pregunta' }, { status: 403 })
     }
 
-    await db.question.delete({
+    await rlsDb.question.delete({
       where: { id: questionId },
     })
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { createRLSClient, getUnscopedClient } from '@/lib/rls'
 import { getAuthFromHeaders } from '@/lib/auth'
 
 import { hashPassword } from '@/lib/password'
@@ -11,15 +11,20 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Derive companyId from auth; SUPER_ADMIN can optionally override
-    const companyId = auth.role === 'SUPER_ADMIN'
-      ? (req.nextUrl.searchParams.get('companyId') || auth.companyId)
-      : auth.companyId
+    // For SUPER_ADMIN with a specific target companyId from query param, scope to that company
+    // For non-SUPER_ADMIN, RLS handles scoping automatically
+    const targetCompanyId = auth.role === 'SUPER_ADMIN'
+      ? req.nextUrl.searchParams.get('companyId')
+      : null
+    const { client: rlsDb } = targetCompanyId
+      ? createRLSClient({ ...auth, companyId: targetCompanyId })
+      : createRLSClient(auth)
 
     // Always filter for CANDIDATO role - the candidates tab shows candidates, not RH/GERENTE users
-    const where: Record<string, unknown> = { ...(companyId ? { companyId } : {}), active: true, role: 'CANDIDATO' }
+    // RLS auto-injects companyId for non-SUPER_ADMIN; SUPER_ADMIN gets unscoped or scoped to target
+    const where: Record<string, unknown> = { active: true, role: 'CANDIDATO' }
 
-    const candidates = await db.user.findMany({
+    const candidates = await rlsDb.user.findMany({
       where,
       orderBy: { createdAt: 'desc' },
       include: {
@@ -70,27 +75,32 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const { email, name, password, positionId } = body
 
-    // Derive companyId from auth; SUPER_ADMIN can optionally override
-    const companyId = auth.role === 'SUPER_ADMIN'
-      ? (body.companyId || auth.companyId)
-      : auth.companyId
+    // For SUPER_ADMIN with a specific target companyId from body, scope to that company
+    const targetCompanyId = auth.role === 'SUPER_ADMIN'
+      ? body.companyId
+      : null
+    const { client: rlsDb } = targetCompanyId
+      ? createRLSClient({ ...auth, companyId: targetCompanyId })
+      : createRLSClient(auth)
+    const companyId = targetCompanyId || auth.companyId
 
     if (!email || !name || !password || !companyId || !positionId) {
       return NextResponse.json({ error: 'All fields are required' }, { status: 400 })
     }
 
-    const existingUser = await db.user.findUnique({ where: { email } })
+    const existingUser = await getUnscopedClient().user.findUnique({ where: { email } })
     if (existingUser) {
       return NextResponse.json({ error: 'El correo ya está registrado' }, { status: 400 })
     }
 
-    const user = await db.user.create({
+    const user = await rlsDb.user.create({
       data: {
         email,
         name,
         password: await hashPassword(password),
         role: 'CANDIDATO',
-        companyId,
+        // companyId auto-injected by RLS for non-SUPER_ADMIN; SUPER_ADMIN must specify
+        ...(companyId ? { companyId } : {}),
         consentGiven: true,
         consentDate: new Date(),
         active: true,
@@ -98,11 +108,12 @@ export async function POST(req: NextRequest) {
     })
 
     // Create evaluation session for the candidate
-    const session = await db.evaluationSession.create({
+    const session = await rlsDb.evaluationSession.create({
       data: {
         candidateId: user.id,
         positionId,
-        companyId,
+        // companyId auto-injected by RLS for non-SUPER_ADMIN; SUPER_ADMIN must specify
+        ...(companyId ? { companyId } : {}),
         status: 'NOT_STARTED',
       },
     })

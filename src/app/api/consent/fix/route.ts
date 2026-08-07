@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { createRLSClient } from '@/lib/rls'
 import { getAuthFromHeaders } from '@/lib/auth'
 
 /**
@@ -21,6 +21,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Solo administradores pueden corregir consentimiento' }, { status: 403 })
     }
 
+    const { client: rlsDb } = createRLSClient(auth)
     const body = await req.json()
     const { candidateId } = body
 
@@ -29,7 +30,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Verify the candidate exists and belongs to the admin's company
-    const candidate = await db.user.findUnique({
+    // RLS auto-filters by companyId for non-SUPER_ADMIN
+    const candidate = await rlsDb.user.findUnique({
       where: { id: candidateId },
       include: {
         sessions: {
@@ -44,7 +46,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Candidato no encontrado' }, { status: 404 })
     }
 
-    // Verify company access (unless SUPER_ADMIN)
+    // Defense-in-depth: RLS already filtered, but keep the check as extra safety
     if (auth.role !== 'SUPER_ADMIN' && candidate.companyId !== auth.companyId) {
       return NextResponse.json({ error: 'No tienes acceso a este candidato' }, { status: 403 })
     }
@@ -53,7 +55,7 @@ export async function POST(req: NextRequest) {
     const consentDate = candidate.sessions[0]?.completedAt || new Date()
 
     // Update the candidate's consent
-    const updatedUser = await db.user.update({
+    const updatedUser = await rlsDb.user.update({
       where: { id: candidateId },
       data: {
         consentGiven: true,

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { createRLSClient, getUnscopedClient } from '@/lib/rls'
 import { getAuthFromHeaders } from '@/lib/auth'
 
 // ============================================
@@ -19,9 +19,10 @@ async function generateUniqueSlug(title: string, excludeId?: string): Promise<st
   const baseSlug = generateSlug(title)
   let slug = baseSlug
   let attempts = 0
+  const unscopedDb = getUnscopedClient()
 
   while (true) {
-    const existing = await db.vacancy.findFirst({
+    const existing = await unscopedDb.vacancy.findFirst({
       where: { slug, ...(excludeId ? { id: { not: excludeId } } : {}) },
     })
     if (!existing) break
@@ -48,9 +49,10 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { client: rlsDb } = createRLSClient(auth)
     const { id } = await params
 
-    const vacancy = await db.vacancy.findUnique({
+    const vacancy = await rlsDb.vacancy.findUnique({
       where: { id },
       include: {
         questions: { orderBy: { order: 'asc' } },
@@ -62,7 +64,7 @@ export async function GET(
       return NextResponse.json({ error: 'Vacancy not found' }, { status: 404 })
     }
 
-    // Non-SUPER_ADMIN users can only access vacancies in their own company
+    // Defense-in-depth: RLS already filtered, but keep the check as extra safety
     if (auth.role !== 'SUPER_ADMIN' && vacancy.companyId !== auth.companyId) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
@@ -122,16 +124,17 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { client: rlsDb } = createRLSClient(auth)
     const { id } = await params
     const body: UpdateVacancyBody = await req.json()
     const { title, description, status, sector, includePsicometrica, includePsicologica, maxVideoSeconds } = body
 
-    const existing = await db.vacancy.findUnique({ where: { id } })
+    const existing = await rlsDb.vacancy.findUnique({ where: { id } })
     if (!existing) {
       return NextResponse.json({ error: 'Vacancy not found' }, { status: 404 })
     }
 
-    // Non-SUPER_ADMIN users can only update vacancies in their own company
+    // Defense-in-depth: RLS already filtered, but keep the check as extra safety
     if (auth.role !== 'SUPER_ADMIN' && existing.companyId !== auth.companyId) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
@@ -142,7 +145,7 @@ export async function PUT(
       slug = await generateUniqueSlug(title, id)
     }
 
-    const vacancy = await db.vacancy.update({
+    const vacancy = await rlsDb.vacancy.update({
       where: { id },
       data: {
         ...(title !== undefined ? { title, slug } : {}),
@@ -204,19 +207,20 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { client: rlsDb } = createRLSClient(auth)
     const { id } = await params
 
-    const existing = await db.vacancy.findUnique({ where: { id } })
+    const existing = await rlsDb.vacancy.findUnique({ where: { id } })
     if (!existing) {
       return NextResponse.json({ error: 'Vacancy not found' }, { status: 404 })
     }
 
-    // Non-SUPER_ADMIN users can only delete vacancies in their own company
+    // Defense-in-depth: RLS already filtered, but keep the check as extra safety
     if (auth.role !== 'SUPER_ADMIN' && existing.companyId !== auth.companyId) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const vacancy = await db.vacancy.update({
+    const vacancy = await rlsDb.vacancy.update({
       where: { id },
       data: { status: 'CLOSED' },
     })

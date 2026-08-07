@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { createRLSClient } from '@/lib/rls'
 import { getAuthFromHeaders } from '@/lib/auth'
 
 // ============================================
@@ -16,9 +16,10 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { client: rlsDb } = createRLSClient(auth)
     const { id } = await params
 
-    const vacancy = await db.vacancy.findUnique({
+    const vacancy = await rlsDb.vacancy.findUnique({
       where: { id },
       include: { questions: { orderBy: { order: 'asc' } } },
     })
@@ -27,7 +28,7 @@ export async function GET(
       return NextResponse.json({ error: 'Vacancy not found' }, { status: 404 })
     }
 
-    // Non-SUPER_ADMIN users can only access vacancies in their own company
+    // Defense-in-depth: RLS already filtered, but keep the check as extra safety
     if (auth.role !== 'SUPER_ADMIN' && vacancy.companyId !== auth.companyId) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
@@ -69,6 +70,7 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { client: rlsDb } = createRLSClient(auth)
     const { id } = await params
     const body: CreateQuestionBody = await req.json()
     const { text, options, correctAnswer } = body
@@ -77,7 +79,7 @@ export async function POST(
       return NextResponse.json({ error: 'text, options, and correctAnswer are required' }, { status: 400 })
     }
 
-    const vacancy = await db.vacancy.findUnique({
+    const vacancy = await rlsDb.vacancy.findUnique({
       where: { id },
       include: { questions: { select: { order: true } } },
     })
@@ -86,7 +88,7 @@ export async function POST(
       return NextResponse.json({ error: 'Vacancy not found' }, { status: 404 })
     }
 
-    // Non-SUPER_ADMIN users can only add questions to vacancies in their own company
+    // Defense-in-depth: RLS already filtered, but keep the check as extra safety
     if (auth.role !== 'SUPER_ADMIN' && vacancy.companyId !== auth.companyId) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
@@ -96,7 +98,7 @@ export async function POST(
       ? Math.max(...vacancy.questions.map((q) => q.order))
       : 0
 
-    const question = await db.vacancyQuestion.create({
+    const question = await rlsDb.vacancyQuestion.create({
       data: {
         text,
         type: 'MULTIPLE_CHOICE',
@@ -145,6 +147,7 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { client: rlsDb } = createRLSClient(auth)
     const { id } = await params
     const body: UpdateQuestionBody = await req.json()
     const { questionId, text, options, correctAnswer } = body
@@ -153,7 +156,7 @@ export async function PUT(
       return NextResponse.json({ error: 'questionId is required' }, { status: 400 })
     }
 
-    const existing = await db.vacancyQuestion.findFirst({
+    const existing = await rlsDb.vacancyQuestion.findFirst({
       where: { id: questionId, vacancyId: id },
     })
 
@@ -161,13 +164,13 @@ export async function PUT(
       return NextResponse.json({ error: 'Question not found in this vacancy' }, { status: 404 })
     }
 
-    // Non-SUPER_ADMIN users can only update questions in vacancies from their own company
-    const vacancy = await db.vacancy.findUnique({ where: { id } })
+    // Defense-in-depth: verify vacancy ownership
+    const vacancy = await rlsDb.vacancy.findUnique({ where: { id } })
     if (auth.role !== 'SUPER_ADMIN' && vacancy?.companyId !== auth.companyId) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const question = await db.vacancyQuestion.update({
+    const question = await rlsDb.vacancyQuestion.update({
       where: { id: questionId },
       data: {
         ...(text !== undefined ? { text } : {}),
@@ -207,6 +210,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { client: rlsDb } = createRLSClient(auth)
     const { id } = await params
     const questionId = req.nextUrl.searchParams.get('questionId')
 
@@ -214,7 +218,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'questionId is required' }, { status: 400 })
     }
 
-    const existing = await db.vacancyQuestion.findFirst({
+    const existing = await rlsDb.vacancyQuestion.findFirst({
       where: { id: questionId, vacancyId: id },
     })
 
@@ -222,13 +226,13 @@ export async function DELETE(
       return NextResponse.json({ error: 'Question not found in this vacancy' }, { status: 404 })
     }
 
-    // Non-SUPER_ADMIN users can only delete questions from vacancies in their own company
-    const vacancy = await db.vacancy.findUnique({ where: { id } })
+    // Defense-in-depth: verify vacancy ownership
+    const vacancy = await rlsDb.vacancy.findUnique({ where: { id } })
     if (auth.role !== 'SUPER_ADMIN' && vacancy?.companyId !== auth.companyId) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    await db.vacancyQuestion.delete({
+    await rlsDb.vacancyQuestion.delete({
       where: { id: questionId },
     })
 

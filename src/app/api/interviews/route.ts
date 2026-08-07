@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { createRLSClient } from '@/lib/rls'
 import { getAuthFromHeaders } from '@/lib/auth'
 
 export async function GET(req: NextRequest) {
@@ -9,15 +9,16 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Derive companyId from auth; SUPER_ADMIN can optionally override
-    const companyId = auth.role === 'SUPER_ADMIN'
-      ? (req.nextUrl.searchParams.get('companyId') || auth.companyId)
-      : auth.companyId
+    // For SUPER_ADMIN with a specific target companyId from query param, scope to that company
+    const targetCompanyId = auth.role === 'SUPER_ADMIN'
+      ? req.nextUrl.searchParams.get('companyId')
+      : null
+    const { client: rlsDb } = targetCompanyId
+      ? createRLSClient({ ...auth, companyId: targetCompanyId })
+      : createRLSClient(auth)
 
-    const where = companyId ? { companyId } : {}
-
-    const interviews = await db.interviewSchedule.findMany({
-      where,
+    // RLS auto-filters by companyId
+    const interviews = await rlsDb.interviewSchedule.findMany({
       orderBy: { scheduledAt: 'asc' },
       include: {
         candidate: {
@@ -46,19 +47,24 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const { candidateId, positionId, scheduledAt, location, notes } = body
 
-    // Derive companyId from auth; SUPER_ADMIN can optionally override
-    const companyId = auth.role === 'SUPER_ADMIN'
-      ? (body.companyId || auth.companyId)
-      : auth.companyId
+    // For SUPER_ADMIN with a specific target companyId from body, scope to that company
+    const targetCompanyId = auth.role === 'SUPER_ADMIN'
+      ? body.companyId
+      : null
+    const { client: rlsDb } = targetCompanyId
+      ? createRLSClient({ ...auth, companyId: targetCompanyId })
+      : createRLSClient(auth)
+    const companyId = targetCompanyId || auth.companyId
 
     if (!candidateId || !companyId || !scheduledAt) {
       return NextResponse.json({ error: 'candidateId, companyId, and scheduledAt are required' }, { status: 400 })
     }
 
-    const interview = await db.interviewSchedule.create({
+    const interview = await rlsDb.interviewSchedule.create({
       data: {
         candidateId,
-        companyId,
+        // companyId auto-injected by RLS for non-SUPER_ADMIN; SUPER_ADMIN must specify
+        ...(companyId ? { companyId } : {}),
         positionId: positionId || null,
         scheduledAt: new Date(scheduledAt),
         location: location || null,
@@ -89,6 +95,7 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { client: rlsDb } = createRLSClient(auth)
     const body = await req.json()
     const { id, status } = body
 
@@ -100,15 +107,16 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid status. Must be SCHEDULED, COMPLETED, or CANCELLED' }, { status: 400 })
     }
 
-    // Non-SUPER_ADMIN users can only update interviews in their own company
+    // RLS auto-filters by companyId on update where clause
+    // Defense-in-depth: verify ownership for non-SUPER_ADMIN
     if (auth.role !== 'SUPER_ADMIN') {
-      const existingInterview = await db.interviewSchedule.findUnique({ where: { id } })
+      const existingInterview = await rlsDb.interviewSchedule.findUnique({ where: { id } })
       if (existingInterview && existingInterview.companyId !== auth.companyId) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
       }
     }
 
-    const interview = await db.interviewSchedule.update({
+    const interview = await rlsDb.interviewSchedule.update({
       where: { id },
       data: { status },
       include: {

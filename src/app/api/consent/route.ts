@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { createRLSClient } from '@/lib/rls'
 import { getAuthFromHeaders } from '@/lib/auth'
 
 export async function POST(req: NextRequest) {
@@ -8,6 +8,8 @@ export async function POST(req: NextRequest) {
     if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    const { client: rlsDb } = createRLSClient(auth)
 
     // Derive userId from auth; SUPER_ADMIN can optionally specify a userId from body
     const body = await req.json()
@@ -19,7 +21,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'userId is required' }, { status: 400 })
     }
 
-    const user = await db.user.findUnique({
+    const user = await rlsDb.user.findUnique({
       where: { id: userId },
     })
 
@@ -27,12 +29,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Company isolation: non-SUPER_ADMIN can only set consent for users in their own company
+    // Defense-in-depth: RLS already filtered, but keep the check as extra safety
     if (auth.role !== 'SUPER_ADMIN' && user.companyId !== auth.companyId) {
       return NextResponse.json({ error: 'No tienes permiso para modificar este usuario' }, { status: 403 })
     }
 
-    const updatedUser = await db.user.update({
+    const updatedUser = await rlsDb.user.update({
       where: { id: userId },
       data: {
         consentGiven: true,

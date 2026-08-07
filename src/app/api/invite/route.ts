@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { createRLSClient, getUnscopedClient } from '@/lib/rls'
 import { getAuthFromHeaders } from '@/lib/auth'
 
 import crypto from 'crypto'
@@ -14,10 +14,14 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const { email, phone, positionId, channel } = body
 
-    // Derive companyId from auth; SUPER_ADMIN can optionally override
-    const companyId = auth.role === 'SUPER_ADMIN'
-      ? (body.companyId || auth.companyId)
-      : auth.companyId
+    // For SUPER_ADMIN with a specific target companyId from body, scope to that company
+    const targetCompanyId = auth.role === 'SUPER_ADMIN'
+      ? body.companyId
+      : null
+    const { client: rlsDb } = targetCompanyId
+      ? createRLSClient({ ...auth, companyId: targetCompanyId })
+      : createRLSClient(auth)
+    const companyId = targetCompanyId || auth.companyId
 
     // Derive invitedBy from auth; SUPER_ADMIN can optionally override
     const invitedBy = auth.role === 'SUPER_ADMIN'
@@ -28,8 +32,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'email, companyId, positionId, and invitedBy are required' }, { status: 400 })
     }
 
-    // Verify position exists
-    const position = await db.position.findUnique({
+    // Verify position exists (use unscoped since we're checking by ID, not by company)
+    const position = await getUnscopedClient().position.findUnique({
       where: { id: positionId },
     })
 
@@ -44,14 +48,15 @@ export async function POST(req: NextRequest) {
     const expiresAt = new Date()
     expiresAt.setDate(expiresAt.getDate() + 7)
 
-    const invitation = await db.candidateInvitation.create({
+    const invitation = await rlsDb.candidateInvitation.create({
       data: {
         email,
         phone: phone || null,
         token,
         status: 'PENDING',
         channel: channel || 'EMAIL',
-        companyId,
+        // companyId auto-injected by RLS for non-SUPER_ADMIN; SUPER_ADMIN must specify
+        ...(companyId ? { companyId } : {}),
         positionId,
         invitedBy,
         expiresAt,

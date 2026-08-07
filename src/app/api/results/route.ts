@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { createRLSClient, getUnscopedClient } from '@/lib/rls'
 import { getAuthFromHeaders } from '@/lib/auth'
 
 export async function GET(req: NextRequest) {
@@ -9,10 +9,14 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Derive companyId from auth; SUPER_ADMIN can optionally override
-    const companyId = auth.role === 'SUPER_ADMIN'
-      ? (req.nextUrl.searchParams.get('companyId') || auth.companyId)
-      : auth.companyId
+    // For SUPER_ADMIN with a specific target companyId from query param, scope to that company
+    const targetCompanyId = auth.role === 'SUPER_ADMIN'
+      ? req.nextUrl.searchParams.get('companyId')
+      : null
+    const { client: rlsDb } = targetCompanyId
+      ? createRLSClient({ ...auth, companyId: targetCompanyId })
+      : createRLSClient(auth)
+
     const candidateId = req.nextUrl.searchParams.get('candidateId')
     const resultId = req.nextUrl.searchParams.get('resultId')
     const compareIds = req.nextUrl.searchParams.get('compareIds')
@@ -20,7 +24,7 @@ export async function GET(req: NextRequest) {
     // Compare multiple candidates
     if (compareIds) {
       const ids = compareIds.split(',').filter(Boolean)
-      const results = await db.evaluationResult.findMany({
+      const results = await rlsDb.evaluationResult.findMany({
         where: { id: { in: ids } },
         include: {
           candidate: {
@@ -32,14 +36,11 @@ export async function GET(req: NextRequest) {
         },
       })
 
-      // Company ownership check: filter out results from other companies (SUPER_ADMIN sees all)
-      const ownedResults = auth.role === 'SUPER_ADMIN'
-        ? results
-        : results.filter((r) => r.companyId === auth.companyId)
+      // RLS auto-filters by companyId for non-SUPER_ADMIN, so no manual post-fetch filtering needed
 
       // Build comparison data
       const comparison = {
-        candidates: ownedResults.map((r) => ({
+        candidates: results.map((r) => ({
           id: r.id,
           candidateId: r.candidateId,
           candidateName: r.candidateName,
@@ -61,17 +62,17 @@ export async function GET(req: NextRequest) {
           },
         })),
         averages: {
-          overallScore: ownedResults.reduce((s, r) => s + r.overallScore, 0) / (ownedResults.length || 1),
-          openness: ownedResults.reduce((s, r) => s + r.openness, 0) / (ownedResults.length || 1),
-          conscientiousness: ownedResults.reduce((s, r) => s + r.conscientiousness, 0) / (ownedResults.length || 1),
-          extraversion: ownedResults.reduce((s, r) => s + r.extraversion, 0) / (ownedResults.length || 1),
-          agreeableness: ownedResults.reduce((s, r) => s + r.agreeableness, 0) / (ownedResults.length || 1),
-          neuroticism: ownedResults.reduce((s, r) => s + r.neuroticism, 0) / (ownedResults.length || 1),
-          stressLevel: ownedResults.reduce((s, r) => s + r.stressLevel, 0) / (ownedResults.length || 1),
-          empathy: ownedResults.reduce((s, r) => s + r.empathy, 0) / (ownedResults.length || 1),
-          adaptability: ownedResults.reduce((s, r) => s + r.adaptability, 0) / (ownedResults.length || 1),
-          leadership: ownedResults.reduce((s, r) => s + r.leadership, 0) / (ownedResults.length || 1),
-          teamwork: ownedResults.reduce((s, r) => s + r.teamwork, 0) / (ownedResults.length || 1),
+          overallScore: results.reduce((s, r) => s + r.overallScore, 0) / (results.length || 1),
+          openness: results.reduce((s, r) => s + r.openness, 0) / (results.length || 1),
+          conscientiousness: results.reduce((s, r) => s + r.conscientiousness, 0) / (results.length || 1),
+          extraversion: results.reduce((s, r) => s + r.extraversion, 0) / (results.length || 1),
+          agreeableness: results.reduce((s, r) => s + r.agreeableness, 0) / (results.length || 1),
+          neuroticism: results.reduce((s, r) => s + r.neuroticism, 0) / (results.length || 1),
+          stressLevel: results.reduce((s, r) => s + r.stressLevel, 0) / (results.length || 1),
+          empathy: results.reduce((s, r) => s + r.empathy, 0) / (results.length || 1),
+          adaptability: results.reduce((s, r) => s + r.adaptability, 0) / (results.length || 1),
+          leadership: results.reduce((s, r) => s + r.leadership, 0) / (results.length || 1),
+          teamwork: results.reduce((s, r) => s + r.teamwork, 0) / (results.length || 1),
         },
       }
 
@@ -80,7 +81,7 @@ export async function GET(req: NextRequest) {
 
     // Single result by ID
     if (resultId) {
-      const result = await db.evaluationResult.findUnique({
+      const result = await rlsDb.evaluationResult.findUnique({
         where: { id: resultId },
         include: {
           candidate: {
@@ -104,7 +105,7 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: 'Result not found' }, { status: 404 })
       }
 
-      // Company ownership check: non-SUPER_ADMIN can only access own company's results
+      // Defense-in-depth: RLS already filtered, but keep the check as extra safety
       if (auth.role !== 'SUPER_ADMIN' && result.companyId !== auth.companyId) {
         return NextResponse.json({ error: 'Forbidden: result belongs to another company' }, { status: 403 })
       }
@@ -112,13 +113,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ result })
     }
 
-    // Results by candidate (scoped to user's company unless SUPER_ADMIN)
+    // Results by candidate — RLS auto-filters by companyId
     if (candidateId) {
-      const candidateWhere = auth.role === 'SUPER_ADMIN'
-        ? { candidateId }
-        : { candidateId, companyId: auth.companyId }
-      const results = await db.evaluationResult.findMany({
-        where: candidateWhere,
+      const results = await rlsDb.evaluationResult.findMany({
+        where: { candidateId },
         orderBy: { createdAt: 'desc' },
         include: {
           position: {
@@ -130,27 +128,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ results })
     }
 
-    // Results by company
-    if (companyId) {
-      const results = await db.evaluationResult.findMany({
-        where: { companyId },
-        orderBy: { createdAt: 'desc' },
-        include: {
-          candidate: {
-            select: { id: true, name: true, email: true },
-          },
-          position: {
-            select: { id: true, title: true, category: true },
-          },
-        },
-      })
-
-      return NextResponse.json({ results })
-    }
-
-    // Super Admin (no companyId) sees all results
-    const results = await db.evaluationResult.findMany({
-      where: {},
+    // All results — RLS auto-filters by companyId for non-SUPER_ADMIN
+    const results = await rlsDb.evaluationResult.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
         candidate: {

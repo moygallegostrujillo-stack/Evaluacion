@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { getUnscopedClient } from '@/lib/rls'
 import { hashPassword } from '@/lib/password'
 
 export async function GET(req: NextRequest) {

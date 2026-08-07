@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { createRLSClient, getUnscopedClient } from '@/lib/rls'
 import { getAuthFromHeaders } from '@/lib/auth'
 
 // ============================================
@@ -19,9 +19,10 @@ async function generateUniqueSlug(title: string): Promise<string> {
   const baseSlug = generateSlug(title)
   let slug = baseSlug
   let attempts = 0
+  const unscopedDb = getUnscopedClient()
 
   while (true) {
-    const existing = await db.vacancy.findUnique({ where: { slug } })
+    const existing = await unscopedDb.vacancy.findUnique({ where: { slug } })
     if (!existing) break
     attempts++
     const suffix = Math.random().toString(36).substring(2, 6)
@@ -43,15 +44,16 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Derive companyId from auth; SUPER_ADMIN can optionally override
-    const companyId = auth.role === 'SUPER_ADMIN'
-      ? (req.nextUrl.searchParams.get('companyId') || auth.companyId)
-      : auth.companyId
+    // For SUPER_ADMIN with a specific target companyId from query param, scope to that company
+    const targetCompanyId = auth.role === 'SUPER_ADMIN'
+      ? req.nextUrl.searchParams.get('companyId')
+      : null
+    const { client: rlsDb } = targetCompanyId
+      ? createRLSClient({ ...auth, companyId: targetCompanyId })
+      : createRLSClient(auth)
 
-    const where = companyId ? { companyId } : {}
-
-    const vacancies = await db.vacancy.findMany({
-      where,
+    // RLS auto-filters by companyId
+    const vacancies = await rlsDb.vacancy.findMany({
       include: {
         questions: {
           orderBy: { order: 'asc' },
@@ -123,24 +125,28 @@ export async function POST(req: NextRequest) {
     const body: CreateVacancyBody = await req.json()
     const { title, description, sector, includePsicometrica, includePsicologica, maxVideoSeconds, questions } = body
 
-    // Derive companyId from auth; SUPER_ADMIN can optionally override
-    const companyId = auth.role === 'SUPER_ADMIN'
-      ? (body.companyId || auth.companyId)
-      : auth.companyId
+    // For SUPER_ADMIN with a specific target companyId from body, scope to that company
+    const targetCompanyId = auth.role === 'SUPER_ADMIN'
+      ? body.companyId
+      : null
+    const { client: rlsDb } = targetCompanyId
+      ? createRLSClient({ ...auth, companyId: targetCompanyId })
+      : createRLSClient(auth)
+    const companyId = targetCompanyId || auth.companyId
 
     if (!title || !companyId) {
       return NextResponse.json({ error: 'title and companyId are required' }, { status: 400 })
     }
 
-    // Verify company exists
-    const company = await db.company.findUnique({ where: { id: companyId } })
+    // Verify company exists (use unscoped since Company is tenant root)
+    const company = await getUnscopedClient().company.findUnique({ where: { id: companyId } })
     if (!company) {
       return NextResponse.json({ error: 'Company not found' }, { status: 404 })
     }
 
     const slug = await generateUniqueSlug(title)
 
-    const vacancy = await db.vacancy.create({
+    const vacancy = await rlsDb.vacancy.create({
       data: {
         title,
         slug,
@@ -149,7 +155,8 @@ export async function POST(req: NextRequest) {
         includePsicometrica: includePsicometrica !== undefined ? includePsicometrica : true,
         includePsicologica: includePsicologica !== undefined ? includePsicologica : true,
         maxVideoSeconds: maxVideoSeconds || 60,
-        companyId,
+        // companyId auto-injected by RLS for non-SUPER_ADMIN; SUPER_ADMIN must specify
+        ...(companyId ? { companyId } : {}),
         questions: questions
           ? {
               create: questions.map((q, index) => ({

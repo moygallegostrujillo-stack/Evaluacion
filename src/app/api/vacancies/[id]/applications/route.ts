@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { createRLSClient } from '@/lib/rls'
 import { getAuthFromHeaders } from '@/lib/auth'
 
 // ============================================
@@ -16,9 +16,10 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { client: rlsDb } = createRLSClient(auth)
     const { id } = await params
 
-    const vacancy = await db.vacancy.findUnique({
+    const vacancy = await rlsDb.vacancy.findUnique({
       where: { id },
       include: {
         applications: {
@@ -31,7 +32,7 @@ export async function GET(
       return NextResponse.json({ error: 'Vacancy not found' }, { status: 404 })
     }
 
-    // Non-SUPER_ADMIN users can only access applications for vacancies in their own company
+    // Defense-in-depth: RLS already filtered, but keep the check as extra safety
     if (auth.role !== 'SUPER_ADMIN' && vacancy.companyId !== auth.companyId) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }

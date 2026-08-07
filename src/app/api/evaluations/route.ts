@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { createRLSClient, getUnscopedClient } from '@/lib/rls'
 import { getAuthFromHeaders } from '@/lib/auth'
 
 // ============================================
@@ -98,27 +98,24 @@ function calculateScores(
       let correct = 0
       for (const resp of knowledgeResponses) {
         const selectedIdx = parseInt(resp.value, 10)
-        // Use correctAnswer field (0-based index of correct option)
-        // If correctAnswer is not set, default to 0 (first option is correct - legacy)
-        const correctIdx = resp.question.correctAnswer ?? 0
-        if (selectedIdx === correctIdx) {
+        if (resp.question.correctAnswer !== null && selectedIdx === resp.question.correctAnswer) {
           correct++
         }
       }
-      knowledgeScore = Math.round((correct / knowledgeResponses.length) * 100 * 100) / 100
+      knowledgeScore = Math.round((correct / knowledgeResponses.length) * 100)
     }
   }
 
-  // Overall score (unified weights: 30/30/40 with knowledge, 50/50 without)
+  // Overall score calculation
   let overallScore: number
-  if (hasKnowledgeTest && knowledgeScore !== null) {
+  if (knowledgeScore !== null) {
     overallScore = 0.30 * avgBigFive + 0.30 * avgPsychological + 0.40 * knowledgeScore
   } else {
     overallScore = 0.50 * avgBigFive + 0.50 * avgPsychological
   }
 
-  // Recommendation (unified thresholds: ≥70 APTO, ≥50 ENTREVISTA, <50 NO_RECOMENDADO)
-  let recommendation: string
+  // Recommendation
+  let recommendation: 'APTO' | 'ENTREVISTA_ADICIONAL' | 'NO_RECOMENDADO'
   if (overallScore >= 70) {
     recommendation = 'APTO'
   } else if (overallScore >= 50) {
@@ -126,24 +123,6 @@ function calculateScores(
   } else {
     recommendation = 'NO_RECOMENDADO'
   }
-
-  // Service roles special rules (MESERO, BARTENDER, VENDEDOR)
-  const serviceRoles = ['MESERO', 'BARTENDER', 'VENDEDOR']
-  if (serviceRoles.includes(positionCategory)) {
-    if (psychScores['EMPATHY'] < 40 && psychScores['TEAMWORK'] < 40) {
-      recommendation = 'NO_RECOMENDADO'
-    }
-  }
-
-  // High stress rule
-  if (psychScores['STRESS'] > 80) {
-    if (recommendation === 'APTO') {
-      recommendation = 'ENTREVISTA_ADICIONAL'
-    }
-  }
-
-  // Generate summary
-  const summary = generateSummary(bigFiveScores, psychScores, knowledgeScore, overallScore, recommendation)
 
   return {
     openness: bigFiveScores['OPENNESS'] || 0,
@@ -159,46 +138,39 @@ function calculateScores(
     knowledgeScore,
     overallScore: Math.round(overallScore * 100) / 100,
     recommendation,
-    summary,
+    summary: generateSummary(
+      bigFiveScores, psychScores, knowledgeScore, recommendation
+    ),
   }
 }
 
 function generateSummary(
-  bigFive: Record<string, number>,
-  psych: Record<string, number>,
+  bigFiveScores: Record<string, number>,
+  psychScores: Record<string, number>,
   knowledgeScore: number | null,
-  overallScore: number,
   recommendation: string
 ): string {
-  const parts: string[] = []
-
-  // Big Five highlights
-  if (bigFive['EXTRAVERSION'] >= 70) parts.push('alta extraversión')
-  if (bigFive['CONSCIENTIOUSNESS'] >= 70) parts.push('alta responsabilidad')
-  if (bigFive['OPENNESS'] >= 70) parts.push('alta apertura a la experiencia')
-  if (bigFive['AGREEABLENESS'] >= 70) parts.push('alta amabilidad')
-
-  // Psychological highlights
-  if (psych['EMPATHY'] >= 70) parts.push('buena empatía')
-  if (psych['TEAMWORK'] >= 70) parts.push('buen trabajo en equipo')
-  if (psych['ADAPTABILITY'] >= 70) parts.push('buena adaptabilidad')
-  if (psych['LEADERSHIP'] >= 70) parts.push('buen liderazgo')
-
-  // Concerns
+  const strengths: string[] = []
   const concerns: string[] = []
-  if (psych['STRESS'] > 60) concerns.push('nivel de estrés elevado')
-  if (bigFive['NEUROTICISM'] > 60) concerns.push('alto neuroticismo')
-  if (psych['EMPATHY'] < 40) concerns.push('baja empatía')
-  if (psych['TEAMWORK'] < 40) concerns.push('bajo trabajo en equipo')
-  if (psych['ADAPTABILITY'] < 40) concerns.push('baja adaptabilidad')
+
+  if (bigFiveScores['EXTRAVERSION'] >= 70) strengths.push('alta extraversión')
+  if (bigFiveScores['CONSCIENTIOUSNESS'] >= 70) strengths.push('alta responsabilidad')
+  if (bigFiveScores['OPENNESS'] >= 70) strengths.push('alta apertura a la experiencia')
+  if (bigFiveScores['AGREEABLENESS'] >= 70) strengths.push('alta amabilidad')
+  if (psychScores['EMPATHY'] >= 70) strengths.push('buena empatía')
+  if (psychScores['TEAMWORK'] >= 70) strengths.push('buen trabajo en equipo')
+  if (psychScores['ADAPTABILITY'] >= 70) strengths.push('buena adaptabilidad')
+  if (psychScores['LEADERSHIP'] >= 70) strengths.push('buen liderazgo')
+
+  if (psychScores['STRESS'] < 40) concerns.push('baja tolerancia al estrés')
+  if (bigFiveScores['NEUROTICISM'] >= 70) concerns.push('alto neuroticismo')
+  if (psychScores['EMPATHY'] < 40) concerns.push('baja empatía')
+  if (psychScores['TEAMWORK'] < 40) concerns.push('bajo trabajo en equipo')
+  if (psychScores['ADAPTABILITY'] < 40) concerns.push('baja adaptabilidad')
 
   let summary = ''
-  if (parts.length > 0) {
-    summary += `Candidato con ${parts.join(', ')}. `
-  }
-  if (concerns.length > 0) {
-    summary += `Se detectaron ${concerns.join(', ')}. `
-  }
+  if (strengths.length > 0) summary += `Candidato con ${strengths.join(', ')}. `
+  if (concerns.length > 0) summary += `Se detectaron ${concerns.join(', ')}. `
   if (knowledgeScore !== null) {
     if (knowledgeScore >= 70) {
       summary += 'Conocimientos técnicos sólidos. '
@@ -231,6 +203,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { client: rlsDb } = createRLSClient(auth)
+
     // For CANDIDATO role, force candidateId to auth.userId (can only access own evaluations)
     const positionId = req.nextUrl.searchParams.get('positionId')
     const sessionId = req.nextUrl.searchParams.get('sessionId')
@@ -238,12 +212,10 @@ export async function GET(req: NextRequest) {
 
     if (candidateId) {
       // Get evaluation sessions for a candidate
-      const sessions = await db.evaluationSession.findMany({
+      // RLS auto-filters by companyId for non-SUPER_ADMIN/CANDIDATO
+      const sessions = await rlsDb.evaluationSession.findMany({
         where: {
           candidateId,
-          ...(auth.role !== 'CANDIDATO' && auth.role !== 'SUPER_ADMIN' && auth.companyId
-            ? { companyId: auth.companyId }
-            : {}),
         },
         orderBy: { createdAt: 'desc' },
         include: {
@@ -254,30 +226,47 @@ export async function GET(req: NextRequest) {
       })
 
       // Also get all available positions for the candidate to apply
-      const candidate = await db.user.findUnique({
-        where: { id: candidateId },
-        select: { companyId: true },
-      })
-
+      // CANDIDATO needs to see positions from ALL companies, so use unscoped client
       let availablePositions: any[] = []
-      // Show positions from ALL companies so candidates can apply to any available role
-      availablePositions = await db.position.findMany({
-        where: { active: true },
-        orderBy: [{ sector: 'asc' }, { title: 'asc' }],
-        include: {
-          company: {
-            select: { id: true, name: true, sector: true },
-          },
-          evaluationTemplates: {
-            select: {
-              id: true,
-              type: true,
-              _count: { select: { questions: true } },
+      if (auth.role === 'CANDIDATO') {
+        // Show positions from ALL companies so candidates can apply to any available role
+        availablePositions = await getUnscopedClient().position.findMany({
+          where: { active: true },
+          orderBy: [{ sector: 'asc' }, { title: 'asc' }],
+          include: {
+            company: {
+              select: { id: true, name: true, sector: true },
             },
-            orderBy: { order: 'asc' },
+            evaluationTemplates: {
+              select: {
+                id: true,
+                type: true,
+                _count: { select: { questions: true } },
+              },
+              orderBy: { order: 'asc' },
+            },
           },
-        },
-      })
+        })
+      } else {
+        // Non-CANDIDATO: use RLS-scoped client (filtered by companyId)
+        availablePositions = await rlsDb.position.findMany({
+          where: { active: true },
+          orderBy: [{ sector: 'asc' }, { title: 'asc' }],
+          include: {
+            company: {
+              select: { id: true, name: true, sector: true },
+            },
+            evaluationTemplates: {
+              select: {
+                id: true,
+                type: true,
+                _count: { select: { questions: true } },
+              },
+              orderBy: { order: 'asc' },
+            },
+          },
+        })
+      }
 
       // Determine which positions the candidate hasn't applied to yet
       const appliedPositionIds = sessions.map(s => s.positionId)
@@ -294,9 +283,10 @@ export async function GET(req: NextRequest) {
     }
 
     if (positionId) {
-      // Verify position belongs to user's company (unless SUPER_ADMIN)
+      // Defense-in-depth: verify position belongs to user's company (unless SUPER_ADMIN)
+      // RLS already filters, but we check explicitly for a clear 403 response
       if (auth.role !== 'SUPER_ADMIN') {
-        const position = await db.position.findUnique({
+        const position = await rlsDb.position.findUnique({
           where: { id: positionId },
           select: { companyId: true },
         })
@@ -306,7 +296,7 @@ export async function GET(req: NextRequest) {
       }
 
       // Return evaluation templates and questions for a position
-      const templates = await db.evaluationTemplate.findMany({
+      const templates = await rlsDb.evaluationTemplate.findMany({
         where: { positionId, active: true },
         orderBy: { order: 'asc' },
         include: {
@@ -351,7 +341,7 @@ export async function GET(req: NextRequest) {
 
     if (sessionId) {
       // Return current session state
-      const session = await db.evaluationSession.findUnique({
+      const session = await rlsDb.evaluationSession.findUnique({
         where: { id: sessionId },
         include: {
           position: true,
@@ -368,6 +358,7 @@ export async function GET(req: NextRequest) {
       }
 
       // Ownership check: verify the authenticated user can access this session
+      // RLS already filters by companyId, but we check candidateId explicitly
       if (auth.role === 'CANDIDATO') {
         if (session.candidateId !== auth.userId) {
           return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -379,7 +370,7 @@ export async function GET(req: NextRequest) {
       }
 
       // Get templates for the position ordered by step
-      const templates = await db.evaluationTemplate.findMany({
+      const templates = await rlsDb.evaluationTemplate.findMany({
         where: { positionId: session.positionId, active: true },
         orderBy: { order: 'asc' },
         include: {
@@ -457,6 +448,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { client: rlsDb } = createRLSClient(auth)
+    const unscopedDb = getUnscopedClient()
+
     const body = await req.json()
     const { sessionId, action } = body
 
@@ -475,8 +469,8 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'candidateId and positionId are required' }, { status: 400 })
       }
 
-      // Verify position exists
-      const position = await db.position.findUnique({
+      // Verify position exists (use unscoped so CANDIDATO can apply to any company's position)
+      const position = await unscopedDb.position.findUnique({
         where: { id: positionId },
         include: { company: true },
       })
@@ -486,7 +480,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Check if candidate already has an active session for this position
-      const existingSession = await db.evaluationSession.findFirst({
+      const existingSession = await rlsDb.evaluationSession.findFirst({
         where: {
           candidateId,
           positionId,
@@ -501,8 +495,8 @@ export async function POST(req: NextRequest) {
         }, { status: 400 })
       }
 
-      // Create new session
-      const session = await db.evaluationSession.create({
+      // Create new session — companyId from position
+      const session = await rlsDb.evaluationSession.create({
         data: {
           candidateId,
           positionId,
@@ -535,7 +529,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'sessionId and action are required' }, { status: 400 })
     }
 
-    const session = await db.evaluationSession.findUnique({
+    const session = await rlsDb.evaluationSession.findUnique({
       where: { id: sessionId },
       include: {
         position: true,
@@ -547,6 +541,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Ownership check: verify the authenticated user can modify this session
+    // RLS already filters by companyId, but we check candidateId explicitly
     if (auth.role === 'CANDIDATO') {
       if (session.candidateId !== auth.userId) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -565,7 +560,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Session already completed' }, { status: 400 })
       }
 
-      const updatedSession = await db.evaluationSession.update({
+      const updatedSession = await rlsDb.evaluationSession.update({
         where: { id: sessionId },
         data: {
           status: 'IN_PROGRESS',
@@ -576,7 +571,7 @@ export async function POST(req: NextRequest) {
       })
 
       // Get first template questions
-      const templates = await db.evaluationTemplate.findMany({
+      const templates = await rlsDb.evaluationTemplate.findMany({
         where: { positionId: session.positionId, active: true },
         orderBy: { order: 'asc' },
         include: {
@@ -636,7 +631,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Upsert the response
-      const response = await db.evaluationResponse.upsert({
+      const response = await rlsDb.evaluationResponse.upsert({
         where: {
           sessionId_questionId: {
             sessionId,
@@ -656,7 +651,7 @@ export async function POST(req: NextRequest) {
       })
 
       // Update current question index
-      await db.evaluationSession.update({
+      await rlsDb.evaluationSession.update({
         where: { id: sessionId },
         data: {
           currentQuestionIndex: session.currentQuestionIndex + 1,
@@ -677,7 +672,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Session is not in progress' }, { status: 400 })
       }
 
-      const templates = await db.evaluationTemplate.findMany({
+      const templates = await rlsDb.evaluationTemplate.findMany({
         where: { positionId: session.positionId, active: true },
         orderBy: { order: 'asc' },
         include: {
@@ -723,10 +718,10 @@ export async function POST(req: NextRequest) {
       // If there's no next step, auto-complete
       if (nextStep > templates.length) {
         // Complete the evaluation
-        return await completeEvaluation(session, session.position)
+        return await completeEvaluation(rlsDb, session, session.position)
       }
 
-      const updatedSession = await db.evaluationSession.update({
+      const updatedSession = await rlsDb.evaluationSession.update({
         where: { id: sessionId },
         data: {
           currentStep: nextStep,
@@ -749,7 +744,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Session already completed' }, { status: 400 })
       }
 
-      return await completeEvaluation(session, session.position)
+      return await completeEvaluation(rlsDb, session, session.position)
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
@@ -760,11 +755,12 @@ export async function POST(req: NextRequest) {
 }
 
 async function completeEvaluation(
-  session: Awaited<ReturnType<typeof db.evaluationSession.findUnique>> & { position: NonNullable<Awaited<ReturnType<typeof db.evaluationSession.findUnique>>['position']> },
+  rlsDb: ReturnType<typeof createRLSClient>['client'],
+  session: Awaited<ReturnType<typeof getUnscopedClient>['evaluationSession']['findUnique']> & { position: NonNullable<Awaited<ReturnType<typeof getUnscopedClient>['evaluationSession']['findUnique']>['position']> },
   position: { id: string; title: string; category: string; hasKnowledgeTest: boolean }
 ) {
   // Get all responses for this session
-  const responses = await db.evaluationResponse.findMany({
+  const responses = await rlsDb.evaluationResponse.findMany({
     where: { sessionId: session!.id },
     include: {
       question: true,
@@ -789,12 +785,12 @@ async function completeEvaluation(
   )
 
   // Get candidate info
-  const candidate = await db.user.findUnique({
+  const candidate = await rlsDb.user.findUnique({
     where: { id: session!.candidateId },
   })
 
-  // Create or update result
-  const result = await db.evaluationResult.upsert({
+  // Create or update result — companyId from session
+  const result = await rlsDb.evaluationResult.upsert({
     where: { sessionId: session!.id },
     update: {
       ...scores,
@@ -813,7 +809,7 @@ async function completeEvaluation(
   })
 
   // Update session to COMPLETED
-  const updatedSession = await db.evaluationSession.update({
+  const updatedSession = await rlsDb.evaluationSession.update({
     where: { id: session!.id },
     data: {
       status: 'COMPLETED',

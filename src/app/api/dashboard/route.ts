@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { createRLSClient } from '@/lib/rls'
 import { getAuthFromHeaders } from '@/lib/auth'
 
 export async function GET(req: NextRequest) {
@@ -9,44 +9,46 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Derive companyId from auth; SUPER_ADMIN can optionally override
-    const companyId = auth.role === 'SUPER_ADMIN'
-      ? (req.nextUrl.searchParams.get('companyId') || auth.companyId)
-      : auth.companyId
+    // For SUPER_ADMIN with a specific target companyId from query param, scope to that company
+    const targetCompanyId = auth.role === 'SUPER_ADMIN'
+      ? req.nextUrl.searchParams.get('companyId')
+      : null
+    const { client: rlsDb } = targetCompanyId
+      ? createRLSClient({ ...auth, companyId: targetCompanyId })
+      : createRLSClient(auth)
 
-    const where = companyId ? { companyId } : {}
+    // RLS auto-injects companyId for non-SUPER_ADMIN; SUPER_ADMIN gets unscoped or scoped to target
 
     // Total candidates
-    const totalCandidates = await db.user.count({
-      where: { ...where, role: 'CANDIDATO', active: true },
+    const totalCandidates = await rlsDb.user.count({
+      where: { role: 'CANDIDATO', active: true },
     })
 
     // Completed evaluations
-    const completedEvaluations = await db.evaluationSession.count({
-      where: { ...where, status: 'COMPLETED' },
+    const completedEvaluations = await rlsDb.evaluationSession.count({
+      where: { status: 'COMPLETED' },
     })
 
     // Pending evaluations (NOT_STARTED + IN_PROGRESS)
-    const pendingEvaluations = await db.evaluationSession.count({
-      where: { ...where, status: { in: ['NOT_STARTED', 'IN_PROGRESS'] } },
+    const pendingEvaluations = await rlsDb.evaluationSession.count({
+      where: { status: { in: ['NOT_STARTED', 'IN_PROGRESS'] } },
     })
 
     // Recommendation counts
-    const aptoCount = await db.evaluationResult.count({
-      where: { ...where, recommendation: 'APTO' },
+    const aptoCount = await rlsDb.evaluationResult.count({
+      where: { recommendation: 'APTO' },
     })
 
-    const entrevistaCount = await db.evaluationResult.count({
-      where: { ...where, recommendation: 'ENTREVISTA_ADICIONAL' },
+    const entrevistaCount = await rlsDb.evaluationResult.count({
+      where: { recommendation: 'ENTREVISTA_ADICIONAL' },
     })
 
-    const noRecomendadoCount = await db.evaluationResult.count({
-      where: { ...where, recommendation: 'NO_RECOMENDADO' },
+    const noRecomendadoCount = await rlsDb.evaluationResult.count({
+      where: { recommendation: 'NO_RECOMENDADO' },
     })
 
     // Recent results
-    const recentResults = await db.evaluationResult.findMany({
-      where: companyId ? { companyId } : {},
+    const recentResults = await rlsDb.evaluationResult.findMany({
       orderBy: { createdAt: 'desc' },
       take: 5,
       include: {
@@ -60,8 +62,7 @@ export async function GET(req: NextRequest) {
     })
 
     // Position stats - count candidates per position
-    const sessions = await db.evaluationSession.findMany({
-      where: companyId ? { companyId } : {},
+    const sessions = await rlsDb.evaluationSession.findMany({
       select: { positionId: true, position: { select: { id: true, title: true } } },
     })
 

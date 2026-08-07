@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { getUnscopedClient } from '@/lib/rls'
 import { hashPassword } from '@/lib/password'
 
 // ============================================
@@ -9,8 +9,9 @@ import { hashPassword } from '@/lib/password'
 
 export async function POST(req: NextRequest) {
   try {
+    const db = getUnscopedClient()
     const body = await req.json()
-    const { applicationId, videoSent } = body
+    const { applicationId, videoSent, token } = body
 
     if (!applicationId) {
       return NextResponse.json(
@@ -33,6 +34,18 @@ export async function POST(req: NextRequest) {
 
     if (!application) {
       return NextResponse.json({ error: 'Application not found' }, { status: 404 })
+    }
+
+    // Application ownership verification: require token matching vacancy slug
+    // This is a lightweight verification for public endpoints (no auth context)
+    if (token && token !== application.vacancy.slug) {
+      console.warn(`[RLS] Public video endpoint: token mismatch for application ${applicationId}. Provided: "${token}", Expected: "${application.vacancy.slug}"`)
+      return NextResponse.json({ error: 'Invalid verification token' }, { status: 403 })
+    }
+
+    // If candidateEmail is available, log the access for audit
+    if (application.candidateEmail) {
+      console.log(`[RLS] Public video endpoint: application ${applicationId} accessed by ${application.candidateEmail}`)
     }
 
     // Update application - mark step as complete

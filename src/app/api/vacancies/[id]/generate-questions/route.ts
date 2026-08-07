@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { createRLSClient, getUnscopedClient } from '@/lib/rls'
 import { getAuthFromHeaders } from '@/lib/auth'
 
 // ============================================
@@ -111,9 +111,12 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { client: rlsDb } = createRLSClient(auth)
     const { id } = await params
 
-    const vacancy = await db.vacancy.findUnique({
+    // Use unscoped client for vacancy lookup since we need company info and RLS on Vacancy
+    // would filter, but we want to check ownership explicitly
+    const vacancy = await rlsDb.vacancy.findUnique({
       where: { id },
       include: { company: true, questions: { select: { id: true } } },
     })
@@ -122,7 +125,7 @@ export async function POST(
       return NextResponse.json({ error: 'Vacancy not found' }, { status: 404 })
     }
 
-    // Non-SUPER_ADMIN users can only generate questions for vacancies in their own company
+    // Defense-in-depth: RLS already filtered, but keep the check as extra safety
     if (auth.role !== 'SUPER_ADMIN' && vacancy.companyId !== auth.companyId) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
@@ -193,7 +196,7 @@ Las preguntas deben ser relevantes al puesto, prácticas, y enfocadas en conocim
     }
 
     // Get the max order of existing questions
-    const existingQuestions = await db.vacancyQuestion.findMany({
+    const existingQuestions = await rlsDb.vacancyQuestion.findMany({
       where: { vacancyId: id },
       orderBy: { order: 'desc' },
       take: 1,
@@ -204,7 +207,7 @@ Las preguntas deben ser relevantes al puesto, prácticas, y enfocadas en conocim
     const createdQuestions = []
     for (let i = 0; i < generatedQuestions.length; i++) {
       const q = generatedQuestions[i]
-      const question = await db.vacancyQuestion.create({
+      const question = await rlsDb.vacancyQuestion.create({
         data: {
           text: q.text,
           type: 'MULTIPLE_CHOICE',
