@@ -16,8 +16,8 @@ npx prisma generate
 
 echo "✅ Prisma client generated for PostgreSQL"
 
-# Build Next.js
+# Build Next.js with increased memory for Turbopack
 echo "📦 Building Next.js..."
-npx next build
+NODE_OPTIONS="--max-old-space-size=3072" npx next build
 
 echo "✅ Build complete!"
