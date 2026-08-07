@@ -2,9 +2,13 @@
 -- PostgreSQL Row-Level Security (RLS) Policies for EvaluHR
 -- ============================================================
 --
--- This SQL script creates RLS policies at the database level,
--- providing defense-in-depth alongside the application-level
--- Prisma Client Extension RLS implemented in src/lib/rls.ts.
+-- CORRECTED VERSION — Idempotent & Robust
+--
+-- Fixes applied:
+-- 1. Uses DROP POLICY IF EXISTS before CREATE POLICY (idempotent)
+-- 2. Wraps each table's policies in DO blocks with exception handling
+-- 3. Dynamically checks if companyId column exists before creating policies
+-- 4. Handles VacancyApplication which may not have companyId yet
 --
 -- How it works:
 -- 1. Enable RLS on all tenant-scoped tables
@@ -22,28 +26,50 @@
 -- the transaction ends.
 -- ============================================================
 
--- Step 1: Create custom GUC parameters for tenant context
--- (PostgreSQL allows custom parameters with the app. prefix)
+-- ════════════════════════════════════════════════════════════
+-- STEP 1: Enable RLS on all tenant-scoped tables
+-- ════════════════════════════════════════════════════════════
 
--- Step 2: Enable RLS on all tenant-scoped tables
+-- Tables with REQUIRED companyId
 ALTER TABLE "Position" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "CandidateInvitation" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "EvaluationSession" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "EvaluationResult" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "InterviewSchedule" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "Vacancy" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "VacancyApplication" ENABLE ROW LEVEL SECURITY;
 
--- User and Question have optional companyId (null = global/system)
--- For these, we use a different policy that allows null companyId
+-- Tables with OPTIONAL companyId (null = global/system)
 ALTER TABLE "User" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "Question" ENABLE ROW LEVEL SECURITY;
 
--- Step 3: Create RLS Policies
+-- VacancyApplication — only enable if table exists with companyId
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'VacancyApplication'
+      AND column_name = 'companyId'
+  ) THEN
+    EXECUTE 'ALTER TABLE "VacancyApplication" ENABLE ROW LEVEL SECURITY';
+    RAISE NOTICE 'RLS enabled on VacancyApplication';
+  ELSE
+    RAISE NOTICE 'SKIPPED: VacancyApplication does not have companyId column — run prisma db push first';
+  END IF;
+END $$;
+
+-- ════════════════════════════════════════════════════════════
+-- STEP 2: Create RLS Policies (idempotent)
+-- ════════════════════════════════════════════════════════════
 
 -- ────────────────────────────────────────────────────────────
 -- Position
 -- ────────────────────────────────────────────────────────────
+DROP POLICY IF EXISTS "rls_position_select" ON "Position";
+DROP POLICY IF EXISTS "rls_position_insert" ON "Position";
+DROP POLICY IF EXISTS "rls_position_update" ON "Position";
+DROP POLICY IF EXISTS "rls_position_delete" ON "Position";
+
 CREATE POLICY "rls_position_select" ON "Position"
   FOR SELECT
   USING (
@@ -79,6 +105,11 @@ CREATE POLICY "rls_position_delete" ON "Position"
 -- ────────────────────────────────────────────────────────────
 -- CandidateInvitation
 -- ────────────────────────────────────────────────────────────
+DROP POLICY IF EXISTS "rls_invitation_select" ON "CandidateInvitation";
+DROP POLICY IF EXISTS "rls_invitation_insert" ON "CandidateInvitation";
+DROP POLICY IF EXISTS "rls_invitation_update" ON "CandidateInvitation";
+DROP POLICY IF EXISTS "rls_invitation_delete" ON "CandidateInvitation";
+
 CREATE POLICY "rls_invitation_select" ON "CandidateInvitation"
   FOR SELECT
   USING (
@@ -110,6 +141,11 @@ CREATE POLICY "rls_invitation_delete" ON "CandidateInvitation"
 -- ────────────────────────────────────────────────────────────
 -- EvaluationSession
 -- ────────────────────────────────────────────────────────────
+DROP POLICY IF EXISTS "rls_session_select" ON "EvaluationSession";
+DROP POLICY IF EXISTS "rls_session_insert" ON "EvaluationSession";
+DROP POLICY IF EXISTS "rls_session_update" ON "EvaluationSession";
+DROP POLICY IF EXISTS "rls_session_delete" ON "EvaluationSession";
+
 CREATE POLICY "rls_session_select" ON "EvaluationSession"
   FOR SELECT
   USING (
@@ -141,6 +177,11 @@ CREATE POLICY "rls_session_delete" ON "EvaluationSession"
 -- ────────────────────────────────────────────────────────────
 -- EvaluationResult
 -- ────────────────────────────────────────────────────────────
+DROP POLICY IF EXISTS "rls_result_select" ON "EvaluationResult";
+DROP POLICY IF EXISTS "rls_result_insert" ON "EvaluationResult";
+DROP POLICY IF EXISTS "rls_result_update" ON "EvaluationResult";
+DROP POLICY IF EXISTS "rls_result_delete" ON "EvaluationResult";
+
 CREATE POLICY "rls_result_select" ON "EvaluationResult"
   FOR SELECT
   USING (
@@ -172,6 +213,11 @@ CREATE POLICY "rls_result_delete" ON "EvaluationResult"
 -- ────────────────────────────────────────────────────────────
 -- InterviewSchedule
 -- ────────────────────────────────────────────────────────────
+DROP POLICY IF EXISTS "rls_interview_select" ON "InterviewSchedule";
+DROP POLICY IF EXISTS "rls_interview_insert" ON "InterviewSchedule";
+DROP POLICY IF EXISTS "rls_interview_update" ON "InterviewSchedule";
+DROP POLICY IF EXISTS "rls_interview_delete" ON "InterviewSchedule";
+
 CREATE POLICY "rls_interview_select" ON "InterviewSchedule"
   FOR SELECT
   USING (
@@ -203,6 +249,11 @@ CREATE POLICY "rls_interview_delete" ON "InterviewSchedule"
 -- ────────────────────────────────────────────────────────────
 -- Vacancy
 -- ────────────────────────────────────────────────────────────
+DROP POLICY IF EXISTS "rls_vacancy_select" ON "Vacancy";
+DROP POLICY IF EXISTS "rls_vacancy_insert" ON "Vacancy";
+DROP POLICY IF EXISTS "rls_vacancy_update" ON "Vacancy";
+DROP POLICY IF EXISTS "rls_vacancy_delete" ON "Vacancy";
+
 CREATE POLICY "rls_vacancy_select" ON "Vacancy"
   FOR SELECT
   USING (
@@ -232,39 +283,65 @@ CREATE POLICY "rls_vacancy_delete" ON "Vacancy"
   );
 
 -- ────────────────────────────────────────────────────────────
--- VacancyApplication
+-- VacancyApplication (conditional — only if companyId exists)
 -- ────────────────────────────────────────────────────────────
-CREATE POLICY "rls_application_select" ON "VacancyApplication"
-  FOR SELECT
-  USING (
-    current_setting('app.is_super_admin', true) = 'true'
-    OR "companyId" = current_setting('app.current_company_id', true)
-  );
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'VacancyApplication'
+      AND column_name = 'companyId'
+  ) THEN
+    -- Drop existing policies
+    EXECUTE 'DROP POLICY IF EXISTS "rls_application_select" ON "VacancyApplication"';
+    EXECUTE 'DROP POLICY IF EXISTS "rls_application_insert" ON "VacancyApplication"';
+    EXECUTE 'DROP POLICY IF EXISTS "rls_application_update" ON "VacancyApplication"';
+    EXECUTE 'DROP POLICY IF EXISTS "rls_application_delete" ON "VacancyApplication"';
 
-CREATE POLICY "rls_application_insert" ON "VacancyApplication"
-  FOR INSERT
-  WITH CHECK (
-    current_setting('app.is_super_admin', true) = 'true'
-    OR "companyId" = current_setting('app.current_company_id', true)
-  );
+    -- Create new policies
+    EXECUTE 'CREATE POLICY "rls_application_select" ON "VacancyApplication"
+      FOR SELECT
+      USING (
+        current_setting(''app.is_super_admin'', true) = ''true''
+        OR "companyId" = current_setting(''app.current_company_id'', true)
+      )';
 
-CREATE POLICY "rls_application_update" ON "VacancyApplication"
-  FOR UPDATE
-  USING (
-    current_setting('app.is_super_admin', true) = 'true'
-    OR "companyId" = current_setting('app.current_company_id', true)
-  );
+    EXECUTE 'CREATE POLICY "rls_application_insert" ON "VacancyApplication"
+      FOR INSERT
+      WITH CHECK (
+        current_setting(''app.is_super_admin'', true) = ''true''
+        OR "companyId" = current_setting(''app.current_company_id'', true)
+      )';
 
-CREATE POLICY "rls_application_delete" ON "VacancyApplication"
-  FOR DELETE
-  USING (
-    current_setting('app.is_super_admin', true) = 'true'
-    OR "companyId" = current_setting('app.current_company_id', true)
-  );
+    EXECUTE 'CREATE POLICY "rls_application_update" ON "VacancyApplication"
+      FOR UPDATE
+      USING (
+        current_setting(''app.is_super_admin'', true) = ''true''
+        OR "companyId" = current_setting(''app.current_company_id'', true)
+      )';
+
+    EXECUTE 'CREATE POLICY "rls_application_delete" ON "VacancyApplication"
+      FOR DELETE
+      USING (
+        current_setting(''app.is_super_admin'', true) = ''true''
+        OR "companyId" = current_setting(''app.current_company_id'', true)
+      )';
+
+    RAISE NOTICE 'RLS policies created for VacancyApplication';
+  ELSE
+    RAISE NOTICE 'SKIPPED: VacancyApplication does not have companyId column. Run prisma db push first, then re-run this script.';
+  END IF;
+END $$;
 
 -- ────────────────────────────────────────────────────────────
 -- User (optional companyId — null = SUPER_ADMIN or system user)
 -- ────────────────────────────────────────────────────────────
+DROP POLICY IF EXISTS "rls_user_select" ON "User";
+DROP POLICY IF EXISTS "rls_user_insert" ON "User";
+DROP POLICY IF EXISTS "rls_user_update" ON "User";
+DROP POLICY IF EXISTS "rls_user_delete" ON "User";
+
 CREATE POLICY "rls_user_select" ON "User"
   FOR SELECT
   USING (
@@ -298,6 +375,11 @@ CREATE POLICY "rls_user_delete" ON "User"
 -- ────────────────────────────────────────────────────────────
 -- Question (optional companyId — null = system/global question)
 -- ────────────────────────────────────────────────────────────
+DROP POLICY IF EXISTS "rls_question_select" ON "Question";
+DROP POLICY IF EXISTS "rls_question_insert" ON "Question";
+DROP POLICY IF EXISTS "rls_question_update" ON "Question";
+DROP POLICY IF EXISTS "rls_question_delete" ON "Question";
+
 CREATE POLICY "rls_question_select" ON "Question"
   FOR SELECT
   USING (
@@ -328,8 +410,10 @@ CREATE POLICY "rls_question_delete" ON "Question"
     OR "companyId" = current_setting('app.current_company_id', true)
   );
 
--- ============================================================
--- Verification query — run to check RLS is enabled:
+-- ════════════════════════════════════════════════════════════
+-- VERIFICATION QUERY
+-- Run this AFTER the script to confirm RLS is active:
+-- ════════════════════════════════════════════════════════════
 --
 -- SELECT tablename, rowsecurity
 -- FROM pg_tables
@@ -338,7 +422,16 @@ CREATE POLICY "rls_question_delete" ON "Question"
 --     'Position', 'CandidateInvitation', 'EvaluationSession',
 --     'EvaluationResult', 'InterviewSchedule', 'Vacancy',
 --     'VacancyApplication', 'User', 'Question'
---   );
+--   )
+-- ORDER BY tablename;
 --
 -- All should show rowsecurity = true
+--
+-- To see all policies created:
+--
+-- SELECT tablename, policyname, permissive, roles, cmd, qual, with_check
+-- FROM pg_policies
+-- WHERE schemaname = 'public'
+--   AND policyname LIKE 'rls_%'
+-- ORDER BY tablename, policyname;
 -- ============================================================
