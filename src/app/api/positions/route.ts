@@ -16,8 +16,36 @@ export async function GET(req: NextRequest) {
     const sector = req.nextUrl.searchParams.get('sector')
     const all = req.nextUrl.searchParams.get('all')
 
-    // If "all" is set, return all active positions (for candidate selection)
+    // If "all" is set, return all active positions (SUPER_ADMIN only for multi-tenant isolation)
     if (all === 'true') {
+      // Only SUPER_ADMIN can see positions from all companies
+      if (auth.role !== 'SUPER_ADMIN') {
+        // Non-admin: return only their own company's positions
+        const positions = await db.position.findMany({
+          where: { active: true, companyId: auth.companyId, ...(sector ? { sector } : {}) },
+          orderBy: [{ sector: 'asc' }, { title: 'asc' }],
+          include: {
+            company: {
+              select: { id: true, name: true, sector: true },
+            },
+            evaluationTemplates: {
+              select: {
+                id: true,
+                name: true,
+                type: true,
+                order: true,
+                _count: { select: { questions: true } },
+              },
+              orderBy: { order: 'asc' },
+            },
+            _count: {
+              select: { sessions: true },
+            },
+          },
+        })
+        return NextResponse.json({ positions })
+      }
+
       const positions = await db.position.findMany({
         where: { active: true, ...(sector ? { sector } : {}) },
         orderBy: [{ sector: 'asc' }, { title: 'asc' }],

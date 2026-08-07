@@ -27,6 +27,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
+    // Company isolation: non-SUPER_ADMIN can only set consent for users in their own company
+    if (auth.role !== 'SUPER_ADMIN' && user.companyId !== auth.companyId) {
+      return NextResponse.json({ error: 'No tienes permiso para modificar este usuario' }, { status: 403 })
+    }
+
     const updatedUser = await db.user.update({
       where: { id: userId },
       data: {

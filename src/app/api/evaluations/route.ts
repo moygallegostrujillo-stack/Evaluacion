@@ -239,7 +239,12 @@ export async function GET(req: NextRequest) {
     if (candidateId) {
       // Get evaluation sessions for a candidate
       const sessions = await db.evaluationSession.findMany({
-        where: { candidateId },
+        where: {
+          candidateId,
+          ...(auth.role !== 'CANDIDATO' && auth.role !== 'SUPER_ADMIN' && auth.companyId
+            ? { companyId: auth.companyId }
+            : {}),
+        },
         orderBy: { createdAt: 'desc' },
         include: {
           position: {
@@ -289,6 +294,17 @@ export async function GET(req: NextRequest) {
     }
 
     if (positionId) {
+      // Verify position belongs to user's company (unless SUPER_ADMIN)
+      if (auth.role !== 'SUPER_ADMIN') {
+        const position = await db.position.findUnique({
+          where: { id: positionId },
+          select: { companyId: true },
+        })
+        if (!position || position.companyId !== auth.companyId) {
+          return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        }
+      }
+
       // Return evaluation templates and questions for a position
       const templates = await db.evaluationTemplate.findMany({
         where: { positionId, active: true },
@@ -349,6 +365,17 @@ export async function GET(req: NextRequest) {
 
       if (!session) {
         return NextResponse.json({ error: 'Session not found' }, { status: 404 })
+      }
+
+      // Ownership check: verify the authenticated user can access this session
+      if (auth.role === 'CANDIDATO') {
+        if (session.candidateId !== auth.userId) {
+          return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        }
+      } else if (auth.role !== 'SUPER_ADMIN') {
+        if (session.companyId !== auth.companyId) {
+          return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        }
       }
 
       // Get templates for the position ordered by step
@@ -517,6 +544,17 @@ export async function POST(req: NextRequest) {
 
     if (!session) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 })
+    }
+
+    // Ownership check: verify the authenticated user can modify this session
+    if (auth.role === 'CANDIDATO') {
+      if (session.candidateId !== auth.userId) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
+    } else if (auth.role !== 'SUPER_ADMIN') {
+      if (session.companyId !== auth.companyId) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
     }
 
     // ============================================

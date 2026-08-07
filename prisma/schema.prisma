@@ -30,6 +30,7 @@ model Company {
   interviews  InterviewSchedule[]
   questions   Question[]
   vacancies   Vacancy[]
+  vacancyApplications VacancyApplication[]
 }
 
 model User {
@@ -252,6 +253,7 @@ model VacancyQuestion {
 model VacancyApplication {
   id                 String    @id @default(cuid())
   vacancyId          String
+  companyId          String
   candidateName      String
   candidateEmail     String
   candidatePhone     String?
@@ -289,6 +291,7 @@ model VacancyApplication {
   summary            String?
 
   vacancy    Vacancy                      @relation(fields: [vacancyId], references: [id])
+  company    Company                      @relation(fields: [companyId], references: [id])
   responses  VacancyApplicationResponse[]
 }
 

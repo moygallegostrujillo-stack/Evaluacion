@@ -1,12 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { getAuthFromHeaders, canAccessCompany } from '@/lib/auth'
 
 // GET: List questions for a position, optionally filtered by company
 export async function GET(req: NextRequest) {
   try {
+    // ── Auth check ──
+    const auth = getAuthFromHeaders(req.headers)
+    if (!auth) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
     const positionId = req.nextUrl.searchParams.get('positionId')
-    const companyId = req.nextUrl.searchParams.get('companyId')
+    const companyIdParam = req.nextUrl.searchParams.get('companyId')
     const templateId = req.nextUrl.searchParams.get('templateId')
+
+    // Derive companyId from JWT; SUPER_ADMIN may override via query param
+    const companyId = auth.role === 'SUPER_ADMIN' && companyIdParam
+      ? companyIdParam
+      : auth.companyId
 
     if (templateId) {
       // Get questions for a specific template
@@ -15,8 +27,13 @@ export async function GET(req: NextRequest) {
         orderBy: { order: 'asc' },
       })
 
+      // Enforce company access: if user is not SUPER_ADMIN, filter to only their company's questions
+      const filtered = auth.role === 'SUPER_ADMIN'
+        ? questions
+        : questions.filter(q => !q.companyId || q.companyId === auth.companyId)
+
       return NextResponse.json({
-        questions: questions.map(q => ({
+        questions: filtered.map(q => ({
           ...q,
           options: q.options ? (() => { try { const p = JSON.parse(q.options); return Array.isArray(p) ? p : null; } catch { return null; } })() : null,
         })),
@@ -54,18 +71,21 @@ export async function GET(req: NextRequest) {
       name: t.name,
       type: t.type,
       order: t.order,
-      questions: t.questions.map(q => ({
-        id: q.id,
-        text: q.text,
-        type: q.type,
-        options: parseOptions(q.options),
-        category: q.category,
-        order: q.order,
-        reverseScored: q.reverseScored,
-        isCustom: q.isCustom,
-        correctAnswer: q.correctAnswer,
-        companyId: q.companyId,
-      })),
+      questions: t.questions
+        // Non-SUPER_ADMIN users can only see their own company's custom questions + global questions
+        .filter(q => auth.role === 'SUPER_ADMIN' || !q.companyId || q.companyId === auth.companyId)
+        .map(q => ({
+          id: q.id,
+          text: q.text,
+          type: q.type,
+          options: parseOptions(q.options),
+          category: q.category,
+          order: q.order,
+          reverseScored: q.reverseScored,
+          isCustom: q.isCustom,
+          correctAnswer: q.correctAnswer,
+          companyId: q.companyId,
+        })),
     }))
 
     return NextResponse.json({ templates: result })
@@ -78,8 +98,19 @@ export async function GET(req: NextRequest) {
 // POST: Create a custom question
 export async function POST(req: NextRequest) {
   try {
+    // ── Auth check ──
+    const auth = getAuthFromHeaders(req.headers)
+    if (!auth) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
     const body = await req.json()
-    const { templateId, text, type, options, category, correctAnswer, companyId } = body
+    const { templateId, text, type, options, category, correctAnswer, companyId: bodyCompanyId } = body
+
+    // Derive companyId from JWT; SUPER_ADMIN may override via body
+    const companyId = auth.role === 'SUPER_ADMIN' && bodyCompanyId
+      ? bodyCompanyId
+      : auth.companyId
 
     if (!templateId || !text || !type || !companyId) {
       return NextResponse.json({ error: 'templateId, text, type, and companyId are required' }, { status: 400 })
@@ -144,8 +175,19 @@ export async function POST(req: NextRequest) {
 // PUT: Update a custom question
 export async function PUT(req: NextRequest) {
   try {
+    // ── Auth check ──
+    const auth = getAuthFromHeaders(req.headers)
+    if (!auth) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
     const body = await req.json()
-    const { questionId, text, type, options, category, correctAnswer, companyId } = body
+    const { questionId, text, type, options, category, correctAnswer, companyId: bodyCompanyId } = body
+
+    // Derive companyId from JWT; SUPER_ADMIN may override via body
+    const companyId = auth.role === 'SUPER_ADMIN' && bodyCompanyId
+      ? bodyCompanyId
+      : auth.companyId
 
     if (!questionId || !companyId) {
       return NextResponse.json({ error: 'questionId and companyId are required' }, { status: 400 })
@@ -164,7 +206,8 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'No puedes editar preguntas predeterminadas del sistema' }, { status: 403 })
     }
 
-    if (existing.companyId !== companyId) {
+    // Enforce company access via canAccessCompany utility
+    if (!canAccessCompany(auth.role, auth.companyId, existing.companyId || '')) {
       return NextResponse.json({ error: 'No tienes permiso para editar esta pregunta' }, { status: 403 })
     }
 
@@ -202,8 +245,19 @@ export async function PUT(req: NextRequest) {
 // DELETE: Delete a custom question
 export async function DELETE(req: NextRequest) {
   try {
+    // ── Auth check ──
+    const auth = getAuthFromHeaders(req.headers)
+    if (!auth) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
     const questionId = req.nextUrl.searchParams.get('questionId')
-    const companyId = req.nextUrl.searchParams.get('companyId')
+    const companyIdParam = req.nextUrl.searchParams.get('companyId')
+
+    // Derive companyId from JWT; SUPER_ADMIN may override via query param
+    const companyId = auth.role === 'SUPER_ADMIN' && companyIdParam
+      ? companyIdParam
+      : auth.companyId
 
     if (!questionId || !companyId) {
       return NextResponse.json({ error: 'questionId and companyId are required' }, { status: 400 })
@@ -221,7 +275,8 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'No puedes eliminar preguntas predeterminadas del sistema' }, { status: 403 })
     }
 
-    if (existing.companyId !== companyId) {
+    // Enforce company access via canAccessCompany utility
+    if (!canAccessCompany(auth.role, auth.companyId, existing.companyId || '')) {
       return NextResponse.json({ error: 'No tienes permiso para eliminar esta pregunta' }, { status: 403 })
     }
 

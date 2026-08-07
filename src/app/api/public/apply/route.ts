@@ -756,6 +756,7 @@ export async function POST(req: NextRequest) {
       const application = await db.vacancyApplication.create({
         data: {
           vacancyId: vacancy.id,
+          companyId: vacancy.companyId,
           candidateName: name,
           candidateEmail: email,
           candidatePhone: phone || null,
