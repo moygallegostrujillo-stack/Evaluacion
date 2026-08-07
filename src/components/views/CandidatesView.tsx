@@ -182,7 +182,21 @@ export default function CandidatesView() {
                       {c.name?.charAt(0) || '?'}
                     </div>
                     <div>
-                      <p className="font-medium">{c.name}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">{c.name}</p>
+                        {/* Consent indicator - right next to name */}
+                        {c.consentGiven ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 border border-emerald-300 text-emerald-700" title={`Aceptó términos y privacidad${c.consentDate ? ' el ' + new Date(c.consentDate).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}`}>
+                            <ShieldCheck className="w-3.5 h-3.5" />
+                            <span className="text-[11px] font-semibold">OK</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-50 border border-red-200 text-red-500" title="No ha aceptado términos y privacidad">
+                            <ShieldX className="w-3.5 h-3.5" />
+                            <span className="text-[11px] font-semibold">Pendiente</span>
+                          </span>
+                        )}
+                      </div>
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
                         <p className="text-xs text-gray-500 flex items-center gap-1">
                           <Mail className="w-3 h-3" /> {c.email}
@@ -196,16 +210,6 @@ export default function CandidatesView() {
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    {/* Consent indicator */}
-                    {c.consentGiven ? (
-                      <div className="flex items-center gap-1" title={`Aceptó términos y privacidad${c.consentDate ? ' el ' + new Date(c.consentDate).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}`}>
-                        <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1" title="No ha aceptado términos y privacidad">
-                        <ShieldX className="w-4 h-4 text-red-400" />
-                      </div>
-                    )}
                     {c.result && (
                       <>
                         <div className="text-right hidden sm:block">
