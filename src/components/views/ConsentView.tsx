@@ -6,7 +6,7 @@ import { apiFetch } from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Shield, Info } from 'lucide-react'
+import { Shield, Info, Download } from 'lucide-react'
 
 export default function ConsentView() {
   const user = useAppStore((s) => s.user)
@@ -126,6 +126,15 @@ export default function ConsentView() {
           >
             {loading ? 'Guardando...' : 'Aceptar y Continuar a la Evaluación'}
           </Button>
+
+          <a
+            href="/Aviso_de_Privacidad_Consentimiento_EvaluHR.pdf"
+            download
+            className="flex items-center justify-center gap-2 text-sm text-emerald-600 hover:text-emerald-800 hover:underline w-full"
+          >
+            <Download className="w-4 h-4" />
+            Descargar Aviso de Privacidad completo (PDF)
+          </a>
         </CardContent>
       </Card>
     </div>

@@ -11,7 +11,7 @@ import { Separator } from '@/components/ui/separator'
 import {
   ArrowLeft, CheckCircle2, AlertTriangle, XCircle,
   Calendar, MapPin, FileText, Mail, Phone, User,
-  ShieldCheck, ShieldX, Scale, AlertCircle, RefreshCw
+  ShieldCheck, ShieldX, Scale, AlertCircle, RefreshCw, Download
 } from 'lucide-react'
 import {
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
@@ -266,6 +266,14 @@ export default function CandidateDetailView() {
               <p className="text-xs text-gray-500 italic">
                 El prospecto aceptó los términos y condiciones de uso del sistema, así como el aviso de privacidad para el tratamiento de datos personales, conforme a la Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP) y el Reglamento de la Ley Federal de Protección de Datos Personales.
               </p>
+              <a
+                href="/Aviso_de_Privacidad_Consentimiento_EvaluHR.pdf"
+                download
+                className="inline-flex items-center gap-1.5 text-xs text-emerald-600 hover:text-emerald-800 hover:underline mt-1"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Descargar Aviso de Privacidad completo (PDF)
+              </a>
             </div>
           ) : (
             <div className="space-y-3">

@@ -14,7 +14,7 @@ import {
   Briefcase, User, Mail, Phone, Calendar, ArrowRight,
   CheckCircle2, Clock, Brain, BookOpen, ClipboardList,
   AlertCircle, MessageCircle, Send, Shield, Info,
-  ChevronRight, ListChecks
+  ChevronRight, ListChecks, Download
 } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 
@@ -753,6 +753,15 @@ export default function PublicEvaluationView() {
                 >
                   Aceptar y Comenzar <ArrowRight className="w-5 h-5 ml-2" />
                 </Button>
+
+                <a
+                  href="/Aviso_de_Privacidad_Consentimiento_EvaluHR.pdf"
+                  download
+                  className="flex items-center justify-center gap-2 text-sm text-emerald-600 hover:text-emerald-800 hover:underline w-full mt-2"
+                >
+                  <Download className="w-4 h-4" />
+                  Descargar Aviso de Privacidad completo (PDF)
+                </a>
               </CardContent>
             </Card>
           </div>

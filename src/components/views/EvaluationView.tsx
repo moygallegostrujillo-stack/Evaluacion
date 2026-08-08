@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
   CheckCircle2, ChevronRight, Clock, ClipboardList, Brain, BookOpen,
-  Utensils, ShoppingBag, Briefcase, ArrowRight, Users, Shield, Info
+  Utensils, ShoppingBag, Briefcase, ArrowRight, Users, Shield, Info, Download
 } from 'lucide-react'
 
 const LIKERT_OPTIONS = [
@@ -674,6 +674,15 @@ export default function EvaluationView() {
               Aceptar y Continuar
               <ChevronRight className="w-4 h-4 ml-1" />
             </Button>
+
+            <a
+              href="/Aviso_de_Privacidad_Consentimiento_EvaluHR.pdf"
+              download
+              className="flex items-center justify-center gap-2 text-sm text-emerald-600 hover:text-emerald-800 hover:underline w-full mt-2"
+            >
+              <Download className="w-4 h-4" />
+              Descargar Aviso de Privacidad completo (PDF)
+            </a>
           </CardContent>
         </Card>
       </div>
