@@ -595,26 +595,50 @@ export default function EvaluationView() {
               </div>
             </div>
 
-            <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-700 space-y-3 max-h-48 overflow-y-auto">
-              <p className="font-semibold">AVISO DE PRIVACIDAD</p>
+            <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-700 space-y-3 max-h-64 overflow-y-auto">
+              <p className="font-semibold">AVISO DE PRIVACIDAD Y CONSENTIMIENTO</p>
               <p>
-                De conformidad con la LFPDPPP, se le informa que sus datos personales serán tratados de manera confidencial.
+                De conformidad con la Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP),
+                se le informa que sus datos personales serán tratados de manera confidencial.
               </p>
               <p><strong>Datos que se recopilan:</strong></p>
               <ul className="list-disc list-inside space-y-1 ml-2">
                 <li>Nombre completo y correo electrónico</li>
+                <li>Teléfono (opcional)</li>
                 <li>Respuestas a evaluaciones psicométricas y psicológicas</li>
                 <li>Resultados de evaluaciones de conocimientos</li>
               </ul>
-              <p><strong>Finalidad:</strong></p>
+              <p><strong>Finalidad del tratamiento:</strong></p>
               <ul className="list-disc list-inside space-y-1 ml-2">
                 <li>Realizar pre-evaluaciones para procesos de reclutamiento</li>
                 <li>Generar perfiles de competencias y recomendaciones</li>
                 <li>Facilitar el proceso de selección laboral</li>
               </ul>
-              <p><strong>Sus derechos ARCO:</strong> Acceder, Rectificar, Cancelar y Oponerse al tratamiento de sus datos.</p>
+              <p><strong>Base legal:</strong></p>
+              <ul className="list-disc list-inside space-y-1 ml-2">
+                <li>LFPDPPP Art. 8: Consentimiento expreso y por escrito para datos personales sensibles</li>
+                <li>NOM-035-STPS-2018: Identificación de factores de riesgo psicosocial</li>
+                <li>LFT Art. 132: Obligaciones del patrón en la relación laboral</li>
+              </ul>
+              <p><strong>Quién puede ver sus resultados:</strong></p>
+              <ul className="list-disc list-inside space-y-1 ml-2">
+                <li>Personal de Recursos Humanos de la empresa</li>
+                <li>Gerentes del área correspondiente</li>
+              </ul>
+              <p><strong>Sus derechos ARCO:</strong></p>
+              <ul className="list-disc list-inside space-y-1 ml-2">
+                <li><strong>A</strong>cceder a sus datos personales</li>
+                <li><strong>R</strong>ectificar datos inexactos</li>
+                <li><strong>C</strong>ancelar sus datos</li>
+                <li><strong>O</strong>ponerse al tratamiento de sus datos</li>
+              </ul>
+              <p>
+                Al aceptar, usted consiente el tratamiento de sus datos personales para los fines señalados.
+                Sus datos no serán compartidos con terceros sin su autorización expresa.
+              </p>
               <p className="text-xs text-gray-500">
-                Responsable: {user?.companyName || 'La empresa correspondiente'} — Tuxtla Gutiérrez, Chiapas, México
+                Responsable: {user?.companyName || 'La empresa correspondiente'}<br/>
+                Tuxtla Gutiérrez, Chiapas, México
               </p>
             </div>
 
@@ -627,6 +651,7 @@ export default function EvaluationView() {
               />
               <label htmlFor="consent-eval" className="text-sm text-emerald-900 cursor-pointer leading-tight">
                 Acepto que mis respuestas serán tratadas como datos personales sensibles y consiento someterme a esta evaluación de forma voluntaria.
+                Entiendo que los resultados serán confidenciales y utilizados solo para el proceso de selección.
               </label>
             </div>
 

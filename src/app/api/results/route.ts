@@ -24,7 +24,9 @@ export async function GET(req: NextRequest) {
     // Compare multiple candidates
     if (compareIds) {
       const ids = compareIds.split(',').filter(Boolean)
-      const results = await rlsDb.evaluationResult.findMany({
+
+      // Fetch from EvaluationResult first
+      const evalResults = await rlsDb.evaluationResult.findMany({
         where: { id: { in: ids } },
         include: {
           candidate: {
@@ -36,43 +38,105 @@ export async function GET(req: NextRequest) {
         },
       })
 
-      // RLS auto-filters by companyId for non-SUPER_ADMIN, so no manual post-fetch filtering needed
+      // Map all EvaluationResult items to the unified comparison shape
+      type CompareCandidate = {
+        id: string
+        candidateId: string
+        candidateName: string
+        positionTitle: string
+        overallScore: number
+        recommendation: string
+        scores: {
+          openness: number
+          conscientiousness: number
+          extraversion: number
+          agreeableness: number
+          neuroticism: number
+          stressLevel: number
+          empathy: number
+          adaptability: number
+          leadership: number
+          teamwork: number
+          knowledgeScore: number | null
+        }
+      }
 
-      // Build comparison data
-      const comparison = {
-        candidates: results.map((r) => ({
-          id: r.id,
-          candidateId: r.candidateId,
-          candidateName: r.candidateName,
-          positionTitle: r.positionTitle,
-          overallScore: r.overallScore,
-          recommendation: r.recommendation,
-          scores: {
-            openness: r.openness,
-            conscientiousness: r.conscientiousness,
-            extraversion: r.extraversion,
-            agreeableness: r.agreeableness,
-            neuroticism: r.neuroticism,
-            stressLevel: r.stressLevel,
-            empathy: r.empathy,
-            adaptability: r.adaptability,
-            leadership: r.leadership,
-            teamwork: r.teamwork,
-            knowledgeScore: r.knowledgeScore,
+      const allCandidates: CompareCandidate[] = evalResults.map((r) => ({
+        id: r.id,
+        candidateId: r.candidateId,
+        candidateName: r.candidateName,
+        positionTitle: r.positionTitle,
+        overallScore: r.overallScore,
+        recommendation: r.recommendation,
+        scores: {
+          openness: r.openness,
+          conscientiousness: r.conscientiousness,
+          extraversion: r.extraversion,
+          agreeableness: r.agreeableness,
+          neuroticism: r.neuroticism,
+          stressLevel: r.stressLevel,
+          empathy: r.empathy,
+          adaptability: r.adaptability,
+          leadership: r.leadership,
+          teamwork: r.teamwork,
+          knowledgeScore: r.knowledgeScore,
+        },
+      }))
+
+      // Find IDs not found in EvaluationResult — they may be VacancyApplication IDs
+      const foundIds = new Set(evalResults.map((r) => r.id))
+      const missingIds = ids.filter((id) => !foundIds.has(id))
+
+      if (missingIds.length > 0) {
+        const vacancyApps = await rlsDb.vacancyApplication.findMany({
+          where: { id: { in: missingIds } },
+          include: {
+            vacancy: {
+              select: { id: true, title: true },
+            },
           },
-        })),
+        })
+
+        for (const app of vacancyApps) {
+          allCandidates.push({
+            id: app.id,
+            candidateId: '', // VacancyApplication doesn't have a direct candidateId FK
+            candidateName: app.candidateName,
+            positionTitle: app.vacancy?.title || '',
+            overallScore: app.overallScore,
+            recommendation: app.recommendation,
+            scores: {
+              openness: app.openness,
+              conscientiousness: app.conscientiousness,
+              extraversion: app.extraversion,
+              agreeableness: app.agreeableness,
+              neuroticism: app.neuroticism,
+              stressLevel: app.stressLevel,
+              empathy: app.empathy,
+              adaptability: app.adaptability,
+              leadership: app.leadership,
+              teamwork: app.teamwork,
+              knowledgeScore: app.knowledgeScore,
+            },
+          })
+        }
+      }
+
+      // Build comparison data from all candidates (both EvaluationResult and VacancyApplication)
+      const comparison = {
+        candidates: allCandidates,
         averages: {
-          overallScore: results.reduce((s, r) => s + r.overallScore, 0) / (results.length || 1),
-          openness: results.reduce((s, r) => s + r.openness, 0) / (results.length || 1),
-          conscientiousness: results.reduce((s, r) => s + r.conscientiousness, 0) / (results.length || 1),
-          extraversion: results.reduce((s, r) => s + r.extraversion, 0) / (results.length || 1),
-          agreeableness: results.reduce((s, r) => s + r.agreeableness, 0) / (results.length || 1),
-          neuroticism: results.reduce((s, r) => s + r.neuroticism, 0) / (results.length || 1),
-          stressLevel: results.reduce((s, r) => s + r.stressLevel, 0) / (results.length || 1),
-          empathy: results.reduce((s, r) => s + r.empathy, 0) / (results.length || 1),
-          adaptability: results.reduce((s, r) => s + r.adaptability, 0) / (results.length || 1),
-          leadership: results.reduce((s, r) => s + r.leadership, 0) / (results.length || 1),
-          teamwork: results.reduce((s, r) => s + r.teamwork, 0) / (results.length || 1),
+          overallScore: allCandidates.reduce((s, r) => s + r.overallScore, 0) / (allCandidates.length || 1),
+          openness: allCandidates.reduce((s, r) => s + r.scores.openness, 0) / (allCandidates.length || 1),
+          conscientiousness: allCandidates.reduce((s, r) => s + r.scores.conscientiousness, 0) / (allCandidates.length || 1),
+          extraversion: allCandidates.reduce((s, r) => s + r.scores.extraversion, 0) / (allCandidates.length || 1),
+          agreeableness: allCandidates.reduce((s, r) => s + r.scores.agreeableness, 0) / (allCandidates.length || 1),
+          neuroticism: allCandidates.reduce((s, r) => s + r.scores.neuroticism, 0) / (allCandidates.length || 1),
+          stressLevel: allCandidates.reduce((s, r) => s + r.scores.stressLevel, 0) / (allCandidates.length || 1),
+          empathy: allCandidates.reduce((s, r) => s + r.scores.empathy, 0) / (allCandidates.length || 1),
+          adaptability: allCandidates.reduce((s, r) => s + r.scores.adaptability, 0) / (allCandidates.length || 1),
+          leadership: allCandidates.reduce((s, r) => s + r.scores.leadership, 0) / (allCandidates.length || 1),
+          teamwork: allCandidates.reduce((s, r) => s + r.scores.teamwork, 0) / (allCandidates.length || 1),
         },
       }
 

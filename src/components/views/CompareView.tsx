@@ -20,12 +20,16 @@ export default function CompareView() {
   const setCurrentView = useAppStore((s) => s.setCurrentView)
   const [results, setResults] = useState<CandidateResult[]>([])
   const [loading, setLoading] = useState(compareIds.length > 0)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (compareIds.length === 0) return
     let cancelled = false
     apiFetch(`/api/results?compareIds=${compareIds.join(',')}`)
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error(`Error ${res.status}: ${res.statusText}`)
+        return res.json()
+      })
       .then(data => {
         if (!cancelled) {
           // API returns { comparison: { candidates: [...] } } with scores nested inside
@@ -39,14 +43,36 @@ export default function CompareView() {
           setLoading(false)
         }
       })
-      .catch(() => {
-        if (!cancelled) setLoading(false)
+      .catch((err) => {
+        if (!cancelled) {
+          console.error('Compare fetch error:', err)
+          setError(err.message || 'Error al cargar comparación')
+          setLoading(false)
+        }
       })
     return () => { cancelled = true }
   }, [compareIds])
 
   if (loading) {
     return <div className="flex items-center justify-center h-64"><div className="animate-spin w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full" /></div>
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-4">
+        <Button variant="ghost" onClick={() => setCurrentView('candidates')}>
+          <ArrowLeft className="w-4 h-4 mr-1" /> Volver a Candidatos
+        </Button>
+        <div className="text-center py-12">
+          <BarChart3 className="w-12 h-12 text-red-300 mx-auto mb-3" />
+          <p className="text-red-600 font-medium">Error al comparar candidatos</p>
+          <p className="text-gray-500 text-sm mt-1">{error}</p>
+          <Button className="mt-4 bg-emerald-600 hover:bg-emerald-700" onClick={() => setCurrentView('candidates')}>
+            Volver a Candidatos
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   if (results.length < 2) {
