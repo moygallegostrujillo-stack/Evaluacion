@@ -41,8 +41,82 @@ export async function GET(req: NextRequest) {
       },
     })
 
+    // Also fetch VacancyApplication data for candidates who applied through vacancies
+    const candidateIds = candidates.map(c => c.id)
+    const vacancyApplications = await rlsDb.vacancyApplication.findMany({
+      where: {
+        candidateEmail: { in: candidates.map(c => c.email) },
+        status: 'COMPLETED',
+      },
+      orderBy: { completedAt: 'desc' },
+      include: {
+        vacancy: {
+          select: { id: true, title: true },
+        },
+      },
+    })
+
+    // Create a map of email -> latest vacancy application result
+    const vacancyResultMap = new Map<string, {
+      id: string
+      candidateId: string
+      candidateName: string
+      positionId: string
+      positionTitle: string
+      companyId: string
+      overallScore: number
+      recommendation: string
+      summary: string | null
+      openness: number
+      conscientiousness: number
+      extraversion: number
+      agreeableness: number
+      neuroticism: number
+      stressLevel: number
+      empathy: number
+      adaptability: number
+      leadership: number
+      teamwork: number
+      knowledgeScore: number | null
+      source: 'vacancy'
+    }>()
+
+    for (const app of vacancyApplications) {
+      if (!vacancyResultMap.has(app.candidateEmail)) {
+        vacancyResultMap.set(app.candidateEmail, {
+          id: app.id,
+          candidateId: candidates.find(c => c.email === app.candidateEmail)?.id || '',
+          candidateName: app.candidateName,
+          positionId: app.vacancyId,
+          positionTitle: app.vacancy?.title || '',
+          companyId: app.companyId,
+          overallScore: app.overallScore,
+          recommendation: app.recommendation,
+          summary: app.summary,
+          openness: app.openness,
+          conscientiousness: app.conscientiousness,
+          extraversion: app.extraversion,
+          agreeableness: app.agreeableness,
+          neuroticism: app.neuroticism,
+          stressLevel: app.stressLevel,
+          empathy: app.empathy,
+          adaptability: app.adaptability,
+          leadership: app.leadership,
+          teamwork: app.teamwork,
+          knowledgeScore: app.knowledgeScore,
+          source: 'vacancy',
+        })
+      }
+    }
+
     const formatted = candidates.map((c) => {
       const session = c.sessions[0]
+      const sessionResult = session?.result || null
+      const vacancyResult = vacancyResultMap.get(c.email) || null
+
+      // Prefer EvaluationResult, fallback to VacancyApplication result
+      const result = sessionResult || vacancyResult || null
+
       return {
         id: c.id,
         email: c.email,
@@ -52,9 +126,10 @@ export async function GET(req: NextRequest) {
         consentGiven: c.consentGiven,
         consentDate: c.consentDate,
         createdAt: c.createdAt,
-        result: session?.result || null,
-        sessionStatus: session?.status || null,
-        positionTitle: session?.position?.title || null,
+        result,
+        sessionStatus: session?.status || (vacancyResult ? 'COMPLETED' : null),
+        positionTitle: session?.position?.title || vacancyResult?.positionTitle || null,
+        resultSource: sessionResult ? 'evaluation' : vacancyResult ? 'vacancy' : null,
       }
     })
 

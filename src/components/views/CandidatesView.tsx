@@ -25,6 +25,8 @@ interface CandidateWithResult {
   createdAt: string
   result?: CandidateResult
   sessionStatus?: string
+  positionTitle?: string | null
+  resultSource?: 'evaluation' | 'vacancy' | null
 }
 
 export default function CandidatesView() {
@@ -219,9 +221,12 @@ export default function CandidatesView() {
                       <>
                         <div className="text-right hidden sm:block">
                           <p className="font-bold">{Math.round(c.result.overallScore)}/100</p>
-                          <p className="text-xs text-gray-500">{c.result.positionTitle}</p>
+                          <p className="text-xs text-gray-500">{c.positionTitle || c.result.positionTitle}</p>
                         </div>
                         {getRecBadge(c.result.recommendation)}
+                        {c.resultSource === 'vacancy' && (
+                          <Badge variant="outline" className="text-[10px] text-blue-500 border-blue-200">Vacante</Badge>
+                        )}
                         <Checkbox
                           checked={compareIds.includes(c.result.id)}
                           onCheckedChange={() => toggleCompare(c.result.id)}

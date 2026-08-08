@@ -81,6 +81,7 @@ export async function GET(req: NextRequest) {
 
     // Single result by ID
     if (resultId) {
+      // First try EvaluationResult
       const result = await rlsDb.evaluationResult.findUnique({
         where: { id: resultId },
         include: {
@@ -101,16 +102,88 @@ export async function GET(req: NextRequest) {
         },
       })
 
-      if (!result) {
-        return NextResponse.json({ error: 'Result not found' }, { status: 404 })
+      if (result) {
+        // Defense-in-depth: RLS already filtered, but keep the check as extra safety
+        if (auth.role !== 'SUPER_ADMIN' && result.companyId !== auth.companyId) {
+          return NextResponse.json({ error: 'Forbidden: result belongs to another company' }, { status: 403 })
+        }
+
+        return NextResponse.json({ result })
       }
 
-      // Defense-in-depth: RLS already filtered, but keep the check as extra safety
-      if (auth.role !== 'SUPER_ADMIN' && result.companyId !== auth.companyId) {
-        return NextResponse.json({ error: 'Forbidden: result belongs to another company' }, { status: 403 })
+      // If not found in EvaluationResult, try VacancyApplication
+      const vacancyApp = await rlsDb.vacancyApplication.findUnique({
+        where: { id: resultId },
+        include: {
+          vacancy: {
+            select: { id: true, title: true, sector: true },
+          },
+        },
+      })
+
+      if (vacancyApp) {
+        // Defense-in-depth check
+        if (auth.role !== 'SUPER_ADMIN' && vacancyApp.companyId !== auth.companyId) {
+          return NextResponse.json({ error: 'Forbidden: result belongs to another company' }, { status: 403 })
+        }
+
+        // Find the candidate user for contact info
+        const candidateUser = await getUnscopedClient().user.findFirst({
+          where: { email: vacancyApp.candidateEmail },
+          select: { id: true, name: true, email: true, phone: true, consentGiven: true, consentDate: true },
+        })
+
+        // Map VacancyApplication to the same shape as EvaluationResult
+        const mappedResult = {
+          id: vacancyApp.id,
+          sessionId: vacancyApp.id,
+          candidateId: candidateUser?.id || '',
+          candidateName: vacancyApp.candidateName,
+          positionId: vacancyApp.vacancyId,
+          positionTitle: vacancyApp.vacancy?.title || '',
+          companyId: vacancyApp.companyId,
+          openness: vacancyApp.openness,
+          conscientiousness: vacancyApp.conscientiousness,
+          extraversion: vacancyApp.extraversion,
+          agreeableness: vacancyApp.agreeableness,
+          neuroticism: vacancyApp.neuroticism,
+          stressLevel: vacancyApp.stressLevel,
+          empathy: vacancyApp.empathy,
+          adaptability: vacancyApp.adaptability,
+          leadership: vacancyApp.leadership,
+          teamwork: vacancyApp.teamwork,
+          knowledgeScore: vacancyApp.knowledgeScore,
+          overallScore: vacancyApp.overallScore,
+          recommendation: vacancyApp.recommendation,
+          summary: vacancyApp.summary,
+          createdAt: vacancyApp.createdAt,
+          candidate: candidateUser ? {
+            id: candidateUser.id,
+            name: candidateUser.name,
+            email: candidateUser.email,
+            phone: candidateUser.phone,
+            consentGiven: candidateUser.consentGiven,
+            consentDate: candidateUser.consentDate,
+          } : null,
+          position: vacancyApp.vacancy ? {
+            id: vacancyApp.vacancy.id,
+            title: vacancyApp.vacancy.title,
+            category: '',
+            sector: vacancyApp.vacancy.sector,
+          } : null,
+          session: {
+            id: vacancyApp.id,
+            startedAt: vacancyApp.startedAt,
+            completedAt: vacancyApp.completedAt,
+            status: vacancyApp.status,
+          },
+          source: 'vacancy' as const,
+        }
+
+        return NextResponse.json({ result: mappedResult })
       }
 
-      return NextResponse.json({ result })
+      return NextResponse.json({ error: 'Result not found' }, { status: 404 })
     }
 
     // Results by candidate — RLS auto-filters by companyId
