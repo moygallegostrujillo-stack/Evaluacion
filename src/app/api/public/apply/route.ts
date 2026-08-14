@@ -637,10 +637,10 @@ export async function GET(req: NextRequest) {
             text: q.text,
             type: q.type,
             options: q.options ? JSON.parse(q.options) : null,
-            category: q.category,
+            category: q.category as "KNOWLEDGE",
             correctAnswer: undefined, // Don't expose correct answer to candidate
             order: q.order,
-            questionId: q.id,
+            vacancyQuestionId: q.id,
           })
         }
       }

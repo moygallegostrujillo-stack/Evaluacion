@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
         status: 'PENDING',
         channel: channel || 'EMAIL',
         // companyId auto-injected by RLS for non-SUPER_ADMIN; SUPER_ADMIN must specify
-        ...(companyId ? { companyId } : {}),
+        companyId,
         positionId,
         invitedBy,
         expiresAt,
@@ -80,8 +80,8 @@ export async function POST(req: NextRequest) {
         status: invitation.status,
         channel: invitation.channel,
         expiresAt: invitation.expiresAt,
-        company: invitation.company,
-        position: invitation.position,
+        companyId: invitation.companyId,
+        positionId: invitation.positionId,
         createdAt: invitation.createdAt,
       },
     }, { status: 201 })

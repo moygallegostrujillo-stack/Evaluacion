@@ -223,13 +223,13 @@ export default function CandidatesView() {
                           <p className="font-bold">{Math.round(c.result.overallScore)}/100</p>
                           <p className="text-xs text-gray-500">{c.positionTitle || c.result.positionTitle}</p>
                         </div>
-                        {getRecBadge(c.result.recommendation)}
+                        {getRecBadge(c.result?.recommendation)}
                         {c.resultSource === 'vacancy' && (
                           <Badge variant="outline" className="text-[10px] text-blue-500 border-blue-200">Vacante</Badge>
                         )}
                         <Checkbox
-                          checked={compareIds.includes(c.result.id)}
-                          onCheckedChange={() => toggleCompare(c.result.id)}
+                          checked={compareIds.includes(c.result!.id)}
+                          onCheckedChange={() => toggleCompare(c.result!.id)}
                           onClick={(e) => e.stopPropagation()}
                           className="shrink-0"
                         />

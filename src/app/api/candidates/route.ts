@@ -188,7 +188,7 @@ export async function POST(req: NextRequest) {
         candidateId: user.id,
         positionId,
         // companyId auto-injected by RLS for non-SUPER_ADMIN; SUPER_ADMIN must specify
-        ...(companyId ? { companyId } : {}),
+        companyId,
         status: 'NOT_STARTED',
       },
     })

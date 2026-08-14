@@ -204,7 +204,7 @@ Las preguntas deben ser relevantes al puesto, prácticas, y enfocadas en conocim
     const maxOrder = existingQuestions.length > 0 ? existingQuestions[0].order : 0
 
     // Create the questions in the database
-    const createdQuestions = []
+    const createdQuestions: any[] = []
     for (let i = 0; i < generatedQuestions.length; i++) {
       const q = generatedQuestions[i]
       const question = await rlsDb.vacancyQuestion.create({

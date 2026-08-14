@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { useAppStore } from '@/lib/store'
-import { apiFetch, apiPost } from '@/lib/api'
+import { apiFetch, apiPost, apiPut, apiPatch } from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,6 +12,8 @@ import { Separator } from '@/components/ui/separator'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -25,7 +27,8 @@ import {
 } from '@/components/ui/select'
 import {
   Building2, Users, UserPlus, Plus, RefreshCw,
-  Briefcase, Hash, CheckCircle2, XCircle, Mail, Phone
+  Briefcase, Hash, CheckCircle2, XCircle, Mail, Phone,
+  Pencil, KeyRound, ShieldOff, ShieldCheck, Trash2, AlertTriangle
 } from 'lucide-react'
 
 interface CompanyData {
@@ -93,6 +96,36 @@ export default function CompanyManagementView() {
 
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+
+  // Edit user modal
+  const [showEditUser, setShowEditUser] = useState(false)
+  const [editForm, setEditForm] = useState({
+    id: '',
+    name: '',
+    email: '',
+    phone: '',
+    role: 'RH',
+    companyId: '',
+  })
+  const [editingUser, setEditingUser] = useState(false)
+
+  // Change password modal
+  const [showChangePassword, setShowChangePassword] = useState(false)
+  const [passwordForm, setPasswordForm] = useState({
+    id: '',
+    name: '',
+    newPassword: '',
+    confirmPassword: '',
+  })
+  const [changingPassword, setChangingPassword] = useState(false)
+
+  // Delete confirmation modal
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<UserData | null>(null)
+  const [deletingUser, setDeletingUser] = useState(false)
+
+  // Action loading per user (for toggle access)
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null)
 
   const fetchCompanies = async () => {
     try {
@@ -196,6 +229,160 @@ export default function CompanyManagementView() {
       setError('Error de conexión')
     } finally {
       setCreatingUser(false)
+    }
+  }
+
+  // Edit user handler
+  const handleEditUser = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    setSuccess('')
+    setEditingUser(true)
+
+    try {
+      const res = await apiPut('/api/users', {
+        id: editForm.id,
+        name: editForm.name,
+        email: editForm.email,
+        phone: editForm.phone,
+        role: editForm.role,
+        companyId: editForm.companyId,
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.error || 'Error al editar usuario')
+        return
+      }
+
+      setSuccess(`Usuario "${editForm.name}" actualizado exitosamente`)
+      setShowEditUser(false)
+      await fetchUsers(selectedCompanyId || undefined)
+    } catch (err) {
+      setError('Error de conexión')
+    } finally {
+      setEditingUser(false)
+    }
+  }
+
+  const openEditModal = (u: UserData) => {
+    setEditForm({
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      phone: u.phone || '',
+      role: u.role,
+      companyId: u.companyId || '',
+    })
+    setError('')
+    setShowEditUser(true)
+  }
+
+  // Change password handler
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    setSuccess('')
+
+    if (passwordForm.newPassword.length < 6) {
+      setError('La contraseña debe tener al menos 6 caracteres')
+      return
+    }
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setError('Las contraseñas no coinciden')
+      return
+    }
+
+    setChangingPassword(true)
+
+    try {
+      const res = await apiPatch('/api/users', {
+        id: passwordForm.id,
+        action: 'change_password',
+        newPassword: passwordForm.newPassword,
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.error || 'Error al cambiar contraseña')
+        return
+      }
+
+      setSuccess('Contraseña actualizada')
+      setShowChangePassword(false)
+      setPasswordForm({ id: '', name: '', newPassword: '', confirmPassword: '' })
+    } catch (err) {
+      setError('Error de conexión')
+    } finally {
+      setChangingPassword(false)
+    }
+  }
+
+  const openPasswordModal = (u: UserData) => {
+    setPasswordForm({
+      id: u.id,
+      name: u.name,
+      newPassword: '',
+      confirmPassword: '',
+    })
+    setError('')
+    setShowChangePassword(true)
+  }
+
+  // Toggle access handler
+  const handleToggleAccess = async (u: UserData) => {
+    setError('')
+    setSuccess('')
+    setActionLoadingId(u.id)
+
+    try {
+      const res = await apiPatch('/api/users', {
+        id: u.id,
+        action: 'toggle_access',
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.error || 'Error al cambiar acceso')
+        return
+      }
+
+      setSuccess(u.active ? 'Acceso revocado' : 'Acceso restaurado')
+      await fetchUsers(selectedCompanyId || undefined)
+    } catch (err) {
+      setError('Error de conexión')
+    } finally {
+      setActionLoadingId(null)
+    }
+  }
+
+  // Delete user handler
+  const handleDeleteUser = async () => {
+    if (!deleteTarget) return
+    setError('')
+    setSuccess('')
+    setDeletingUser(true)
+
+    try {
+      const res = await apiPatch('/api/users', {
+        id: deleteTarget.id,
+        action: 'delete',
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.error || 'Error al eliminar usuario')
+        return
+      }
+
+      setSuccess(`Usuario "${deleteTarget.name}" eliminado`)
+      setShowDeleteConfirm(false)
+      setDeleteTarget(null)
+      await fetchUsers(selectedCompanyId || undefined)
+    } catch (err) {
+      setError('Error de conexión')
+    } finally {
+      setDeletingUser(false)
     }
   }
 
@@ -338,7 +525,7 @@ export default function CompanyManagementView() {
           <button onClick={() => setSuccess('')} className="ml-auto text-emerald-600 hover:text-emerald-800">×</button>
         </div>
       )}
-      {error && !showCreateCompany && !showCreateUser && (
+      {error && !showCreateCompany && !showCreateUser && !showEditUser && !showChangePassword && !showDeleteConfirm && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-center gap-2">
           <XCircle className="w-5 h-5 text-red-600" />
           <p className="text-sm text-red-700">{error}</p>
@@ -591,10 +778,10 @@ export default function CompanyManagementView() {
               {companyUsers
                 .filter(u => u.role !== 'CANDIDATO')
                 .map((u) => (
-                <Card key={u.id}>
+                <Card key={u.id} className={u.active ? '' : 'opacity-60'}>
                   <CardContent className="p-3">
                     <div className="flex items-start gap-3">
-                      <div className="w-9 h-9 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-semibold text-sm">
+                      <div className={`w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm ${u.active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
                         {u.name.charAt(0).toUpperCase()}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -603,6 +790,11 @@ export default function CompanyManagementView() {
                           <Badge variant="outline" className="text-xs">
                             {u.role === 'RH' ? 'RH' : u.role === 'GERENTE' ? 'Gerente' : u.role}
                           </Badge>
+                          {!u.active && (
+                            <Badge variant="destructive" className="text-xs">
+                              Inactivo
+                            </Badge>
+                          )}
                         </div>
                         <p className="text-xs text-gray-500 flex items-center gap-1">
                           <Mail className="w-3 h-3" /> {u.email}
@@ -618,12 +810,48 @@ export default function CompanyManagementView() {
                           </p>
                         )}
                       </div>
-                      <div className="flex items-center">
-                        {u.active ? (
-                          <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                        ) : (
-                          <XCircle className="w-4 h-4 text-gray-300" />
-                        )}
+                      <div className="flex items-center gap-0.5">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 w-7 p-0"
+                          onClick={() => openEditModal(u)}
+                          title="Editar"
+                        >
+                          <Pencil className="w-3.5 h-3.5 text-gray-500" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 w-7 p-0"
+                          onClick={() => openPasswordModal(u)}
+                          title="Cambiar contraseña"
+                        >
+                          <KeyRound className="w-3.5 h-3.5 text-gray-500" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 w-7 p-0"
+                          onClick={() => handleToggleAccess(u)}
+                          disabled={actionLoadingId === u.id}
+                          title={u.active ? 'Revocar acceso' : 'Restaurar acceso'}
+                        >
+                          {u.active ? (
+                            <ShieldOff className="w-3.5 h-3.5 text-amber-500" />
+                          ) : (
+                            <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+                          )}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 w-7 p-0"
+                          onClick={() => { setDeleteTarget(u); setShowDeleteConfirm(true); }}
+                          title="Eliminar"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                        </Button>
                       </div>
                     </div>
                   </CardContent>
@@ -649,6 +877,168 @@ export default function CompanyManagementView() {
           </Card>
         </div>
       </div>
+
+      {/* Edit User Modal */}
+      <Dialog open={showEditUser} onOpenChange={setShowEditUser}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar Usuario</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleEditUser} className="space-y-4 mt-2">
+            <div>
+              <Label htmlFor="edit-name">Nombre completo *</Label>
+              <Input
+                id="edit-name"
+                value={editForm.name}
+                onChange={(e) => setEditForm(f => ({ ...f, name: e.target.value }))}
+                placeholder="Ej: María García"
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-email">Correo electrónico *</Label>
+              <Input
+                id="edit-email"
+                type="email"
+                value={editForm.email}
+                onChange={(e) => setEditForm(f => ({ ...f, email: e.target.value }))}
+                placeholder="maria@empresa.com"
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-phone">Teléfono</Label>
+              <Input
+                id="edit-phone"
+                value={editForm.phone}
+                onChange={(e) => setEditForm(f => ({ ...f, phone: e.target.value }))}
+                placeholder="+52 961..."
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="edit-role">Rol</Label>
+                <Select
+                  value={editForm.role}
+                  onValueChange={(v) => setEditForm(f => ({ ...f, role: v }))}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="RH">Recursos Humanos</SelectItem>
+                    <SelectItem value="GERENTE">Gerente</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="edit-company">Empresa *</Label>
+                <Select
+                  value={editForm.companyId}
+                  onValueChange={(v) => setEditForm(f => ({ ...f, companyId: v }))}
+                >
+                  <SelectTrigger><SelectValue placeholder="Seleccionar empresa" /></SelectTrigger>
+                  <SelectContent>
+                    {companies.map(c => (
+                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            {error && <p className="text-sm text-red-600">{error}</p>}
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setShowEditUser(false)}>Cancelar</Button>
+              <Button
+                type="submit"
+                disabled={editingUser || !editForm.email || !editForm.name || !editForm.companyId}
+                className="bg-emerald-600 hover:bg-emerald-700"
+              >
+                {editingUser ? 'Guardando...' : 'Guardar Cambios'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Change Password Modal */}
+      <Dialog open={showChangePassword} onOpenChange={setShowChangePassword}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Cambiar Contraseña</DialogTitle>
+            <DialogDescription>
+              Cambiar contraseña para <strong>{passwordForm.name}</strong>
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleChangePassword} className="space-y-4 mt-2">
+            <div>
+              <Label htmlFor="new-password">Nueva contraseña *</Label>
+              <Input
+                id="new-password"
+                type="password"
+                value={passwordForm.newPassword}
+                onChange={(e) => setPasswordForm(f => ({ ...f, newPassword: e.target.value }))}
+                placeholder="Mínimo 6 caracteres"
+                required
+                minLength={6}
+              />
+            </div>
+            <div>
+              <Label htmlFor="confirm-password">Confirmar contraseña *</Label>
+              <Input
+                id="confirm-password"
+                type="password"
+                value={passwordForm.confirmPassword}
+                onChange={(e) => setPasswordForm(f => ({ ...f, confirmPassword: e.target.value }))}
+                placeholder="Repetir contraseña"
+                required
+                minLength={6}
+              />
+            </div>
+            {error && <p className="text-sm text-red-600">{error}</p>}
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setShowChangePassword(false)}>Cancelar</Button>
+              <Button
+                type="submit"
+                disabled={changingPassword || !passwordForm.newPassword || !passwordForm.confirmPassword}
+                className="bg-emerald-600 hover:bg-emerald-700"
+              >
+                {changingPassword ? 'Cambiando...' : 'Cambiar Contraseña'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Modal */}
+      <Dialog open={showDeleteConfirm} onOpenChange={(open) => { setShowDeleteConfirm(open); if (!open) setDeleteTarget(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-red-500" />
+              Eliminar Usuario
+            </DialogTitle>
+            <DialogDescription>
+              ¿Estás seguro de eliminar a <strong>{deleteTarget?.name}</strong>? Esta acción es permanente y no se puede deshacer.
+            </DialogDescription>
+          </DialogHeader>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => { setShowDeleteConfirm(false); setDeleteTarget(null); }}
+              disabled={deletingUser}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteUser}
+              disabled={deletingUser}
+            >
+              {deletingUser ? 'Eliminando...' : 'Eliminar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

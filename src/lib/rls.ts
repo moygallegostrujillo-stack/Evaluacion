@@ -140,7 +140,7 @@ export function createRLSExtension(context: TenantContext) {
               },
             }
             // Use the underlying findFirst to allow compound where
-            const result = await query(filteredArgs)
+            const result = await query(filteredArgs as any)
             return result
           }
           return query(args)
@@ -189,7 +189,7 @@ export function createRLSExtension(context: TenantContext) {
               args.data = {
                 ...data,
                 companyId,
-              }
+              } as any
             } else if (data.companyId !== companyId) {
               // Block attempts to create records in another company
               throw new RLSViolationError(
@@ -207,7 +207,7 @@ export function createRLSExtension(context: TenantContext) {
             args.where = {
               ...existingWhere,
               companyId,
-            }
+            } as any
           }
           return query(args)
         },
@@ -219,7 +219,7 @@ export function createRLSExtension(context: TenantContext) {
             args.where = {
               ...existingWhere,
               companyId,
-            }
+            } as any
           }
           return query(args)
         },
@@ -230,7 +230,7 @@ export function createRLSExtension(context: TenantContext) {
             args.where = {
               ...existingWhere,
               companyId,
-            }
+            } as any
           }
           return query(args)
         },
@@ -241,7 +241,7 @@ export function createRLSExtension(context: TenantContext) {
             args.where = {
               ...existingWhere,
               companyId,
-            }
+            } as any
           }
           return query(args)
         },
@@ -252,14 +252,14 @@ export function createRLSExtension(context: TenantContext) {
             args.where = {
               ...existingWhere,
               companyId,
-            }
+            } as any
             // Ensure create data has correct companyId
             const createData = args.create as Record<string, unknown>
             if (!createData.companyId) {
               args.create = {
                 ...createData,
                 companyId,
-              }
+              } as any
             } else if (createData.companyId !== companyId) {
               throw new RLSViolationError(
                 `RLS violation: attempted to upsert ${model} with companyId="${createData.companyId}" but tenant context is "${companyId}"`

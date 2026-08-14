@@ -405,7 +405,7 @@ export default function CandidateDetailView() {
         <CardContent className="text-sm space-y-3">
           <div>
             <p className="font-semibold text-gray-700 mb-1">Puntaje General se calcula con:</p>
-            {result.knowledgeScore !== null && result.knowledgeScore > 0 ? (
+            {result.knowledgeScore != null && result.knowledgeScore > 0 ? (
               <ul className="list-disc pl-5 text-gray-600 space-y-0.5">
                 <li><strong>30%</strong> Evaluación Psicométrica (Big Five)</li>
                 <li><strong>30%</strong> Evaluación Psicológica</li>

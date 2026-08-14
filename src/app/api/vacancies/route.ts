@@ -156,12 +156,12 @@ export async function POST(req: NextRequest) {
         includePsicologica: includePsicologica !== undefined ? includePsicologica : true,
         maxVideoSeconds: maxVideoSeconds || 60,
         // companyId auto-injected by RLS for non-SUPER_ADMIN; SUPER_ADMIN must specify
-        ...(companyId ? { companyId } : {}),
+        companyId,
         questions: questions
           ? {
-              create: questions.map((q, index) => ({
+              create: questions.map((q: any, index: number) => ({
                 text: q.text,
-                type: 'MULTIPLE_CHOICE',
+                type: 'MULTIPLE_CHOICE' as const,
                 options: JSON.stringify(q.options),
                 correctAnswer: q.correctAnswer,
                 order: index + 1,
@@ -189,7 +189,7 @@ export async function POST(req: NextRequest) {
         companyId: vacancy.companyId,
         createdAt: vacancy.createdAt,
         updatedAt: vacancy.updatedAt,
-        questions: vacancy.questions.map((q) => ({
+        questions: (vacancy as any).questions.map((q: any) => ({
           id: q.id,
           text: q.text,
           type: q.type,
@@ -197,7 +197,7 @@ export async function POST(req: NextRequest) {
           correctAnswer: q.correctAnswer,
           order: q.order,
         })),
-        applicationCount: vacancy._count.applications,
+        applicationCount: (vacancy as any)._count.applications,
       },
     }, { status: 201 })
   } catch (error) {

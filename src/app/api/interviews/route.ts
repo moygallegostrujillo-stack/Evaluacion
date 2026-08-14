@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
       data: {
         candidateId,
         // companyId auto-injected by RLS for non-SUPER_ADMIN; SUPER_ADMIN must specify
-        ...(companyId ? { companyId } : {}),
+        companyId,
         positionId: positionId || null,
         scheduledAt: new Date(scheduledAt),
         location: location || null,

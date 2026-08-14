@@ -718,7 +718,7 @@ export async function POST(req: NextRequest) {
       // If there's no next step, auto-complete
       if (nextStep > templates.length) {
         // Complete the evaluation
-        return await completeEvaluation(rlsDb, session, session.position)
+        return await completeEvaluation(rlsDb, session, { id: session.position.id, title: session.position.title, category: session.position.category, hasKnowledgeTest: session.position.hasKnowledgeTest })
       }
 
       const updatedSession = await rlsDb.evaluationSession.update({
@@ -744,7 +744,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Session already completed' }, { status: 400 })
       }
 
-      return await completeEvaluation(rlsDb, session, session.position)
+      return await completeEvaluation(rlsDb, session, { id: session.position.id, title: session.position.title, category: session.position.category, hasKnowledgeTest: session.position.hasKnowledgeTest })
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
@@ -756,7 +756,7 @@ export async function POST(req: NextRequest) {
 
 async function completeEvaluation(
   rlsDb: ReturnType<typeof createRLSClient>['client'],
-  session: Awaited<ReturnType<typeof getUnscopedClient>['evaluationSession']['findUnique']> & { position: NonNullable<Awaited<ReturnType<typeof getUnscopedClient>['evaluationSession']['findUnique']>['position']> },
+  session: any,
   position: { id: string; title: string; category: string; hasKnowledgeTest: boolean }
 ) {
   // Get all responses for this session

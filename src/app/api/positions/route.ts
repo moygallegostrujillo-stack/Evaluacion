@@ -135,7 +135,7 @@ export async function POST(req: NextRequest) {
         description: description || null,
         hasKnowledgeTest: hasKnowledgeTest || false,
         // companyId auto-injected by RLS for non-SUPER_ADMIN; SUPER_ADMIN must specify
-        ...(companyId ? { companyId } : {}),
+        companyId,
       },
     })
 

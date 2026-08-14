@@ -282,7 +282,7 @@ export default function VacancyManagementView() {
         setVacancies((prev) => [data.vacancy, ...prev])
         setSelectedVacancyId(data.vacancy.id)
         setShowCreateDialog(false)
-        setCreateForm({ title: '', description: '', sector: 'GENERAL' })
+        setCreateForm({ title: '', description: '', sector: 'GENERAL', companyId: '' })
         const link = `${window.location.origin}/?v=${data.vacancy.slug}`
         toast({
           title: 'Vacante creada',

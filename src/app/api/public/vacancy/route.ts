@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
       where: { slug },
       include: {
         company: {
-          select: { name: true },
+          select: { name: true, phone: true },
         },
         questions: {
           where: { type: 'MULTIPLE_CHOICE' },

@@ -292,14 +292,14 @@ export default function DashboardView() {
                       <p className="font-medium text-sm">{r.candidateName}</p>
                       <p className="text-xs text-gray-500">{r.positionTitle}</p>
                       <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
-                        {r.candidate?.email && (
+                        {(r as any).candidate?.email && (
                           <span className="text-xs text-gray-400 flex items-center gap-1">
-                            <Mail className="w-3 h-3" /> {r.candidate.email}
+                            <Mail className="w-3 h-3" /> {(r as any).candidate.email}
                           </span>
                         )}
-                        {r.candidate?.phone && (
+                        {(r as any).candidate?.phone && (
                           <span className="text-xs text-green-600 font-medium flex items-center gap-1">
-                            <Phone className="w-3 h-3" /> {r.candidate.phone}
+                            <Phone className="w-3 h-3" /> {(r as any).candidate.phone}
                           </span>
                         )}
                       </div>
