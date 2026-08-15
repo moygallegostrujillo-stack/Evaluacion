@@ -4,6 +4,59 @@ import { getAuthFromHeaders } from '@/lib/auth'
 
 import crypto from 'crypto'
 
+export async function GET(req: NextRequest) {
+  try {
+    const auth = getAuthFromHeaders(req.headers)
+    if (!auth) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { searchParams } = new URL(req.url)
+    const targetCompanyId = auth.role === 'SUPER_ADMIN'
+      ? searchParams.get('companyId')
+      : null
+    const companyId = targetCompanyId || auth.companyId
+
+    if (!companyId) {
+      return NextResponse.json({ invitations: [] })
+    }
+
+    const db = getUnscopedClient()
+    const invitations = await db.candidateInvitation.findMany({
+      where: { companyId },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        candidateName: true,
+        email: true,
+        phone: true,
+        token: true,
+        status: true,
+        channel: true,
+        createdAt: true,
+        position: { select: { id: true, title: true } },
+      },
+    })
+
+    return NextResponse.json({
+      invitations: invitations.map(inv => ({
+        id: inv.id,
+        candidateName: inv.candidateName,
+        email: inv.email,
+        phone: inv.phone,
+        token: inv.token,
+        status: inv.status,
+        channel: inv.channel,
+        positionTitle: inv.position?.title,
+        createdAt: inv.createdAt,
+      })),
+    })
+  } catch (error) {
+    console.error('Invite GET error:', error)
+    return NextResponse.json({ error: 'Error fetching invitations' }, { status: 500 })
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const auth = getAuthFromHeaders(req.headers)
@@ -12,7 +65,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { email, phone, positionId, channel } = body
+    const { candidateName, email, phone, positionId, channel } = body
 
     // For SUPER_ADMIN with a specific target companyId from body, scope to that company
     const targetCompanyId = auth.role === 'SUPER_ADMIN'
@@ -28,11 +81,12 @@ export async function POST(req: NextRequest) {
       ? (body.invitedBy || auth.userId)
       : auth.userId
 
-    if (!email || !companyId || !positionId || !invitedBy) {
-      return NextResponse.json({ error: 'email, companyId, positionId, and invitedBy are required' }, { status: 400 })
+    // At least phone or email is required
+    if ((!email && !phone) || !companyId || !positionId || !invitedBy) {
+      return NextResponse.json({ error: 'Se requiere al menos teléfono o correo, companyId, positionId e invitedBy' }, { status: 400 })
     }
 
-    // Verify position exists (use unscoped since we're checking by ID, not by company)
+    // Verify position exists
     const position = await getUnscopedClient().position.findUnique({
       where: { id: positionId },
     })
@@ -50,11 +104,12 @@ export async function POST(req: NextRequest) {
 
     const invitation = await rlsDb.candidateInvitation.create({
       data: {
-        email,
+        candidateName: candidateName || null,
+        email: email || null,
         phone: phone || null,
         token,
         status: 'PENDING',
-        channel: channel || 'EMAIL',
+        channel: channel || 'WHATSAPP',
         // companyId auto-injected by RLS for non-SUPER_ADMIN; SUPER_ADMIN must specify
         companyId,
         positionId,
@@ -74,6 +129,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       invitation: {
         id: invitation.id,
+        candidateName: invitation.candidateName,
         email: invitation.email,
         phone: invitation.phone,
         token: invitation.token,
@@ -82,6 +138,7 @@ export async function POST(req: NextRequest) {
         expiresAt: invitation.expiresAt,
         companyId: invitation.companyId,
         positionId: invitation.positionId,
+        positionTitle: invitation.position?.title,
         createdAt: invitation.createdAt,
       },
     }, { status: 201 })

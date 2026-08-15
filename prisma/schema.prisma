@@ -108,18 +108,19 @@ model Question {
 }
 
 model CandidateInvitation {
-  id         String   @id @default(cuid())
-  email      String
-  phone      String?
-  token      String   @unique
-  status     String   @default("PENDING") // PENDING, REGISTERED, COMPLETED, EXPIRED
-  channel    String   @default("EMAIL") // EMAIL, WHATSAPP
-  companyId  String
-  positionId String
-  invitedBy  String
-  expiresAt  DateTime
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id           String   @id @default(cuid())
+  candidateName String?
+  email        String?
+  phone        String?
+  token        String   @unique
+  status       String   @default("PENDING") // PENDING, REGISTERED, COMPLETED, EXPIRED
+  channel      String   @default("WHATSAPP") // EMAIL, WHATSAPP
+  companyId    String
+  positionId   String
+  invitedBy    String
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   company  Company  @relation(fields: [companyId], references: [id])
   position Position @relation(fields: [positionId], references: [id])
