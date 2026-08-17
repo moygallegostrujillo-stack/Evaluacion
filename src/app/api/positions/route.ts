@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createRLSClient, getUnscopedClient } from '@/lib/rls'
 import { getAuthFromHeaders } from '@/lib/auth'
+import { generateTemplatesForPosition } from '@/lib/generate-templates'
 
 export async function GET(req: NextRequest) {
   try {
@@ -139,9 +140,60 @@ export async function POST(req: NextRequest) {
       },
     })
 
+    // Auto-generate evaluation templates and questions for the new position
+    try {
+      await generateTemplatesForPosition(position.id, title, category, hasKnowledgeTest || false)
+    } catch (templateError) {
+      console.error('Error generating templates (non-fatal):', templateError)
+      // Don't fail position creation if template generation fails
+    }
+
     return NextResponse.json({ position }, { status: 201 })
   } catch (error) {
     console.error('Positions POST error:', error)
     return NextResponse.json({ error: 'Error creating position' }, { status: 500 })
+  }
+}
+
+// PATCH: Generate templates for existing positions that don't have them
+export async function PATCH(req: NextRequest) {
+  try {
+    const auth = getAuthFromHeaders(req.headers)
+    if (!auth) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const body = await req.json()
+    const { positionId } = body
+
+    if (!positionId) {
+      return NextResponse.json({ error: 'positionId is required' }, { status: 400 })
+    }
+
+    const db = getUnscopedClient()
+    const position = await db.position.findUnique({
+      where: { id: positionId },
+    })
+
+    if (!position) {
+      return NextResponse.json({ error: 'Position not found' }, { status: 404 })
+    }
+
+    const result = await generateTemplatesForPosition(
+      position.id,
+      position.title,
+      position.category,
+      position.hasKnowledgeTest
+    )
+
+    return NextResponse.json({
+      success: true,
+      positionId: position.id,
+      templatesCreated: result.templatesCreated,
+      questionsCreated: result.questionsCreated,
+    })
+  } catch (error) {
+    console.error('Positions PATCH error:', error)
+    return NextResponse.json({ error: 'Error generating templates' }, { status: 500 })
   }
 }
