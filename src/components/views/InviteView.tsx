@@ -227,13 +227,12 @@ export default function InviteView() {
     setTimeout(() => setCopiedToken(null), 2000)
   }
 
-  const copyWhatsAppLink = (token: string, phoneNumber: string, positionTitle?: string) => {
+  const copyWhatsAppMessage = (token: string, positionTitle?: string) => {
     const url = `${window.location.origin}/?token=${token}`
     const companyName = user?.companyName || 'la empresa'
-    const positionText = positionTitle ? `para el puesto de *${positionTitle}*` : ''
-    const message = `¡Hola! 🎉\n\nTe invitamos a completar tu evaluación pre-laboral ${positionText} en *${companyName}*.\n\nEs un proceso rápido (10-15 min) que incluye evaluaciones de personalidad y competencias.\n\n👉 Haz clic en el siguiente enlace para comenzar:\n${url}\n\nSi tienes dudas, no dudes en preguntar. ¡Te deseamos mucho éxito! 💪`
-    const whatsappUrl = `https://wa.me/${phoneNumber.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(message)}`
-    navigator.clipboard.writeText(whatsappUrl)
+    const positionText = positionTitle ? `para el puesto de ${positionTitle}` : ''
+    const message = `¡Hola! 🎉\n\nTe invitamos a completar tu evaluación pre-laboral ${positionText} en ${companyName}.\n\nEs un proceso rápido (10-15 min) que incluye evaluaciones de personalidad y competencias.\n\n👉 Haz clic en el siguiente enlace para comenzar:\n${url}\n\nSi tienes dudas, no dudes en preguntar. ¡Te deseamos mucho éxito! 💪`
+    navigator.clipboard.writeText(message)
     setCopiedToken(token)
     setTimeout(() => setCopiedToken(null), 2000)
   }
@@ -563,17 +562,15 @@ export default function InviteView() {
                             <><Copy className="w-3 h-3 mr-1" /> Enlace</>
                           )}
                         </Button>
-                        {inv.phone && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => copyWhatsAppLink(inv.token, inv.phone!, inv.positionTitle)}
-                            className="text-xs h-7 text-emerald-600"
-                            title="Copiar enlace de WhatsApp"
-                          >
-                            <MessageSquare className="w-3 h-3 mr-1" /> WhatsApp
-                          </Button>
-                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => copyWhatsAppMessage(inv.token, inv.positionTitle)}
+                          className="text-xs h-7 text-emerald-600"
+                          title="Copiar mensaje para WhatsApp"
+                        >
+                          <MessageSquare className="w-3 h-3 mr-1" /> WhatsApp
+                        </Button>
                       </div>
                     </div>
                   </div>
