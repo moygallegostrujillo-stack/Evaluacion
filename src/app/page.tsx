@@ -313,23 +313,29 @@ export default function Home() {
     return <InvitationWelcomeView />
   }
 
-  // Consent view - renders standalone for candidates (auth already set in store)
+  // Consent view - renders standalone for candidates coming from invitation flow
+  // (user is already in store via auto-login, just needs to accept consent)
   if (currentView === 'consent') {
     return <ConsentView />
   }
 
-  // Register view from invitation - renders LoginView in register mode
+  // Register view from old invitation flow or manual registration
   if (currentView === 'register') {
     return <LoginView />
   }
 
-  // Not logged in
+  // Not logged in — show standard login
   if (!user) {
     return <LoginView />
   }
 
-  // Candidate view - simpler layout
+  // Candidate view - simpler layout (auto-logged or logged in)
   if (user.role === 'CANDIDATO') {
+    // If candidate hasn't given consent, show consent first
+    if (!user.consentGiven && currentView !== 'consent') {
+      return <ConsentView />
+    }
+
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col">
         <CandidateNav />

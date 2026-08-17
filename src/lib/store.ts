@@ -29,6 +29,7 @@ export interface User {
   email: string
   name: string
   role: UserRole
+  phone?: string
   companyId?: string
   companyName?: string
   companySector?: string

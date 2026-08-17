@@ -2,13 +2,14 @@
 
 import React, { useEffect, useState } from 'react'
 import { useAppStore, type InvitationData } from '@/lib/store'
+import { apiFetch } from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
   Building2, Briefcase, Clock, Shield, Brain, BookOpen,
   CheckCircle2, AlertTriangle, XCircle, ArrowRight, User,
-  ClipboardList, ChevronRight, Utensils, ShoppingBag
+  ClipboardList, ChevronRight, Utensils, ShoppingBag, Loader2
 } from 'lucide-react'
 
 const POSITION_CATEGORY_LABELS: Record<string, string> = {
@@ -22,11 +23,13 @@ const POSITION_CATEGORY_LABELS: Record<string, string> = {
 export default function InvitationWelcomeView() {
   const invitationToken = useAppStore((s) => s.invitationToken)
   const setCurrentView = useAppStore((s) => s.setCurrentView)
+  const setAuth = useAppStore((s) => s.setAuth)
   const setInvitationData = useAppStore((s) => s.setInvitationData)
-  const invitationData = useAppStore((s) => s.invitationData)
 
   const [loading, setLoading] = useState(true)
+  const [autoLogging, setAutoLogging] = useState(false)
   const [data, setData] = useState<InvitationData | null>(null)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     if (!invitationToken) {
@@ -45,6 +48,37 @@ export default function InvitationWelcomeView() {
       })
       .finally(() => setLoading(false))
   }, [invitationToken, setInvitationData])
+
+  // Auto-login: call the auto-login endpoint, then navigate
+  const handleStartEvaluation = async () => {
+    if (!invitationToken) return
+    setAutoLogging(true)
+    setError('')
+    try {
+      const res = await apiFetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'auto-login', token: invitationToken }),
+      })
+      const result = await res.json()
+      if (!res.ok) {
+        setError(result.error || 'Error al iniciar. Intenta de nuevo.')
+        return
+      }
+      // Set auth in store
+      setAuth(result.user, result.token)
+      // Navigate based on consent status
+      if (result.user.consentGiven) {
+        setCurrentView('take-evaluation')
+      } else {
+        setCurrentView('consent')
+      }
+    } catch {
+      setError('Error de conexión. Intenta de nuevo.')
+    } finally {
+      setAutoLogging(false)
+    }
+  }
 
   // Loading state
   if (loading) {
@@ -81,6 +115,9 @@ export default function InvitationWelcomeView() {
 
   // Invalid / expired / already used
   if (data && !data.valid) {
+    // If already registered, offer to auto-login directly
+    const canAutoLogin = data.status === 'REGISTERED' || data.status === 'COMPLETED'
+
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 via-white to-teal-50 p-4">
         <Card className="w-full max-w-md shadow-xl border-0">
@@ -90,12 +127,10 @@ export default function InvitationWelcomeView() {
                 <AlertTriangle className="w-16 h-16 text-amber-500 mx-auto" />
                 <h2 className="text-xl font-bold text-gray-900">Invitación Expirada</h2>
               </>
-            ) : data.status === 'REGISTERED' || data.status === 'COMPLETED' ? (
+            ) : canAutoLogin ? (
               <>
                 <CheckCircle2 className="w-16 h-16 text-emerald-500 mx-auto" />
-                <h2 className="text-xl font-bold text-gray-900">
-                  {data.status === 'REGISTERED' ? 'Ya te registraste' : 'Evaluación completada'}
-                </h2>
+                <h2 className="text-xl font-bold text-gray-900">¡Ya estás registrado/a!</h2>
               </>
             ) : (
               <>
@@ -109,12 +144,26 @@ export default function InvitationWelcomeView() {
               </p>
             )}
             <p className="text-gray-600">{data.error}</p>
-            <Button
-              onClick={() => setCurrentView('login')}
-              className="bg-emerald-600 hover:bg-emerald-700"
-            >
-              Iniciar Sesión
-            </Button>
+            {canAutoLogin ? (
+              <Button
+                onClick={handleStartEvaluation}
+                className="bg-emerald-600 hover:bg-emerald-700"
+                disabled={autoLogging}
+              >
+                {autoLogging ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Ingresando...</>
+                ) : (
+                  <>Continuar a mi Evaluación <ArrowRight className="w-4 h-4 ml-1" /></>
+                )}
+              </Button>
+            ) : (
+              <Button
+                onClick={() => setCurrentView('login')}
+                className="bg-emerald-600 hover:bg-emerald-700"
+              >
+                Ir a Inicio de Sesión
+              </Button>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -215,7 +264,7 @@ export default function InvitationWelcomeView() {
               {daysLeft !== null && daysLeft > 0 && (
                 <div className="flex items-center gap-2 text-sm text-amber-700 bg-amber-50 p-2.5 rounded-lg border border-amber-200">
                   <Clock className="w-4 h-4 text-amber-500" />
-                  <span>Tienes <strong>{daysLeft} día{daysLeft > 1 ? 's' : ''}</strong> para completar tu registro</span>
+                  <span>Tienes <strong>{daysLeft} día{daysLeft > 1 ? 's' : ''}</strong> para completar tu evaluación</span>
                 </div>
               )}
             </CardContent>
@@ -268,8 +317,7 @@ export default function InvitationWelcomeView() {
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Tu camino</p>
               <div className="flex items-center justify-between">
                 {[
-                  { icon: <User className="w-4 h-4" />, label: 'Registro', active: true },
-                  { icon: <Shield className="w-4 h-4" />, label: 'Consentimiento', active: false },
+                  { icon: <Shield className="w-4 h-4" />, label: 'Consentimiento', active: true },
                   { icon: <Brain className="w-4 h-4" />, label: 'Evaluación', active: false },
                   { icon: <CheckCircle2 className="w-4 h-4" />, label: '¡Listo!', active: false },
                 ].map((step, idx) => (
@@ -286,7 +334,7 @@ export default function InvitationWelcomeView() {
                         {step.label}
                       </span>
                     </div>
-                    {idx < 3 && (
+                    {idx < 2 && (
                       <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0" />
                     )}
                   </React.Fragment>
@@ -304,14 +352,25 @@ export default function InvitationWelcomeView() {
             </p>
           </div>
 
-          {/* CTA */}
+          {/* Error from auto-login */}
+          {error && (
+            <div className="bg-red-50 text-red-700 p-3 rounded-lg text-sm border border-red-200">
+              {error}
+            </div>
+          )}
+
+          {/* CTA — NO registration, just start! */}
           <Button
-            onClick={() => setCurrentView('register')}
+            onClick={handleStartEvaluation}
             className="w-full bg-emerald-600 hover:bg-emerald-700 text-base py-6 shadow-lg"
             size="lg"
+            disabled={autoLogging}
           >
-            Comenzar mi Registro
-            <ArrowRight className="w-5 h-5 ml-2" />
+            {autoLogging ? (
+              <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Ingresando...</>
+            ) : (
+              <>Comenzar Evaluación <ArrowRight className="w-5 h-5 ml-2" /></>
+            )}
           </Button>
         </div>
       </main>
