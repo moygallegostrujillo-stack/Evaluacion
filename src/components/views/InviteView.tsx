@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
-import { ArrowLeft, Send, Copy, Check, MessageSquare, UserPlus, Phone, User, Building2, Plus, Loader2 } from 'lucide-react'
+import { ArrowLeft, Send, Copy, Check, MessageSquare, UserPlus, Phone, User, Building2, Plus, Loader2, Trash2 } from 'lucide-react'
 
 interface Invitation {
   id: string
@@ -56,6 +56,7 @@ export default function InviteView() {
   const [loadingPositions, setLoadingPositions] = useState(true)
   const [sent, setSent] = useState(false)
   const [copiedToken, setCopiedToken] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [error, setError] = useState('')
 
   // Position creation state
@@ -235,6 +236,23 @@ export default function InviteView() {
     navigator.clipboard.writeText(message)
     setCopiedToken(token)
     setTimeout(() => setCopiedToken(null), 2000)
+  }
+
+  const handleDeleteInvitation = async (invitationId: string) => {
+    setDeletingId(invitationId)
+    try {
+      const res = await apiFetch(`/api/invite?id=${invitationId}`, { method: 'DELETE' })
+      if (res.ok) {
+        setInvitations(prev => prev.filter(inv => inv.id !== invitationId))
+      } else {
+        const data = await res.json()
+        setError(data.error || 'Error al eliminar invitación')
+      }
+    } catch {
+      setError('Error de conexión al eliminar')
+    } finally {
+      setDeletingId(null)
+    }
   }
 
   const getStatusBadge = (status: string) => {
@@ -549,6 +567,22 @@ export default function InviteView() {
                         <span>Canal: {inv.channel === 'EMAIL' ? '📧 Correo' : '📱 WhatsApp'}</span>
                       </div>
                       <div className="flex gap-1">
+                        {inv.status === 'PENDING' && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteInvitation(inv.id)}
+                            className="text-xs h-7 text-red-500 hover:text-red-700 hover:bg-red-50"
+                            title="Eliminar invitación"
+                            disabled={deletingId === inv.id}
+                          >
+                            {deletingId === inv.id ? (
+                              <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-3 h-3 mr-1" />
+                            )}
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="sm"

@@ -95,6 +95,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Position not found' }, { status: 404 })
     }
 
+    // Check for duplicate PENDING invitation (same phone + position)
+    const db = getUnscopedClient()
+    if (phone) {
+      const existingPending = await db.candidateInvitation.findFirst({
+        where: {
+          phone,
+          positionId,
+          status: 'PENDING',
+          companyId,
+        },
+      })
+      if (existingPending) {
+        return NextResponse.json(
+          { error: 'Ya existe una invitación pendiente para este teléfono y puesto', duplicateId: existingPending.id },
+          { status: 409 }
+        )
+      }
+    }
+
     // Generate unique token
     const token = crypto.randomBytes(32).toString('hex')
 
@@ -145,5 +164,54 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error('Invite POST error:', error)
     return NextResponse.json({ error: 'Error creating invitation' }, { status: 500 })
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const auth = getAuthFromHeaders(req.headers)
+    if (!auth) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { searchParams } = new URL(req.url)
+    const invitationId = searchParams.get('id')
+
+    if (!invitationId) {
+      return NextResponse.json({ error: 'ID de invitación requerido' }, { status: 400 })
+    }
+
+    const db = getUnscopedClient()
+
+    // Find the invitation
+    const invitation = await db.candidateInvitation.findUnique({
+      where: { id: invitationId },
+    })
+
+    if (!invitation) {
+      return NextResponse.json({ error: 'Invitación no encontrada' }, { status: 404 })
+    }
+
+    // Only allow deleting PENDING invitations
+    if (invitation.status !== 'PENDING') {
+      return NextResponse.json(
+        { error: 'Solo se pueden eliminar invitaciones pendientes' },
+        { status: 400 }
+      )
+    }
+
+    // Check authorization: SUPER_ADMIN or same company
+    if (auth.role !== 'SUPER_ADMIN' && auth.companyId !== invitation.companyId) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+    }
+
+    await db.candidateInvitation.delete({
+      where: { id: invitationId },
+    })
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Invite DELETE error:', error)
+    return NextResponse.json({ error: 'Error deleting invitation' }, { status: 500 })
   }
 }
