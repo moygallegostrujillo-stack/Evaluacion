@@ -16,6 +16,7 @@ import QuestionsManagementView from '@/components/views/QuestionsManagementView'
 import VacancyManagementView from '@/components/views/VacancyManagementView'
 import PublicEvaluationView from '@/components/views/PublicEvaluationView'
 import CompanyManagementView from '@/components/views/CompanyManagementView'
+import InvitationWelcomeView from '@/components/views/InvitationWelcomeView'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -77,8 +78,8 @@ function useInvitationCheck() {
     const token = params.get('token')
     if (token) {
       setInvitationToken(token)
-      setCurrentView('register')
-      // Clean URL
+      setCurrentView('invitation-welcome')
+      // Clean URL — keep token in store only
       window.history.replaceState({}, '', '/')
     }
   }, [])
@@ -247,6 +248,8 @@ function CandidateNav() {
 
 function renderView(view: ViewType) {
   switch (view) {
+    case 'invitation-welcome':
+      return <InvitationWelcomeView />
     case 'login':
     case 'register':
       return <LoginView />
@@ -303,6 +306,21 @@ export default function Home() {
   // Public evaluation - no auth required
   if (currentView === 'public-evaluation') {
     return <PublicEvaluationView />
+  }
+
+  // Invitation welcome page - no auth required (shows company/position info)
+  if (currentView === 'invitation-welcome') {
+    return <InvitationWelcomeView />
+  }
+
+  // Consent view - renders standalone for candidates (auth already set in store)
+  if (currentView === 'consent') {
+    return <ConsentView />
+  }
+
+  // Register view from invitation - renders LoginView in register mode
+  if (currentView === 'register') {
+    return <LoginView />
   }
 
   // Not logged in

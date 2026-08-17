@@ -139,9 +139,12 @@ export default function InviteView() {
     setTimeout(() => setCopiedToken(null), 2000)
   }
 
-  const copyWhatsAppLink = (token: string, phoneNumber: string) => {
+  const copyWhatsAppLink = (token: string, phoneNumber: string, positionTitle?: string) => {
     const url = `${window.location.origin}/?token=${token}`
-    const whatsappUrl = `https://wa.me/${phoneNumber.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hola, te comparto el enlace para tu evaluación: ${url}`)}`
+    const companyName = user?.companyName || 'la empresa'
+    const positionText = positionTitle ? `para el puesto de *${positionTitle}*` : ''
+    const message = `¡Hola! 🎉\n\nTe invitamos a completar tu evaluación pre-laboral ${positionText} en *${companyName}*.\n\nEs un proceso rápido (10-15 min) que incluye evaluaciones de personalidad y competencias.\n\n👉 Haz clic en el siguiente enlace para comenzar:\n${url}\n\nSi tienes dudas, no dudes en preguntar. ¡Te deseamos mucho éxito! 💪`
+    const whatsappUrl = `https://wa.me/${phoneNumber.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(message)}`
     navigator.clipboard.writeText(whatsappUrl)
     setCopiedToken(token)
     setTimeout(() => setCopiedToken(null), 2000)
@@ -272,8 +275,10 @@ export default function InviteView() {
 
               {/* Success */}
               {sent && (
-                <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-200 text-sm text-emerald-700">
-                  ¡Invitación generada exitosamente! Copia el enlace y envíalo por WhatsApp al candidato.
+                <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-200 text-sm text-emerald-700 space-y-2">
+                  <p className="font-medium">✅ ¡Invitación generada exitosamente!</p>
+                  <p>Copia el enlace de WhatsApp y envíalo al candidato para que pueda registrarse y completar su evaluación.</p>
+                  <p className="text-xs text-emerald-600">El enlace expira en 7 días.</p>
                 </div>
               )}
 
@@ -345,7 +350,7 @@ export default function InviteView() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => copyWhatsAppLink(inv.token, inv.phone!)}
+                            onClick={() => copyWhatsAppLink(inv.token, inv.phone!, inv.positionTitle)}
                             className="text-xs h-7 text-emerald-600"
                             title="Copiar enlace de WhatsApp"
                           >

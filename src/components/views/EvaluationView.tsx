@@ -86,7 +86,12 @@ export default function EvaluationView() {
             setCurrentQuestionIndex(activeSession.currentQuestionIndex || 0)
             setPhase('IN_PROGRESS')
           } else if (activeSession.status === 'NOT_STARTED') {
-            setPhase('CONSENT')
+            // If user already gave consent via ConsentView, skip to session ready
+            if (user.consentGiven) {
+              setPhase('SESSION_READY')
+            } else {
+              setPhase('CONSENT')
+            }
           }
         } else if (data.completedSessions?.length > 0 && data.availablePositions?.length === 0) {
           // All evaluations completed, no more positions
@@ -157,6 +162,8 @@ export default function EvaluationView() {
           setPositionTitle(data.session.positionTitle || '')
           if (data.session.status === 'IN_PROGRESS') {
             setPhase('IN_PROGRESS')
+          } else if (user.consentGiven) {
+            setPhase('SESSION_READY')
           } else {
             setPhase('CONSENT')
           }
@@ -165,7 +172,11 @@ export default function EvaluationView() {
       }
       setSessionId(data.session.id)
       setPositionTitle(data.session.positionTitle || '')
-      setPhase('CONSENT')
+      if (user.consentGiven) {
+        setPhase('SESSION_READY')
+      } else {
+        setPhase('CONSENT')
+      }
     } catch (e) {
       console.error('Error creating session', e)
     } finally {
