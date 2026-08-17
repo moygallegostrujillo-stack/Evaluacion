@@ -48,17 +48,11 @@ export default function ConsentView() {
             </div>
             <span className="font-bold text-lg text-gray-900">EvaluHR</span>
           </div>
-          {/* Step indicator: Step 2 of 3 */}
+          {/* Step indicator: Step 1 of 2 */}
           <div className="flex items-center gap-1">
-            <div className="w-7 h-7 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs">
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
+            <div className="w-7 h-7 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs font-bold">1</div>
             <ChevronRight className="w-3 h-3 text-gray-300" />
-            <div className="w-7 h-7 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs font-bold">2</div>
-            <ChevronRight className="w-3 h-3 text-gray-300" />
-            <div className="w-7 h-7 rounded-full bg-gray-200 text-gray-400 flex items-center justify-center text-xs font-bold">3</div>
+            <div className="w-7 h-7 rounded-full bg-gray-200 text-gray-400 flex items-center justify-center text-xs font-bold">2</div>
           </div>
         </div>
       </header>
@@ -70,7 +64,7 @@ export default function ConsentView() {
               <Shield className="w-7 h-7" />
             </div>
             <CardTitle className="text-xl">Consentimiento Informado</CardTitle>
-            <p className="text-sm text-gray-500 mt-1">Paso 2 de 3 — Antes de la evaluación</p>
+            <p className="text-sm text-gray-500 mt-1">Paso 1 de 2 — Antes de la evaluación</p>
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Warning about what they're about to do */}

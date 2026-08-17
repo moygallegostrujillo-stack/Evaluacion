@@ -251,7 +251,6 @@ function renderView(view: ViewType) {
     case 'invitation-welcome':
       return <InvitationWelcomeView />
     case 'login':
-    case 'register':
       return <LoginView />
     case 'consent':
       return <ConsentView />
@@ -317,11 +316,6 @@ export default function Home() {
   // (user is already in store via auto-login, just needs to accept consent)
   if (currentView === 'consent') {
     return <ConsentView />
-  }
-
-  // Register view from old invitation flow or manual registration
-  if (currentView === 'register') {
-    return <LoginView />
   }
 
   // Not logged in — show standard login

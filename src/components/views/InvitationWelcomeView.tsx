@@ -130,7 +130,7 @@ export default function InvitationWelcomeView() {
             ) : canAutoLogin ? (
               <>
                 <CheckCircle2 className="w-16 h-16 text-emerald-500 mx-auto" />
-                <h2 className="text-xl font-bold text-gray-900">¡Ya estás registrado/a!</h2>
+                <h2 className="text-xl font-bold text-gray-900">¡Ya tienes acceso!</h2>
               </>
             ) : (
               <>

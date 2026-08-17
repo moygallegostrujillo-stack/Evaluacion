@@ -3,7 +3,6 @@ import { create } from 'zustand'
 export type UserRole = 'SUPER_ADMIN' | 'RH' | 'GERENTE' | 'CANDIDATO'
 export type ViewType = 
   | 'login' 
-  | 'register' 
   | 'consent'
   | 'dashboard' 
   | 'candidates' 
