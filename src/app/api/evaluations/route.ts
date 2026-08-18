@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createRLSClient, getUnscopedClient } from '@/lib/rls'
 import { getAuthFromHeaders } from '@/lib/auth'
+import { generateTemplatesForPosition } from '@/lib/generate-templates'
 
 // ============================================
 // SCORING ALGORITHM
@@ -296,7 +297,7 @@ export async function GET(req: NextRequest) {
       }
 
       // Return evaluation templates and questions for a position
-      const templates = await rlsDb.evaluationTemplate.findMany({
+      let templates = await rlsDb.evaluationTemplate.findMany({
         where: { positionId, active: true },
         orderBy: { order: 'asc' },
         include: {
@@ -305,6 +306,35 @@ export async function GET(req: NextRequest) {
           },
         },
       })
+
+      // Auto-generate templates if none exist for this position
+      if (templates.length === 0 && positionId) {
+        const unscopedDb = getUnscopedClient()
+        const position = await unscopedDb.position.findUnique({
+          where: { id: positionId },
+        })
+        if (position) {
+          try {
+            await generateTemplatesForPosition(
+              position.id,
+              position.title,
+              position.category,
+              position.hasKnowledgeTest
+            )
+          } catch (genError) {
+            console.error('Auto-generate templates error (non-fatal):', genError)
+          }
+          templates = await rlsDb.evaluationTemplate.findMany({
+            where: { positionId, active: true },
+            orderBy: { order: 'asc' },
+            include: {
+              questions: {
+                orderBy: { order: 'asc' },
+              },
+            },
+          })
+        }
+      }
 
       // Parse options JSON strings into arrays
       const parseOptions = (options: string | null | undefined): string[] | undefined => {
@@ -370,7 +400,7 @@ export async function GET(req: NextRequest) {
       }
 
       // Get templates for the position ordered by step
-      const templates = await rlsDb.evaluationTemplate.findMany({
+      let templates = await rlsDb.evaluationTemplate.findMany({
         where: { positionId: session.positionId, active: true },
         orderBy: { order: 'asc' },
         include: {
@@ -379,6 +409,35 @@ export async function GET(req: NextRequest) {
           },
         },
       })
+
+      // Auto-generate templates if none exist for this position
+      if (templates.length === 0) {
+        const unscopedDb = getUnscopedClient()
+        const position = await unscopedDb.position.findUnique({
+          where: { id: session.positionId },
+        })
+        if (position) {
+          try {
+            await generateTemplatesForPosition(
+              position.id,
+              position.title,
+              position.category,
+              position.hasKnowledgeTest
+            )
+          } catch (genError) {
+            console.error('Auto-generate templates error (non-fatal):', genError)
+          }
+          templates = await rlsDb.evaluationTemplate.findMany({
+            where: { positionId: session.positionId, active: true },
+            orderBy: { order: 'asc' },
+            include: {
+              questions: {
+                orderBy: { order: 'asc' },
+              },
+            },
+          })
+        }
+      }
 
       // Helper to parse options JSON string into array
       const parseOptions = (options: string | null | undefined): string[] | undefined => {
@@ -571,7 +630,7 @@ export async function POST(req: NextRequest) {
       })
 
       // Get first template questions
-      const templates = await rlsDb.evaluationTemplate.findMany({
+      let templates = await rlsDb.evaluationTemplate.findMany({
         where: { positionId: session.positionId, active: true },
         orderBy: { order: 'asc' },
         include: {
@@ -580,6 +639,36 @@ export async function POST(req: NextRequest) {
           },
         },
       })
+
+      // Auto-generate templates if none exist for this position
+      if (templates.length === 0) {
+        const unscopedDb = getUnscopedClient()
+        const position = await unscopedDb.position.findUnique({
+          where: { id: session.positionId },
+        })
+        if (position) {
+          try {
+            await generateTemplatesForPosition(
+              position.id,
+              position.title,
+              position.category,
+              position.hasKnowledgeTest
+            )
+          } catch (genError) {
+            console.error('Auto-generate templates error (non-fatal):', genError)
+          }
+          // Re-fetch templates after generation
+          templates = await rlsDb.evaluationTemplate.findMany({
+            where: { positionId: session.positionId, active: true },
+            orderBy: { order: 'asc' },
+            include: {
+              questions: {
+                orderBy: { order: 'asc' },
+              },
+            },
+          })
+        }
+      }
 
       // Helper to parse options JSON string into array
       const parseOptions = (options: string | null | undefined): string[] | undefined => {
@@ -672,7 +761,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Session is not in progress' }, { status: 400 })
       }
 
-      const templates = await rlsDb.evaluationTemplate.findMany({
+      let templates = await rlsDb.evaluationTemplate.findMany({
         where: { positionId: session.positionId, active: true },
         orderBy: { order: 'asc' },
         include: {
@@ -681,6 +770,35 @@ export async function POST(req: NextRequest) {
           },
         },
       })
+
+      // Auto-generate templates if none exist for this position
+      if (templates.length === 0) {
+        const unscopedDb = getUnscopedClient()
+        const position = await unscopedDb.position.findUnique({
+          where: { id: session.positionId },
+        })
+        if (position) {
+          try {
+            await generateTemplatesForPosition(
+              position.id,
+              position.title,
+              position.category,
+              position.hasKnowledgeTest
+            )
+          } catch (genError) {
+            console.error('Auto-generate templates error (non-fatal):', genError)
+          }
+          templates = await rlsDb.evaluationTemplate.findMany({
+            where: { positionId: session.positionId, active: true },
+            orderBy: { order: 'asc' },
+            include: {
+              questions: {
+                orderBy: { order: 'asc' },
+              },
+            },
+          })
+        }
+      }
 
       // Helper to parse options JSON string into array
       const parseOptions = (options: string | null | undefined): string[] | undefined => {
