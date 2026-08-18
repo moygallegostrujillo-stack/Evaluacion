@@ -33,6 +33,8 @@ export interface User {
   companyName?: string
   companySector?: string
   consentGiven: boolean
+  consentOption?: string // FULL, KNOWLEDGE_ONLY
+  anonymousStats?: boolean // Option C
 }
 
 export interface CandidateResult {

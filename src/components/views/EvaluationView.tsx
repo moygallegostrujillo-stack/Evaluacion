@@ -57,6 +57,17 @@ export default function EvaluationView() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [answers, setAnswers] = useState<Record<string, number | string>>({})
   const [loading, setLoading] = useState(false)
+
+  // Filter templates based on consent option
+  // KNOWLEDGE_ONLY: skip PSICOMETRICA and PSICOLOGICA
+  const consentOption = user?.consentOption || 'FULL'
+  const setTemplatesWithConsent = (rawTemplates: EvaluationTemplate[]) => {
+    if (consentOption === 'KNOWLEDGE_ONLY') {
+      setTemplates(rawTemplates.filter(t => t.type === 'CONOCIMIENTOS'))
+    } else {
+      setTemplates(rawTemplates)
+    }
+  }
   const [positionTitle, setPositionTitle] = useState('')
   const [consentAccepted, setConsentAccepted] = useState(false)
   const [showSectionTransition, setShowSectionTransition] = useState(false)
@@ -121,7 +132,7 @@ export default function EvaluationView() {
       const res = await apiFetch(`/api/evaluations?sessionId=${sessionId}`)
       const data = await res.json()
       if (data.templates) {
-        setTemplates(data.templates)
+        setTemplatesWithConsent(data.templates)
       }
       if (data.session && data.session.status === 'IN_PROGRESS') {
         setCurrentTemplateIndex(Math.max(0, (data.session.currentStep || 1) - 1))
@@ -195,7 +206,7 @@ export default function EvaluationView() {
       })
       const data = await res.json()
       if (data.templates) {
-        setTemplates(data.templates)
+        setTemplatesWithConsent(data.templates)
         setCurrentTemplateIndex(0)
         setCurrentQuestionIndex(0)
         // Show section transition for the first section
@@ -711,7 +722,7 @@ export default function EvaluationView() {
         positionTitle={positionTitle}
         loading={loading}
         setLoading={setLoading}
-        setTemplates={setTemplates}
+        setTemplates={setTemplatesWithConsent}
         setPhase={setPhase}
         setCurrentTemplateIndex={setCurrentTemplateIndex}
         setCurrentQuestionIndex={setCurrentQuestionIndex}
@@ -966,7 +977,7 @@ function SessionReadyView({
       })
       const data = await res.json()
       if (data.templates) {
-        setTemplates(data.templates)
+        setTemplatesWithConsent(data.templates)
         setCurrentTemplateIndex(0)
         setCurrentQuestionIndex(0)
         // Show section transition for the first section

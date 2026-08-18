@@ -76,6 +76,8 @@ export async function POST(req: NextRequest) {
           companyName: user.company?.name,
           companySector: user.company?.sector,
           consentGiven: user.consentGiven,
+          consentOption: user.consentOption,
+          anonymousStats: user.anonymousStats,
         },
         token,
       })
@@ -163,6 +165,8 @@ export async function POST(req: NextRequest) {
           companyName: invitation.company.name,
           companySector: invitation.company.sector,
           consentGiven: false,
+          consentOption: null,
+          anonymousStats: false,
         },
         token: jwtToken,
       })
@@ -320,6 +324,8 @@ export async function POST(req: NextRequest) {
           companyName: fullUser!.company?.name,
           companySector: fullUser!.company?.sector,
           consentGiven: fullUser!.consentGiven,
+          consentOption: fullUser!.consentOption,
+          anonymousStats: fullUser!.anonymousStats,
           phone: fullUser!.phone,
         },
         token: jwtToken,

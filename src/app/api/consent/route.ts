@@ -17,8 +17,16 @@ export async function POST(req: NextRequest) {
       ? (body.userId || auth.userId)
       : auth.userId
 
+    // Consent option: FULL (all evaluations), KNOWLEDGE_ONLY (just knowledge test)
+    const consentOption = body.consentOption || 'FULL'
+    const anonymousStats = body.anonymousStats || false
+
     if (!userId) {
       return NextResponse.json({ error: 'userId is required' }, { status: 400 })
+    }
+
+    if (!['FULL', 'KNOWLEDGE_ONLY'].includes(consentOption)) {
+      return NextResponse.json({ error: 'consentOption must be FULL or KNOWLEDGE_ONLY' }, { status: 400 })
     }
 
     const user = await rlsDb.user.findUnique({
@@ -39,6 +47,8 @@ export async function POST(req: NextRequest) {
       data: {
         consentGiven: true,
         consentDate: new Date(),
+        consentOption,
+        anonymousStats,
       },
     })
 
@@ -49,6 +59,8 @@ export async function POST(req: NextRequest) {
         name: updatedUser.name,
         consentGiven: updatedUser.consentGiven,
         consentDate: updatedUser.consentDate,
+        consentOption: updatedUser.consentOption,
+        anonymousStats: updatedUser.anonymousStats,
       },
       message: 'Consent recorded successfully',
     })

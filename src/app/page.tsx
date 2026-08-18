@@ -72,13 +72,20 @@ function useAuthRestore() {
 function useInvitationCheck() {
   const setInvitationToken = useAppStore((s) => s.setInvitationToken)
   const setCurrentView = useAppStore((s) => s.setCurrentView)
+  const user = useAppStore((s) => s.user)
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const token = params.get('token')
     if (token) {
       setInvitationToken(token)
-      setCurrentView('invitation-welcome')
+      // If user is already authenticated and hasn't given consent, go to consent directly
+      // Otherwise, show welcome page (which will re-check consent on auto-login)
+      if (user && user.role === 'CANDIDATO' && !user.consentGiven) {
+        setCurrentView('consent')
+      } else {
+        setCurrentView('invitation-welcome')
+      }
       // Clean URL — keep token in store only
       window.history.replaceState({}, '', '/')
     }
@@ -324,7 +331,11 @@ export default function Home() {
   }
 
   // Invitation welcome page - no auth required (shows company/position info)
+  // BUT: if user is authenticated candidate without consent, redirect to consent
   if (currentView === 'invitation-welcome') {
+    if (user && user.role === 'CANDIDATO' && !user.consentGiven) {
+      return <ConsentView />
+    }
     return <InvitationWelcomeView />
   }
 
