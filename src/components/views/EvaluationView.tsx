@@ -73,10 +73,6 @@ export default function EvaluationView() {
     }
   }
 
-  // Is the candidate in a sensitive section (psicometrica or psicologica) with FULL consent?
-  const isInSensitiveSection = consentOption === 'FULL' &&
-    (currentTemplate?.type === 'PSICOMETRICA' || currentTemplate?.type === 'PSICOLOGICA')
-
   // Handle consent withdrawal
   const handleRetractConsent = async () => {
     if (!user?.id) return
@@ -202,6 +198,10 @@ export default function EvaluationView() {
 
   const currentTemplate = templates[currentTemplateIndex]
   const currentQuestion = currentTemplate?.questions?.[currentQuestionIndex]
+
+  // Is the candidate in a sensitive section (psicometrica or psicologica) with FULL consent?
+  const isInSensitiveSection = consentOption === 'FULL' &&
+    (currentTemplate?.type === 'PSICOMETRICA' || currentTemplate?.type === 'PSICOLOGICA')
 
   const totalQuestions = templates.reduce((sum, t) => sum + (t.questions?.length || 0), 0)
   const answeredCount = templates.slice(0, currentTemplateIndex).reduce((sum, t) => sum + (t.questions?.length || 0), 0) + currentQuestionIndex

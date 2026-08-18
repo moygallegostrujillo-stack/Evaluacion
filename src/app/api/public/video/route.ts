@@ -157,8 +157,11 @@ export async function POST(req: NextRequest) {
             role: 'CANDIDATO',
             companyId,
             phone: application.candidatePhone,
-            consentGiven: true,
-            consentDate: application.startedAt || new Date(),
+            // DO NOT auto-consent: LFPDPPP Art. 8 requires explicit consent from the data subject
+            consentGiven: false,
+            consentOption: null,
+            anonymousStats: false,
+            consentConfirmed: false,
             active: true,
           },
         })
