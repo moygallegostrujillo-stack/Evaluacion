@@ -78,6 +78,8 @@ export async function POST(req: NextRequest) {
           consentGiven: user.consentGiven,
           consentOption: user.consentOption,
           anonymousStats: user.anonymousStats,
+          consentConfirmed: user.consentConfirmed,
+          consentVersion: user.consentVersion,
         },
         token,
       })
@@ -167,6 +169,8 @@ export async function POST(req: NextRequest) {
           consentGiven: false,
           consentOption: null,
           anonymousStats: false,
+          consentConfirmed: false,
+          consentVersion: null,
         },
         token: jwtToken,
       })
@@ -326,6 +330,8 @@ export async function POST(req: NextRequest) {
           consentGiven: fullUser!.consentGiven,
           consentOption: fullUser!.consentOption,
           anonymousStats: fullUser!.anonymousStats,
+          consentConfirmed: fullUser!.consentConfirmed,
+          consentVersion: fullUser!.consentVersion,
           phone: fullUser!.phone,
         },
         token: jwtToken,

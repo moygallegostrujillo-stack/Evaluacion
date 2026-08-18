@@ -35,6 +35,8 @@ export interface User {
   consentGiven: boolean
   consentOption?: string // FULL, KNOWLEDGE_ONLY
   anonymousStats?: boolean // Option C
+  consentConfirmed?: boolean // Confirmed reading all options + ARCO
+  consentVersion?: string // Privacy notice version at time of consent
 }
 
 export interface CandidateResult {

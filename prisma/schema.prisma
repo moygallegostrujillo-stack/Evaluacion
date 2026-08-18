@@ -41,10 +41,13 @@ model User {
   phone        String?
   companyId    String?
   active       Boolean   @default(true)
-  consentGiven  Boolean   @default(false)
-  consentDate   DateTime?
-  consentOption String?   // FULL, KNOWLEDGE_ONLY — which consent option the candidate chose
-  anonymousStats Boolean  @default(false) // Option C: anonymous statistics consent
+  consentGiven     Boolean   @default(false)
+  consentDate      DateTime?
+  consentOption    String?   // FULL, KNOWLEDGE_ONLY — which consent option the candidate chose
+  anonymousStats   Boolean   @default(false) // Option C: anonymous statistics consent
+  consentConfirmed Boolean   @default(false) // Did candidate confirm reading all options + ARCO?
+  consentWithdrawnAt DateTime? // When consent was withdrawn (retracted from FULL to KNOWLEDGE_ONLY)
+  consentVersion   String?   // Version of the privacy notice the candidate consented to
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
@@ -53,6 +56,7 @@ model User {
   results          EvaluationResult[]
   sentInvitations  CandidateInvitation[] @relation("InvitationSender")
   interviews       InterviewSchedule[]   @relation("InterviewCandidate")
+  consentLogs      ConsentLog[]
 }
 
 model Position {
@@ -309,4 +313,18 @@ model VacancyApplicationResponse {
 
   application     VacancyApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   vacancyQuestion VacancyQuestion?   @relation(fields: [vacancyQuestionId], references: [id])
+}
+
+model ConsentLog {
+  id              String   @id @default(cuid())
+  userId          String
+  action          String   // GIVEN, WITHDRAWN, MODIFIED
+  previousOption  String?  // e.g., FULL
+  newOption       String?  // e.g., KNOWLEDGE_ONLY
+  anonymousStats  Boolean  @default(false)
+  consentVersion  String?
+  ipAddress       String?
+  createdAt       DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
