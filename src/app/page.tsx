@@ -25,7 +25,7 @@ import { Separator } from '@/components/ui/separator'
 import {
   LayoutDashboard, Users, ClipboardCheck, UserPlus,
   BarChart3, Calendar, LogOut, Menu, X, ChevronRight, HelpCircle, Briefcase,
-  CheckCircle2, Building2, Shield
+  CheckCircle2, Building2, Shield, FileDown
 } from 'lucide-react'
 
 // Restore auth from localStorage
@@ -193,6 +193,22 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
           </button>
         ))}
       </nav>
+
+      <Separator />
+
+      {/* Legal Documents */}
+      {isRH && (
+        <div className="px-2 py-1">
+          <a
+            href="/api/download?doc=aviso-privacidad"
+            download
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors"
+          >
+            <FileDown className="w-5 h-5" />
+            {!collapsed && <span>Aviso de Privacidad</span>}
+          </a>
+        </div>
+      )}
 
       <Separator />
 
