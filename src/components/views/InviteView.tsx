@@ -9,8 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { Textarea } from '@/components/ui/textarea'
-import { ArrowLeft, Send, Copy, Check, MessageSquare, UserPlus, Phone, User, Building2, Plus, Loader2, Trash2 } from 'lucide-react'
+import { ArrowLeft, Send, Copy, Check, MessageSquare, UserPlus, Phone, User, Building2, Loader2, Trash2, BookOpen, HelpCircle, AlertCircle } from 'lucide-react'
 
 interface Invitation {
   id: string
@@ -24,29 +23,38 @@ interface Invitation {
   createdAt: string
 }
 
-// Sector & category options
-const SECTOR_OPTIONS = [
-  { value: 'RESTAURANT', label: 'Restaurante' },
-  { value: 'RETAIL', label: 'Retail' },
-]
+interface PositionWithDetails {
+  id: string
+  title: string
+  sector: string
+  category: string
+  hasKnowledgeTest: boolean
+  evaluationTemplates?: Array<{
+    id: string
+    name: string
+    type: string
+    order: number
+    _count: { questions: number }
+  }>
+}
 
-const CATEGORIES_BY_SECTOR: Record<string, { value: string; label: string }[]> = {
-  RESTAURANT: [
-    { value: 'MESERO', label: 'Mesero/a' },
-    { value: 'COCINERO', label: 'Cocinero/a' },
-    { value: 'BARTENDER', label: 'Bartender' },
-    { value: 'GERENTE_PISO', label: 'Gerente de Piso' },
-  ],
-  RETAIL: [
-    { value: 'VENDEDOR', label: 'Vendedor/a' },
-    { value: 'GERENTE_PISO', label: 'Gerente de Piso' },
-  ],
+const CATEGORY_LABELS: Record<string, string> = {
+  MESERO: 'Mesero/a',
+  COCINERO: 'Cocinero/a',
+  BARTENDER: 'Bartender',
+  GERENTE_PISO: 'Gerente de Piso',
+  VENDEDOR: 'Vendedor/a',
+}
+
+const SECTOR_LABELS: Record<string, string> = {
+  RESTAURANT: 'Restaurante',
+  RETAIL: 'Retail',
 }
 
 export default function InviteView() {
   const user = useAppStore((s) => s.user)
   const setCurrentView = useAppStore((s) => s.setCurrentView)
-  const [positions, setPositions] = useState<Position[]>([])
+  const [positions, setPositions] = useState<PositionWithDetails[]>([])
   const [invitations, setInvitations] = useState<Invitation[]>([])
   const [candidateName, setCandidateName] = useState('')
   const [phone, setPhone] = useState('')
@@ -58,16 +66,6 @@ export default function InviteView() {
   const [copiedToken, setCopiedToken] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [error, setError] = useState('')
-
-  // Position creation state
-  const [showCreatePosition, setShowCreatePosition] = useState(false)
-  const [newPosTitle, setNewPosTitle] = useState('')
-  const [newPosSector, setNewPosSector] = useState(user?.companySector || 'RESTAURANT')
-  const [newPosCategory, setNewPosCategory] = useState('')
-  const [newPosDescription, setNewPosDescription] = useState('')
-  const [newPosHasKnowledgeTest, setNewPosHasKnowledgeTest] = useState(false)
-  const [creatingPosition, setCreatingPosition] = useState(false)
-  const [createPositionError, setCreatePositionError] = useState('')
 
   // For SUPER_ADMIN: company selector
   const [companies, setCompanies] = useState<{ id: string; name: string; sector?: string }[]>([])
@@ -85,16 +83,6 @@ export default function InviteView() {
         .catch(console.error)
     }
   }, [isSuperAdmin])
-
-  // When SUPER_ADMIN selects a company, update sector
-  useEffect(() => {
-    if (isSuperAdmin && selectedCompanyId) {
-      const company = companies.find(c => c.id === selectedCompanyId)
-      if (company?.sector) {
-        setNewPosSector(company.sector)
-      }
-    }
-  }, [isSuperAdmin, selectedCompanyId, companies])
 
   // Load positions when company changes
   const loadPositions = React.useCallback(() => {
@@ -133,48 +121,15 @@ export default function InviteView() {
       .catch(() => {}) // invitations may 404 if no GET handler, that's ok
   }, [activeCompanyId])
 
-  // Create position handler
-  const handleCreatePosition = async () => {
-    if (!activeCompanyId || !newPosTitle.trim() || !newPosCategory) return
+  // Get total question count for a position
+  const getQuestionCount = (pos: PositionWithDetails): number => {
+    if (!pos.evaluationTemplates) return 0
+    return pos.evaluationTemplates.reduce((sum, t) => sum + t._count.questions, 0)
+  }
 
-    setCreatingPosition(true)
-    setCreatePositionError('')
-    try {
-      const res = await apiFetch('/api/positions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: newPosTitle.trim(),
-          sector: newPosSector,
-          category: newPosCategory,
-          description: newPosDescription.trim() || undefined,
-          hasKnowledgeTest: newPosHasKnowledgeTest,
-          companyId: activeCompanyId,
-        }),
-      })
-      const data = await res.json()
-      if (res.ok) {
-        // Refresh positions and auto-select the new one
-        const params = new URLSearchParams()
-        params.set('companyId', activeCompanyId)
-        const posRes = await apiFetch(`/api/positions?${params.toString()}`)
-        const posData = await posRes.json()
-        setPositions(posData.positions || [])
-        setPositionId(data.position.id)
-        setShowCreatePosition(false)
-        // Reset form
-        setNewPosTitle('')
-        setNewPosCategory('')
-        setNewPosDescription('')
-        setNewPosHasKnowledgeTest(false)
-      } else {
-        setCreatePositionError(data.error || 'Error al crear puesto')
-      }
-    } catch {
-      setCreatePositionError('Error de conexión')
-    } finally {
-      setCreatingPosition(false)
-    }
+  // Get template count for a position
+  const getTemplateCount = (pos: PositionWithDetails): number => {
+    return pos.evaluationTemplates?.length || 0
   }
 
   const handleInvite = async (e: React.FormEvent) => {
@@ -265,8 +220,8 @@ export default function InviteView() {
     }
   }
 
-  // Available categories based on selected sector
-  const availableCategories = CATEGORIES_BY_SECTOR[newPosSector] || []
+  // Find selected position details
+  const selectedPosition = positions.find(p => p.id === positionId)
 
   return (
     <div className="space-y-6">
@@ -307,156 +262,93 @@ export default function InviteView() {
                 </div>
               )}
 
-              {/* Position selector */}
+              {/* Position selector - ONLY existing positions */}
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label>Puesto al que aplica</Label>
-                  {positions.length > 0 && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="text-xs text-emerald-600 h-6"
-                      onClick={() => setShowCreatePosition(!showCreatePosition)}
-                    >
-                      <Plus className="w-3 h-3 mr-1" /> Nuevo puesto
-                    </Button>
-                  )}
-                </div>
+                <Label className="flex items-center gap-1.5">
+                  <Building2 className="w-4 h-4 text-gray-500" />
+                  Puesto al que aplica <span className="text-red-500">*</span>
+                </Label>
                 {!activeCompanyId ? (
                   <p className="text-sm text-gray-400 italic">
                     {isSuperAdmin ? 'Selecciona una empresa primero' : 'No hay empresa asociada'}
                   </p>
                 ) : loadingPositions ? (
-                  <p className="text-sm text-gray-400">Cargando puestos...</p>
-                ) : positions.length === 0 && !showCreatePosition ? (
-                  <div className="space-y-3">
-                    <p className="text-sm text-amber-600">No hay puestos creados para esta empresa.</p>
+                  <div className="flex items-center gap-2 text-sm text-gray-400">
+                    <Loader2 className="w-4 h-4 animate-spin" /> Cargando puestos...
+                  </div>
+                ) : positions.length === 0 ? (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-3">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />
+                      <div>
+                        <p className="text-sm font-medium text-amber-700">No hay puestos creados</p>
+                        <p className="text-xs text-amber-600 mt-1">
+                          Primero necesitas crear puestos con sus preguntas de evaluación. Luego podrás invitar candidatos a esos puestos.
+                        </p>
+                      </div>
+                    </div>
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="w-full border-dashed border-amber-300 text-amber-700 hover:bg-amber-50"
-                      onClick={() => setShowCreatePosition(true)}
+                      className="w-full border-amber-300 text-amber-700 hover:bg-amber-100"
+                      onClick={() => setCurrentView('questions')}
                     >
-                      <Plus className="w-4 h-4 mr-1" /> Crear primer puesto
+                      <HelpCircle className="w-4 h-4 mr-1" /> Ir a Preguntas y Puestos
                     </Button>
                   </div>
-                ) : positions.length > 0 ? (
-                  <Select value={positionId} onValueChange={setPositionId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecciona un puesto" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {positions.map(p => (
-                        <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : null}
+                ) : (
+                  <>
+                    <Select value={positionId} onValueChange={setPositionId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona un puesto..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {positions.map(p => {
+                          const qCount = getQuestionCount(p)
+                          const tCount = getTemplateCount(p)
+                          return (
+                            <SelectItem key={p.id} value={p.id}>
+                              <div className="flex items-center gap-2">
+                                <span>{p.title}</span>
+                                <span className="text-xs text-gray-400">
+                                  ({CATEGORY_LABELS[p.category] || p.category} · {qCount} preguntas)
+                                </span>
+                              </div>
+                            </SelectItem>
+                          )
+                        })}
+                      </SelectContent>
+                    </Select>
+                    {/* Position info card when selected */}
+                    {selectedPosition && (
+                      <div className="bg-gray-50 rounded-lg p-3 border border-gray-200 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-medium text-gray-700">{selectedPosition.title}</p>
+                          <Badge variant="outline" className="text-xs">
+                            {SECTOR_LABELS[selectedPosition.sector] || selectedPosition.sector}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-4 text-xs text-gray-500">
+                          <span className="flex items-center gap-1">
+                            <BookOpen className="w-3.5 h-3.5" />
+                            {getTemplateCount(selectedPosition)} plantillas
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <HelpCircle className="w-3.5 h-3.5" />
+                            {getQuestionCount(selectedPosition)} preguntas
+                          </span>
+                          {selectedPosition.hasKnowledgeTest && (
+                            <Badge className="bg-teal-100 text-teal-700 text-[10px] px-1.5 py-0">
+                              Con conocimientos
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
-
-              {/* Inline Create Position Form */}
-              {showCreatePosition && (
-                <div className="bg-gray-50 rounded-lg p-4 space-y-3 border border-gray-200">
-                  <p className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
-                    <Plus className="w-4 h-4 text-emerald-600" /> Crear nuevo puesto
-                  </p>
-                  {createPositionError && (
-                    <div className="bg-red-50 border border-red-200 rounded-md p-2 text-xs text-red-700">
-                      {createPositionError}
-                    </div>
-                  )}
-                  <div className="space-y-3">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="new-pos-title" className="text-xs">Nombre del puesto *</Label>
-                      <Input
-                        id="new-pos-title"
-                        placeholder="Ej: Mesero, Cocinero, Vendedor..."
-                        value={newPosTitle}
-                        onChange={(e) => setNewPosTitle(e.target.value)}
-                        required
-                        className="h-9 text-sm"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <Label className="text-xs">Sector *</Label>
-                        <Select value={newPosSector} onValueChange={(v) => { setNewPosSector(v); setNewPosCategory(''); }}>
-                          <SelectTrigger className="h-9 text-sm">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {SECTOR_OPTIONS.map(s => (
-                              <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs">Categoría *</Label>
-                        <Select value={newPosCategory} onValueChange={setNewPosCategory}>
-                          <SelectTrigger className="h-9 text-sm">
-                            <SelectValue placeholder="Seleccionar..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {availableCategories.map(c => (
-                              <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="new-pos-desc" className="text-xs">Descripción (opcional)</Label>
-                      <Textarea
-                        id="new-pos-desc"
-                        placeholder="Breve descripción del puesto..."
-                        value={newPosDescription}
-                        onChange={(e) => setNewPosDescription(e.target.value)}
-                        rows={2}
-                        className="text-sm"
-                      />
-                    </div>
-                    <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={newPosHasKnowledgeTest}
-                        onChange={(e) => setNewPosHasKnowledgeTest(e.target.checked)}
-                        className="rounded border-gray-300"
-                      />
-                      Incluir evaluación de conocimientos
-                    </label>
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        className="bg-emerald-600 hover:bg-emerald-700 text-xs"
-                        disabled={creatingPosition || !newPosTitle.trim() || !newPosCategory}
-                        onClick={handleCreatePosition}
-                      >
-                        {creatingPosition ? (
-                          <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Creando...</>
-                        ) : (
-                          'Crear Puesto'
-                        )}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="text-xs"
-                        onClick={() => {
-                          setShowCreatePosition(false)
-                          setCreatePositionError('')
-                        }}
-                      >
-                        Cancelar
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {/* Channel selector */}
               <div className="space-y-2">
@@ -519,7 +411,7 @@ export default function InviteView() {
               <Button
                 type="submit"
                 className="w-full bg-emerald-600 hover:bg-emerald-700"
-                disabled={loading || !positionId || !phone.trim()}
+                disabled={loading || !positionId || !phone.trim() || positions.length === 0}
               >
                 {loading ? 'Generando...' : (
                   <>
