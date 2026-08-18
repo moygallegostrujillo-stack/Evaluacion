@@ -176,8 +176,12 @@ export async function POST(req: NextRequest) {
         role: 'CANDIDATO',
         // companyId auto-injected by RLS for non-SUPER_ADMIN; SUPER_ADMIN must specify
         ...(companyId ? { companyId } : {}),
-        consentGiven: true,
-        consentDate: new Date(),
+        // DO NOT auto-consent: the candidate must give consent themselves
+        // via the ConsentView screen (LFPDPPP Art. 8 requires explicit consent from the data subject)
+        consentGiven: false,
+        consentOption: null,
+        anonymousStats: false,
+        consentConfirmed: false,
         active: true,
       },
     })

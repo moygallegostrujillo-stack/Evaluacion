@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
   CheckCircle2, ChevronRight, Clock, ClipboardList, Brain, BookOpen,
-  Utensils, ShoppingBag, Briefcase, ArrowRight, Users
+  Utensils, ShoppingBag, Briefcase, ArrowRight, Users, ShieldAlert, X
 } from 'lucide-react'
 
 const LIKERT_OPTIONS = [
@@ -57,6 +57,10 @@ export default function EvaluationView() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [answers, setAnswers] = useState<Record<string, number | string>>({})
   const [loading, setLoading] = useState(false)
+  const [showRetractDialog, setShowRetractDialog] = useState(false)
+  const [retractLoading, setRetractLoading] = useState(false)
+  const setAuth = useAppStore((s) => s.setAuth)
+  const token = useAppStore((s) => s.token)
 
   // Filter templates based on consent option
   // KNOWLEDGE_ONLY: skip PSICOMETRICA and PSICOLOGICA
@@ -66,6 +70,48 @@ export default function EvaluationView() {
       setTemplates(rawTemplates.filter(t => t.type === 'CONOCIMIENTOS'))
     } else {
       setTemplates(rawTemplates)
+    }
+  }
+
+  // Is the candidate in a sensitive section (psicometrica or psicologica) with FULL consent?
+  const isInSensitiveSection = consentOption === 'FULL' &&
+    (currentTemplate?.type === 'PSICOMETRICA' || currentTemplate?.type === 'PSICOLOGICA')
+
+  // Handle consent withdrawal
+  const handleRetractConsent = async () => {
+    if (!user?.id) return
+    setRetractLoading(true)
+    try {
+      const res = await apiFetch('/api/consent', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        console.error('Error withdrawing consent:', data.error)
+        return
+      }
+      // Update store: change consentOption to KNOWLEDGE_ONLY
+      if (token) {
+        setAuth({
+          ...user,
+          consentOption: 'KNOWLEDGE_ONLY',
+        }, token)
+      }
+      // Filter templates to only CONOCIMIENTOS and find the knowledge section
+      const knowledgeTemplates = templates.filter(t => t.type === 'CONOCIMIENTOS')
+      setTemplates(knowledgeTemplates)
+      if (knowledgeTemplates.length > 0) {
+        setCurrentTemplateIndex(0)
+        setCurrentQuestionIndex(0)
+        setPhase('SECTION_TRANSITION')
+      }
+      setShowRetractDialog(false)
+    } catch (e) {
+      console.error('Error withdrawing consent:', e)
+    } finally {
+      setRetractLoading(false)
     }
   }
   const [positionTitle, setPositionTitle] = useState('')
@@ -797,6 +843,73 @@ export default function EvaluationView() {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Retract consent button — only shown in sensitive sections with FULL consent */}
+      {isInSensitiveSection && (
+        <div className="flex justify-center">
+          <button
+            onClick={() => setShowRetractDialog(true)}
+            className="text-xs text-gray-400 hover:text-red-500 flex items-center gap-1.5 transition-colors py-2"
+          >
+            <ShieldAlert className="w-3.5 h-3.5" />
+            Retirar consentimiento para datos sensibles
+          </button>
+        </div>
+      )}
+
+      {/* Retract consent confirmation dialog */}
+      {showRetractDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <Card className="w-full max-w-md shadow-2xl border-0">
+            <CardContent className="p-6 space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center flex-shrink-0">
+                  <ShieldAlert className="w-5 h-5" />
+                </div>
+                <h3 className="font-semibold text-lg">Retirar Consentimiento</h3>
+              </div>
+
+              <p className="text-sm text-gray-700">
+                ¿Desea retirar su consentimiento para el tratamiento de datos sensibles?
+              </p>
+
+              <div className="bg-gray-50 rounded-lg p-4 space-y-2 text-xs text-gray-600">
+                <p className="font-semibold text-gray-800">Si retira su consentimiento:</p>
+                <ul className="space-y-1.5 ml-1">
+                  <li>• Continuará solo con la evaluación de <strong>conocimientos técnicos</strong></li>
+                  <li>• Sus respuestas psicométricas/psicológicas serán marcadas para eliminación</li>
+                  <li>• <strong>NO afecta</strong> su participación en el proceso de selección</li>
+                  <li>• Tendrá las <strong>mismas oportunidades</strong> que los demás candidatos</li>
+                </ul>
+              </div>
+
+              <div className="bg-emerald-50 p-3 rounded-md border border-emerald-200">
+                <p className="text-xs text-emerald-700 font-medium">
+                  Su derecho a retirar el consentimiento está protegido por el Art. 37 de la LFPDPPP.
+                </p>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setShowRetractDialog(false)}
+                  disabled={retractLoading}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  className="flex-1 bg-amber-600 hover:bg-amber-700 text-white"
+                  onClick={handleRetractConsent}
+                  disabled={retractLoading}
+                >
+                  {retractLoading ? 'Procesando...' : 'Confirmar Retiro'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       )}
     </div>
   )
