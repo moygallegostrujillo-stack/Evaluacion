@@ -176,12 +176,24 @@ export async function DELETE(req: NextRequest) {
 
     const { searchParams } = new URL(req.url)
     const invitationId = searchParams.get('id')
+    const deleteAll = searchParams.get('all') === 'true'
+
+    const db = getUnscopedClient()
+
+    // DELETE ALL invitations for the company (or all if SUPER_ADMIN)
+    if (deleteAll) {
+      const where = auth.role === 'SUPER_ADMIN' ? {} : { companyId: auth.companyId }
+      const result = await db.candidateInvitation.deleteMany({ where })
+      return NextResponse.json({
+        success: true,
+        deleted: result.count,
+        message: `${result.count} invitación(es) eliminada(s)`,
+      })
+    }
 
     if (!invitationId) {
       return NextResponse.json({ error: 'ID de invitación requerido' }, { status: 400 })
     }
-
-    const db = getUnscopedClient()
 
     // Find the invitation
     const invitation = await db.candidateInvitation.findUnique({
@@ -192,17 +204,38 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Invitación no encontrada' }, { status: 404 })
     }
 
-    // Only allow deleting PENDING invitations
-    if (invitation.status !== 'PENDING') {
-      return NextResponse.json(
-        { error: 'Solo se pueden eliminar invitaciones pendientes' },
-        { status: 400 }
-      )
-    }
-
     // Check authorization: SUPER_ADMIN or same company
     if (auth.role !== 'SUPER_ADMIN' && auth.companyId !== invitation.companyId) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+    }
+
+    // Delete the invitation (and associated candidate user if auto-created)
+    // Also delete any evaluation sessions created for this candidate
+    if (invitation.candidateName || invitation.phone) {
+      // Find and delete auto-created candidate users matching this invitation
+      const autoUsers = await db.user.findMany({
+        where: {
+          role: 'CANDIDATO',
+          companyId: invitation.companyId,
+          OR: [
+            { phone: invitation.phone || undefined },
+            { name: invitation.candidateName || undefined },
+          ],
+        },
+        select: { id: true },
+      })
+
+      if (autoUsers.length > 0) {
+        // Delete evaluation sessions first (cascade will handle responses)
+        await db.evaluationSession.deleteMany({
+          where: { candidateId: { in: autoUsers.map(u => u.id) } },
+        }).catch(() => {})
+
+        // Delete the candidate users
+        await db.user.deleteMany({
+          where: { id: { in: autoUsers.map(u => u.id) } },
+        }).catch(() => {})
+      }
     }
 
     await db.candidateInvitation.delete({
