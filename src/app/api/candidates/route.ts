@@ -240,3 +240,97 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Error creating candidate' }, { status: 500 })
   }
 }
+
+// ============================================
+// DELETE — Delete a candidate (or all candidates if ?all=true)
+// ============================================
+export async function DELETE(req: NextRequest) {
+  try {
+    const auth = getAuthFromHeaders(req.headers)
+    if (!auth) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (auth.role !== 'SUPER_ADMIN' && auth.role !== 'RH' && auth.role !== 'GERENTE') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    const { searchParams } = new URL(req.url)
+    const candidateId = searchParams.get('id')
+    const deleteAll = searchParams.get('all') === 'true'
+
+    const db = getUnscopedClient()
+
+    // DELETE ALL candidates for the company (or all if SUPER_ADMIN)
+    if (deleteAll) {
+      const where = auth.role === 'SUPER_ADMIN'
+        ? { role: 'CANDIDATO' as const }
+        : { role: 'CANDIDATO' as const, companyId: auth.companyId }
+
+      // Delete related records first
+      const candidates = await db.user.findMany({
+        where,
+        select: { id: true },
+      })
+      const candidateIds = candidates.map(c => c.id)
+
+      if (candidateIds.length > 0) {
+        await db.evaluationResponse.deleteMany({
+          where: { session: { candidateId: { in: candidateIds } } },
+        }).catch(() => {})
+        await db.evaluationResult.deleteMany({
+          where: { candidateId: { in: candidateIds } },
+        }).catch(() => {})
+        await db.evaluationSession.deleteMany({
+          where: { candidateId: { in: candidateIds } },
+        }).catch(() => {})
+        await db.interviewSchedule.deleteMany({
+          where: { candidateId: { in: candidateIds } },
+        }).catch(() => {})
+        await db.consentLog.deleteMany({
+          where: { userId: { in: candidateIds } },
+        }).catch(() => {})
+        const result = await db.user.deleteMany({
+          where,
+        })
+        return NextResponse.json({
+          success: true,
+          deleted: result.count,
+          message: `${result.count} candidato(s) eliminado(s)`,
+        })
+      }
+      return NextResponse.json({
+        success: true,
+        deleted: 0,
+        message: 'No hay candidatos para eliminar',
+      })
+    }
+
+    if (!candidateId) {
+      return NextResponse.json({ error: 'Candidate ID is required' }, { status: 400 })
+    }
+
+    // Delete related records first
+    await db.evaluationResponse.deleteMany({
+      where: { session: { candidateId } },
+    }).catch(() => {})
+    await db.evaluationResult.deleteMany({
+      where: { candidateId },
+    }).catch(() => {})
+    await db.evaluationSession.deleteMany({
+      where: { candidateId },
+    }).catch(() => {})
+    await db.interviewSchedule.deleteMany({
+      where: { candidateId },
+    }).catch(() => {})
+    await db.consentLog.deleteMany({
+      where: { userId: candidateId },
+    }).catch(() => {})
+    await db.user.delete({ where: { id: candidateId } })
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Candidates DELETE error:', error)
+    return NextResponse.json({ error: 'Error deleting candidate' }, { status: 500 })
+  }
+}
