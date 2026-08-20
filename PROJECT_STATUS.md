@@ -1,6 +1,6 @@
 # EvaluHR — Documento de Estado del Proyecto
 
-> **Última actualización:** Marzo 2026
+> **Última actualización:** 20 Agosto 2026
 > **Propósito:** Contexto completo para futuras sesiones de desarrollo
 
 ---
@@ -652,11 +652,114 @@ ZAI_TOKEN        — Token de sesión Z.ai
 
 ### Auditoría legal (31 secciones)
 
-| Issue | Detalle |
-|-------|---------|
-| Aviso de privacidad | Pendiente implementar 31 secciones de auditoría legal para cumplimiento LFPDPPP (México) |
-| Consentimiento | El flujo de consent existe pero falta texto legal completo |
-| Datos sensibles | Se almacenan datos psicométricos — verificar base legal bajo LFPDPPP |
+| Issue | Detalle | Estado |
+|-------|---------|--------|
+| Aviso de privacidad | Pendiente implementar 31 secciones de auditoría legal para cumplimiento LFPDPPP (México) | Pendiente |
+| Consentimiento | Sistema de consentimiento LFPDPPP-compliant implementado (Opciones A/B/C + audit log) | ✅ Completado |
+| Datos sensibles | Se almacenan datos psicométricos — base legal: consentimiento expreso (Art. 8 LFPDPPP) | ✅ Completado |
+
+---
+
+## 12.5. Sistema de Consentimiento (LFPDPPP-Compliant) — IMPLEMENTADO
+
+### Resumen
+
+El sistema de consentimiento informado cumple con la **Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP)** y la **NOM-035-STPS-2018**. Permite a los candidatos elegir entre 3 opciones de participación antes de iniciar la evaluación.
+
+### Opciones de Participación
+
+| Opción | Código | Descripción |
+|--------|--------|-------------|
+| **A** | `FULL` | Evaluación Completa (psicométrica + psicológica + conocimientos) |
+| **B** | `KNOWLEDGE_ONLY` | Solo Conocimientos (sin datos psicológicos sensibles) |
+| **C** | `anonymousStats=true` | Estadísticas Anónimas (opcional, independiente de A/B) |
+
+### Esquema de Base de Datos (Modelo User)
+
+```prisma
+model User {
+  // ... campos básicos ...
+  consentGiven         Boolean   @default(false)    // ¿Aceptó el consentimiento?
+  consentDate          DateTime?                    // Fecha de aceptación
+  consentOption        String?                      // FULL o KNOWLEDGE_ONLY
+  anonymousStats       Boolean   @default(false)    // Opción C (estadísticas anónimas)
+  consentConfirmed     Boolean   @default(false)    // Confirmó lectura de opciones + ARCO
+  consentWithdrawnAt   DateTime?                    // Fecha de retiro (FULL → KNOWLEDGE_ONLY)
+  consentVersion       String?                      // Versión del aviso de privacidad (actual: 2026-01-v1)
+}
+```
+
+### Modelo ConsentLog (Audit Trail)
+
+```prisma
+model ConsentLog {
+  id              String   @id @default(cuid())
+  userId          String                        // FK → User
+  action          String                        // GIVEN, MODIFIED, WITHDRAWN
+  previousOption  String?                        // FULL, KNOWLEDGE_ONLY
+  newOption       String?                        // FULL, KNOWLEDGE_ONLY
+  anonymousStats  Boolean  @default(false)
+  consentVersion  String?                        // Versión del aviso
+  ipAddress       String?                        // IP del cliente (para auditoría)
+  createdAt       DateTime @default(now())
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+```
+
+### Endpoints API
+
+| Endpoint | Método | Descripción |
+|----------|--------|-------------|
+| `/api/consent` | POST | Registrar consentimiento (Opción A/B + C) |
+| `/api/consent` | PATCH | Retirar consentimiento de datos sensibles (FULL → KNOWLEDGE_ONLY) |
+| `/api/migrate` | POST | Migrar BD producción (añadir columnas consent + ConsentLog) — SUPER_ADMIN only |
+
+### Características LFPDPPP
+
+- ✅ **Consentimiento expreso** (Art. 8): El candidato debe seleccionar una opción Y confirmar lectura
+- ✅ **Datos sensibles** (Art. 7): Las respuestas psicométricas/psicológicas se tratan como datos sensibles
+- ✅ **Derechos ARCO**: Acceso, Rectificación, Cancelación, Oposición (mostrados en la UI)
+- ✅ **Retiro de consentimiento**: El candidato puede retirar consentimiento en cualquier momento (botón "Retirar consentimiento" en EvaluationView)
+- ✅ **No discriminación** (Art. 37 Bis): La elección de opción NO afecta oportunidades
+- ✅ **Audit trail**: ConsentLog registra GIVEN, MODIFIED, WITHDRAWN con IP y versión
+- ✅ **Períodos de conservación**: 2 años datos personales, eliminación al concluir para sensibles
+- ✅ **Versión del aviso**: `consentVersion = "2026-01-v1"` (bump cuando cambie el aviso)
+
+### Flujo de Consentimiento
+
+```
+Candidato abre link (?token=xxx)
+  ↓
+InvitationWelcomeView (muestra info de empresa/puesto)
+  ↓ (Click "Comenzar Evaluación")
+Auto-login (POST /api/auth {action: "auto-login"})
+  ↓ (Crea usuario si no existe, genera JWT)
+ConsentView (selección de Opción A/B/C + confirmación)
+  ↓ (Click "Continuar" → POST /api/consent)
+EvaluationView (evaluación según opción elegida)
+```
+
+### Arquitectura de Resiliencia
+
+El consent API usa `safeFindUserById()` con cliente **unscoped** (no RLS) para evitar el error "Usuario no encontrado" cuando hay discrepancias de companyId entre JWT y BD (usuarios huérfanos de invitaciones eliminadas).
+
+**Patrón:**
+1. Lookup con cliente unscoped (confía en JWT para auth)
+2. Verificación explícita de ownership (`user.companyId === auth.companyId`)
+3. Fallback a SQL crudo si faltan columnas de consent
+4. Audit log write no bloqueante (try/catch)
+
+### Archivos Clave
+
+| Archivo | Propósito |
+|---------|-----------|
+| `src/components/views/ConsentView.tsx` | UI de consentimiento (Opciones A/B/C con toggle) |
+| `src/components/views/InvitationWelcomeView.tsx` | Welcome page del candidato |
+| `src/app/api/consent/route.ts` | POST (registrar) + PATCH (retirar) consentimiento |
+| `src/app/api/auth/route.ts` | Auto-login (crea usuario + JWT) |
+| `src/app/api/migrate/route.ts` | Migración de BD para consent columns |
+| `prisma/schema.prisma` | Schema SQLite (local) |
+| `prisma/schema.prod.prisma` | Schema PostgreSQL (producción) |
 
 ### Funcionalidad pendiente
 
@@ -767,3 +870,56 @@ bun run lint               # ESLint
 - **Nuevas vistas:** Añadir al tipo `ViewType` en `store.ts`, crear componente en `views/`, añadir caso en `renderView()` en `page.tsx`
 - **Nuevos modelos:** Actualizar ambos schemas (`schema.prisma` y `schema.prod.prisma`), añadir a `TENANT_SCOPED_MODELS` en `rls.ts` si tiene `companyId`
 - **SUPER_ADMIN scoping:** Siempre pasar `companyId` explícito cuando SUPER_ADMIN opera en un tenant específico
+
+---
+
+## 15. Changelog
+
+### 20 Agosto 2026 — Fix "Usuario no encontrado" en consent flow
+
+**Commit:** `e0d2b08` → `751cf3b` (pushed to main)
+
+**Problema:** Al crear una invitación nueva y abrir el link, el candidato llegaba a la vista de consentimiento pero al hacer clic en "Continuar" recibía el error "Usuario no encontrado" (HTTP 404).
+
+**Causa raíz:** El API de consentimiento usaba `rlsDb.user.findUnique()` con el cliente RLS (Row-Level Security), que agrega automáticamente un filtro `companyId`. Si había cualquier discrepancia entre el `companyId` del JWT y el `companyId` real del usuario en la BD (usuarios huérfanos de invitaciones eliminadas), la búsqueda retornaba `null` → "Usuario no encontrado".
+
+**Fixes aplicados:**
+
+1. **`src/app/api/consent/route.ts`** — Reescritura completa del lookup del usuario:
+   - Cambió de `rlsDb.user.findUnique` (RLS) → `safeFindUserById()` con cliente **unscoped**
+   - 3 niveles de fallback (full query → minimal select → bare minimum) para resiliencia a columnas faltantes
+   - Verificación explícita de ownership como defense-in-depth
+   - Fallback a SQL crudo si Prisma update fall
+   - Logging detallado con prefijo `[consent]`
+
+2. **`src/app/api/auth/route.ts` (auto-login)** — Fix de usuarios huérfanos:
+   - Cuando reutiliza un usuario huérfano existente (mismo teléfono), ahora **actualiza su companyId** para que coincida con la invitación actual
+   - Manejo graceful de fallos de create con fallback a campos mínimos
+
+3. **`src/app/api/invite/route.ts` (bulk delete)** — Limpieza de huérfanos:
+   - Al borrar todas las invitaciones (`?all=true`), también elimina los usuarios candidatos auto-creados (`cand_*.auto`), sus sesiones de evaluación y logs de consentimiento
+
+4. **`src/app/api/migrate/route.ts`** — Cobertura completa de columnas:
+   - Ahora agrega las **7 columnas** de consent (antes solo 5): consentGiven, consentDate, consentOption, anonymousStats, consentConfirmed, consentWithdrawnAt, consentVersion
+   - Limpia usuarios huérfanos como parte de la migración
+
+**Verificación en producción:**
+- ✅ Deploy exitoso a Vercel
+- ✅ Migración ejecutada (todas las columnas existen, no hay huérfanos)
+- ✅ Test end-to-end con Agent Browser: invitación → auto-login → consentimiento → evaluación (sin errores)
+
+---
+
+### Agosto 2026 — Sistema de Consentimiento LFPDPPP
+
+**Implementación completa del sistema de consentimiento informado:**
+
+- ConsentView con 3 opciones (A=FULL, B=KNOWLEDGE_ONLY, C=anonymousStats)
+- ConsentLog audit table (GIVEN, MODIFIED, WITHDRAWN)
+- Botón "Retirar consentimiento" en EvaluationView
+- Opción B con toggle (click para seleccionar/deseleccionar)
+- Versión del aviso de privacidad: `2026-01-v1`
+- Períodos de conservación documentados
+- Derechos ARCO en la UI
+- Aviso de no discriminación (Art. 37 Bis)
+- Endpoint `/api/migrate` para sync de schema en producción
