@@ -6,6 +6,56 @@ import crypto from 'crypto'
 
 const db = getUnscopedClient()
 
+/**
+ * Safely fetch a user with company, resilient to missing consent columns in prod DB.
+ * If the full query fails (because consentOption/anonymousStats/etc. columns don't exist),
+ * it retries with a minimal select and provides default values for the consent fields.
+ */
+async function safeFindUser(where: Record<string, unknown>, includeCompany = true) {
+  try {
+    return await db.user.findFirst({
+      where,
+      include: includeCompany ? { company: true } : undefined,
+    })
+  } catch (err) {
+    // Consent columns likely missing — retry with explicit select of only known columns
+    console.error('User query failed, retrying with minimal select:', err)
+    const minimal = await db.user.findFirst({
+      where,
+      select: {
+        id: true, email: true, name: true, password: true, role: true,
+        phone: true, companyId: true, active: true,
+        consentGiven: true, consentDate: true,
+        ...(includeCompany ? { company: true } : {}),
+      },
+    }).catch(() => null)
+    return minimal
+  }
+}
+
+/**
+ * Build the user response object with safe defaults for consent fields that may
+ * not exist in the production database yet (during schema migration).
+ */
+function buildUserResponse(user: Record<string, unknown> | null) {
+  if (!user) return null
+  return {
+    id: user.id as string,
+    email: user.email as string,
+    name: user.name as string,
+    role: user.role as string,
+    companyId: (user.companyId as string) || undefined,
+    companyName: (user.company as { name?: string } | null)?.name || undefined,
+    companySector: (user.company as { sector?: string } | null)?.sector || undefined,
+    phone: (user.phone as string) || undefined,
+    consentGiven: (user.consentGiven as boolean) ?? false,
+    consentOption: (user.consentOption as string) ?? null,
+    anonymousStats: (user.anonymousStats as boolean) ?? false,
+    consentConfirmed: (user.consentConfirmed as boolean) ?? false,
+    consentVersion: (user.consentVersion as string) ?? null,
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
@@ -25,10 +75,8 @@ export async function POST(req: NextRequest) {
 
     if (action === 'login') {
       const { email, password } = body
-      const user = await db.user.findUnique({
-        where: { email },
-        include: { company: true },
-      })
+      // Use safeFindUser — resilient to missing consent columns in prod DB
+      const user = await safeFindUser({ email })
 
       if (!user) {
         return NextResponse.json({ error: 'Credenciales inválidas' }, { status: 401 })
@@ -67,20 +115,7 @@ export async function POST(req: NextRequest) {
 
       // Set token as httpOnly cookie for extra security
       const response = NextResponse.json({
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role,
-          companyId: user.companyId,
-          companyName: user.company?.name,
-          companySector: user.company?.sector,
-          consentGiven: user.consentGiven,
-          consentOption: user.consentOption,
-          anonymousStats: user.anonymousStats,
-          consentConfirmed: user.consentConfirmed,
-          consentVersion: user.consentVersion,
-        },
+        user: buildUserResponse(user as Record<string, unknown>),
         token,
       })
 
@@ -221,24 +256,15 @@ export async function POST(req: NextRequest) {
         // Find existing candidate user for this invitation
         // Look by phone first (most reliable for WhatsApp invitations)
         if (invitation.phone) {
-          user = await db.user.findFirst({
-            where: { phone: invitation.phone, companyId: invitation.companyId, role: 'CANDIDATO' },
-            include: { company: true },
-          })
+          user = await safeFindUser({ phone: invitation.phone, companyId: invitation.companyId, role: 'CANDIDATO' })
         }
         // Fallback: find by email
         if (!user && invitation.email) {
-          user = await db.user.findUnique({
-            where: { email: invitation.email },
-            include: { company: true },
-          })
+          user = await safeFindUser({ email: invitation.email })
         }
         // Fallback: find by name + company
         if (!user && invitation.candidateName) {
-          user = await db.user.findFirst({
-            where: { name: invitation.candidateName, companyId: invitation.companyId, role: 'CANDIDATO' },
-            include: { company: true },
-          })
+          user = await safeFindUser({ name: invitation.candidateName, companyId: invitation.companyId, role: 'CANDIDATO' })
         }
 
         if (!user) {
@@ -251,23 +277,28 @@ export async function POST(req: NextRequest) {
         const autoEmail = `cand_${phoneClean || invitation.id.slice(0, 12)}@evaluhr.auto`
 
         // Check if a user with this auto-email already exists
-        const existingAutoUser = await db.user.findUnique({ where: { email: autoEmail } })
+        const existingAutoUser = await safeFindUser({ email: autoEmail })
 
         if (existingAutoUser) {
           user = existingAutoUser
         } else {
           // Create user without password — token is their auth
-          user = await db.user.create({
-            data: {
-              email: autoEmail,
-              name: invitation.candidateName || invitation.phone || 'Candidato',
-              password: await hashPassword(crypto.randomUUID()), // Random unusable password
-              role: 'CANDIDATO',
-              phone: invitation.phone,
-              companyId: invitation.companyId,
-            },
-            include: { company: true },
-          })
+          try {
+            user = await db.user.create({
+              data: {
+                email: autoEmail,
+                name: invitation.candidateName || invitation.phone || 'Candidato',
+                password: await hashPassword(crypto.randomUUID()), // Random unusable password
+                role: 'CANDIDATO',
+                phone: invitation.phone,
+                companyId: invitation.companyId,
+              },
+              include: { company: true },
+            })
+          } catch (createErr) {
+            console.error('User create failed:', createErr)
+            return NextResponse.json({ error: 'Error al crear el usuario' }, { status: 500 })
+          }
         }
 
         // Mark invitation as REGISTERED
@@ -302,38 +333,25 @@ export async function POST(req: NextRequest) {
       }
 
       // Reload user with company if not already included
-      const fullUser = user.company ? user : await db.user.findUnique({
-        where: { id: user.id },
-        include: { company: true },
-      })
+      const fullUser = user.company ? user : await safeFindUser({ id: user.id })
+
+      if (!fullUser) {
+        return NextResponse.json({ error: 'No se pudo cargar el usuario' }, { status: 500 })
+      }
 
       // Generate JWT
       const jwtToken = await generateToken({
-        sub: fullUser!.id,
-        email: fullUser!.email,
-        name: fullUser!.name,
-        role: fullUser!.role,
-        companyId: fullUser!.companyId || undefined,
-        companyName: fullUser!.company?.name || undefined,
-        companySector: fullUser!.company?.sector || undefined,
+        sub: fullUser.id,
+        email: fullUser.email,
+        name: fullUser.name,
+        role: fullUser.role,
+        companyId: fullUser.companyId || undefined,
+        companyName: fullUser.company?.name || undefined,
+        companySector: fullUser.company?.sector || undefined,
       })
 
       const response = NextResponse.json({
-        user: {
-          id: fullUser!.id,
-          email: fullUser!.email,
-          name: fullUser!.name,
-          role: fullUser!.role,
-          companyId: fullUser!.companyId,
-          companyName: fullUser!.company?.name,
-          companySector: fullUser!.company?.sector,
-          consentGiven: fullUser!.consentGiven,
-          consentOption: fullUser!.consentOption,
-          anonymousStats: fullUser!.anonymousStats,
-          consentConfirmed: fullUser!.consentConfirmed,
-          consentVersion: fullUser!.consentVersion,
-          phone: fullUser!.phone,
-        },
+        user: buildUserResponse(fullUser as Record<string, unknown>),
         token: jwtToken,
       })
 
