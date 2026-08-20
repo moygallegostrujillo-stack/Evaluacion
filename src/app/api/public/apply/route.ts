@@ -52,44 +52,52 @@ function calculateScores(responses: ScoredResponse[]) {
 
   // Big Five scores (normalized 0-100)
   const bigFiveScores: Record<string, number> = {}
+  let bigFiveSum = 0
+  let bigFiveCategoriesWithResponses = 0
+
   for (const cat of bigFiveCategories) {
     const scores = categoryScores[cat] || []
     if (scores.length > 0) {
       const avg = scores.reduce((a, b) => a + b, 0) / scores.length
-      const normalized = normalizeBigFive(avg)
+      let normalized = normalizeBigFive(avg)
+      // NEUROTICISM is already handled via reverseScored in the questions
+      // So we don't invert it again here for Big Five
       bigFiveScores[cat] = Math.round(Math.max(0, Math.min(100, normalized)) * 100) / 100
+      bigFiveSum += bigFiveScores[cat]
+      bigFiveCategoriesWithResponses++
     } else {
       bigFiveScores[cat] = 0
     }
   }
 
-  // For psicometrica average: average of (100 - neuroticism), openness, conscientiousness, extraversion, agreeableness
-  const psicometricaAvg =
-    (100 - bigFiveScores['NEUROTICISM'] +
-      bigFiveScores['OPENNESS'] +
-      bigFiveScores['CONSCIENTIOUSNESS'] +
-      bigFiveScores['EXTRAVERSION'] +
-      bigFiveScores['AGREEABLENESS']) / 5
+  // Only average over categories that actually have responses
+  const psicometricaAvg = bigFiveCategoriesWithResponses > 0 ? bigFiveSum / bigFiveCategoriesWithResponses : 0
+  const hasBigFiveData = bigFiveCategoriesWithResponses > 0
 
   // Psychological scores (normalized 0-100)
   const psychScores: Record<string, number> = {}
+  let psychSum = 0
+  let psychCategoriesWithResponses = 0
+
   for (const cat of psychCategories) {
     const scores = categoryScores[cat] || []
     if (scores.length > 0) {
       const avg = scores.reduce((a, b) => a + b, 0) / scores.length
       let normalized = normalizePsychological(avg)
-      // STRESS is inverted for psychological
+      // STRESS is inverted: high raw stress → low score (better stress management)
       if (cat === 'STRESS') {
         normalized = 100 - normalized
       }
       psychScores[cat] = Math.round(Math.max(0, Math.min(100, normalized)) * 100) / 100
+      psychSum += psychScores[cat]
+      psychCategoriesWithResponses++
     } else {
       psychScores[cat] = 0
     }
   }
 
-  const psicologicaAvg =
-    psychCategories.reduce((sum, cat) => sum + psychScores[cat], 0) / psychCategories.length
+  const psicologicaAvg = psychCategoriesWithResponses > 0 ? psychSum / psychCategoriesWithResponses : 0
+  const hasPsychData = psychCategoriesWithResponses > 0
 
   // Knowledge score
   const knowledgeResponses = responses.filter(
@@ -108,22 +116,48 @@ function calculateScores(responses: ScoredResponse[]) {
     knowledgeScore = Math.round((correct / knowledgeResponses.length) * 100 * 100) / 100
   }
 
-  // Overall: 30% psicometrica + 30% psicologica + 40% conocimientos
+  // Overall score calculation — adaptive weighting based on which sections have data
+  // This fixes the bug where missing sections scored 0 and dragged the overall down
   let overallScore: number
-  if (knowledgeScore !== null) {
+  const sectionsWithData: string[] = []
+  if (hasBigFiveData) sectionsWithData.push('bigFive')
+  if (hasPsychData) sectionsWithData.push('psych')
+  if (knowledgeScore !== null) sectionsWithData.push('knowledge')
+
+  if (sectionsWithData.length === 0) {
+    overallScore = 0
+  } else if (sectionsWithData.length === 1) {
+    // Only one section — use its score directly
+    if (knowledgeScore !== null) overallScore = knowledgeScore
+    else if (hasBigFiveData) overallScore = psicometricaAvg
+    else overallScore = psicologicaAvg
+  } else if (knowledgeScore !== null && hasBigFiveData && hasPsychData) {
+    // All three sections — original weights
     overallScore = 0.30 * psicometricaAvg + 0.30 * psicologicaAvg + 0.40 * knowledgeScore
+  } else if (knowledgeScore !== null && (hasBigFiveData || hasPsychData)) {
+    // Knowledge + one behavioral section
+    const behavioralAvg = hasBigFiveData && hasPsychData
+      ? (psicometricaAvg + psicologicaAvg) / 2
+      : hasBigFiveData ? psicometricaAvg : psicologicaAvg
+    overallScore = 0.50 * behavioralAvg + 0.50 * knowledgeScore
   } else {
-    overallScore = 0.50 * psicometricaAvg + 0.50 * psicologicaAvg
+    // Only behavioral sections (no knowledge)
+    overallScore = hasBigFiveData && hasPsychData
+      ? 0.50 * psicometricaAvg + 0.50 * psicologicaAvg
+      : hasBigFiveData ? psicometricaAvg : psicologicaAvg
   }
 
-  // Recommendation
-  let recommendation: string
-  if (overallScore >= 70) {
-    recommendation = 'APTO'
-  } else if (overallScore >= 50) {
-    recommendation = 'ENTREVISTA_ADICIONAL'
+  // Guidance level — NOT a hiring decision, just informational orientation
+  // PERFIL_COMPLETO = all sections completed
+  // PERFIL_PARCIAL = only some sections completed
+  // PENDIENTE = no data yet
+  let guidance: string
+  if (sectionsWithData.length === 0) {
+    guidance = 'PENDIENTE'
+  } else if (hasBigFiveData && hasPsychData && knowledgeScore !== null) {
+    guidance = 'PERFIL_COMPLETO'
   } else {
-    recommendation = 'NO_RECOMENDADO'
+    guidance = 'PERFIL_PARCIAL'
   }
 
   return {
@@ -139,7 +173,7 @@ function calculateScores(responses: ScoredResponse[]) {
     teamwork: psychScores['TEAMWORK'] || 0,
     knowledgeScore,
     overallScore: Math.round(overallScore * 100) / 100,
-    recommendation,
+    recommendation: guidance, // Keep field name for DB compatibility, but value is now guidance
     psicometricaAvg: Math.round(psicometricaAvg * 100) / 100,
     psicologicaAvg: Math.round(psicologicaAvg * 100) / 100,
   }
@@ -389,112 +423,191 @@ async function calculateStepScores(
 }
 
 // ============================================
-// HELPER: Calculate overall score and recommendation
+// HELPER: Calculate overall score and guidance
 // ============================================
 
 async function calculateOverallScore(applicationId: string) {
   const application = await db.vacancyApplication.findUnique({
     where: { id: applicationId },
+    include: { vacancy: true },
   })
   if (!application) return null
 
-  // Psicometrica average: average of (100 - neuroticism), openness, conscientiousness, extraversion, agreeableness
-  const psicometricaAvg =
-    (100 - application.neuroticism +
-      application.openness +
-      application.conscientiousness +
-      application.extraversion +
-      application.agreeableness) / 5
+  const vacancy = application.vacancy
 
-  // Psicologica average
-  const psicologicaAvg =
-    (application.stressLevel +
-      application.empathy +
-      application.adaptability +
-      application.leadership +
-      application.teamwork) / 5
+  // Determine which sections actually have data
+  // A section is considered to have data if the vacancy included it AND scores are non-zero
+  const hasBigFiveData = vacancy.includePsicometrica === true && (
+    application.openness > 0 || application.conscientiousness > 0 ||
+    application.extraversion > 0 || application.agreeableness > 0 ||
+    application.neuroticism > 0
+  )
+  const hasPsychData = vacancy.includePsicologica === true && (
+    application.stressLevel > 0 || application.empathy > 0 ||
+    application.adaptability > 0 || application.leadership > 0 ||
+    application.teamwork > 0
+  )
+  const hasKnowledgeData = application.knowledgeScore !== null
 
-  // Overall: 30% psicometrica + 30% psicologica + 40% conocimientos
+  // Big Five average — adaptive (only categories with responses)
+  // NEUROTICISM is already reverse-scored via calculateLikertScore, so high = stable
+  const bigFiveValues = [application.openness, application.conscientiousness, application.extraversion, application.agreeableness, application.neuroticism]
+  const nonZeroBigFive = bigFiveValues.filter(s => s > 0)
+  const psicometricaAvg = nonZeroBigFive.length > 0 ? nonZeroBigFive.reduce((a, b) => a + b, 0) / nonZeroBigFive.length : 0
+
+  // Psych average — adaptive
+  const psychValues = [application.stressLevel, application.empathy, application.adaptability, application.leadership, application.teamwork]
+  const nonZeroPsych = psychValues.filter(s => s > 0)
+  const psicologicaAvg = nonZeroPsych.length > 0 ? nonZeroPsych.reduce((a, b) => a + b, 0) / nonZeroPsych.length : 0
+
+  // Overall score — adaptive weighting based on which sections have data
   let overallScore: number
-  if (application.knowledgeScore !== null) {
-    overallScore = 0.30 * psicometricaAvg + 0.30 * psicologicaAvg + 0.40 * application.knowledgeScore
+  const sectionsWithData: string[] = []
+  if (hasBigFiveData) sectionsWithData.push('bigFive')
+  if (hasPsychData) sectionsWithData.push('psych')
+  if (hasKnowledgeData) sectionsWithData.push('knowledge')
+
+  if (sectionsWithData.length === 0) {
+    overallScore = 0
+  } else if (sectionsWithData.length === 1) {
+    if (hasKnowledgeData) overallScore = application.knowledgeScore!
+    else if (hasBigFiveData) overallScore = psicometricaAvg
+    else overallScore = psicologicaAvg
+  } else if (hasKnowledgeData && hasBigFiveData && hasPsychData) {
+    overallScore = 0.30 * psicometricaAvg + 0.30 * psicologicaAvg + 0.40 * application.knowledgeScore!
+  } else if (hasKnowledgeData && (hasBigFiveData || hasPsychData)) {
+    const behavioralAvg = hasBigFiveData && hasPsychData
+      ? (psicometricaAvg + psicologicaAvg) / 2
+      : hasBigFiveData ? psicometricaAvg : psicologicaAvg
+    overallScore = 0.50 * behavioralAvg + 0.50 * application.knowledgeScore!
   } else {
-    overallScore = 0.50 * psicometricaAvg + 0.50 * psicologicaAvg
+    overallScore = hasBigFiveData && hasPsychData
+      ? 0.50 * psicometricaAvg + 0.50 * psicologicaAvg
+      : hasBigFiveData ? psicometricaAvg : psicologicaAvg
   }
 
-  let recommendation: string
-  if (overallScore >= 70) {
-    recommendation = 'APTO'
-  } else if (overallScore >= 50) {
-    recommendation = 'ENTREVISTA_ADICIONAL'
+  // Guidance level — NOT a hiring decision, just informational orientation
+  let guidance: string
+  if (sectionsWithData.length === 0) {
+    guidance = 'PENDIENTE'
+  } else if (hasBigFiveData && hasPsychData && hasKnowledgeData) {
+    guidance = 'PERFIL_COMPLETO'
   } else {
-    recommendation = 'NO_RECOMENDADO'
+    guidance = 'PERFIL_PARCIAL'
   }
 
-  // Generate summary
-  const summary = generateSummary(application, overallScore, recommendation)
+  // Generate orientation summary
+  const bigFiveScores = {
+    OPENNESS: application.openness,
+    CONSCIENTIOUSNESS: application.conscientiousness,
+    EXTRAVERSION: application.extraversion,
+    AGREEABLENESS: application.agreeableness,
+    NEUROTICISM: application.neuroticism,
+  }
+  const psychScores = {
+    STRESS: application.stressLevel,
+    EMPATHY: application.empathy,
+    ADAPTABILITY: application.adaptability,
+    LEADERSHIP: application.leadership,
+    TEAMWORK: application.teamwork,
+  }
+
+  const summary = generateSummary(bigFiveScores, psychScores, application.knowledgeScore, guidance, hasBigFiveData, hasPsychData)
 
   return {
     overallScore: Math.round(overallScore * 100) / 100,
-    recommendation,
+    recommendation: guidance, // Keep field name for DB compatibility, but value is now guidance
     summary,
   }
 }
 
+/**
+ * Generates an ORIENTATION summary — describes the candidate’s profile
+ * without making a hiring decision. The system provides guidance to the
+ * recruiter, who makes the final decision.
+ *
+ * LFPDPPP Art. 37 Bis: The evaluation result must NOT be the sole basis
+ * for a hiring decision. It is informational orientation only.
+ */
 function generateSummary(
-  app: {
-    openness: number
-    conscientiousness: number
-    extraversion: number
-    agreeableness: number
-    neuroticism: number
-    stressLevel: number
-    empathy: number
-    adaptability: number
-    leadership: number
-    teamwork: number
-    knowledgeScore: number | null
-  },
-  overallScore: number,
-  recommendation: string
+  bigFiveScores: Record<string, number>,
+  psychScores: Record<string, number>,
+  knowledgeScore: number | null,
+  guidance: string,
+  hasBigFiveData: boolean,
+  hasPsychData: boolean
 ): string {
-  const parts: string[] = []
-  const concerns: string[] = []
+  const strengths: string[] = []
+  const areasToExplore: string[] = []
 
-  if (app.extraversion >= 70) parts.push('alta extraversión')
-  if (app.conscientiousness >= 70) parts.push('alta responsabilidad')
-  if (app.openness >= 70) parts.push('alta apertura a la experiencia')
-  if (app.agreeableness >= 70) parts.push('alta amabilidad')
-  if (app.empathy >= 70) parts.push('buena empatía')
-  if (app.teamwork >= 70) parts.push('buen trabajo en equipo')
-  if (app.adaptability >= 70) parts.push('buena adaptabilidad')
-  if (app.leadership >= 70) parts.push('buen liderazgo')
+  // Big Five strengths (note: neuroticism is reverse-scored, so high = LOW neuroticism = good)
+  if (hasBigFiveData) {
+    if (bigFiveScores['EXTRAVERSION'] >= 70) strengths.push('alta extraversión')
+    if (bigFiveScores['CONSCIENTIOUSNESS'] >= 70) strengths.push('alta responsabilidad')
+    if (bigFiveScores['OPENNESS'] >= 70) strengths.push('alta apertura a la experiencia')
+    if (bigFiveScores['AGREEABLENESS'] >= 70) strengths.push('alta amabilidad')
+    // High neuroticism score = low neuroticism (reverse-scored) = strength
+    if (bigFiveScores['NEUROTICISM'] >= 70) strengths.push('baja tendencia al neuroticismo (estabilidad emocional)')
+  }
 
-  if (app.stressLevel > 60) concerns.push('nivel de estrés elevado')
-  if (app.neuroticism > 60) concerns.push('alto neuroticismo')
-  if (app.empathy < 40) concerns.push('baja empatía')
-  if (app.teamwork < 40) concerns.push('bajo trabajo en equipo')
-  if (app.adaptability < 40) concerns.push('baja adaptabilidad')
+  // Psychological strengths
+  if (hasPsychData) {
+    if (psychScores['EMPATHY'] >= 70) strengths.push('buena empatía')
+    if (psychScores['TEAMWORK'] >= 70) strengths.push('buen trabajo en equipo')
+    if (psychScores['ADAPTABILITY'] >= 70) strengths.push('buena adaptabilidad')
+    if (psychScores['LEADERSHIP'] >= 70) strengths.push('buen liderazgo')
+    if (psychScores['STRESS'] >= 70) strengths.push('buena gestión del estrés')
+  }
+
+  // Areas to explore in interview (not concerns, not disqualifiers)
+  if (hasPsychData) {
+    if (psychScores['STRESS'] < 40) areasToExplore.push('manejo del estrés en situaciones de alta demanda')
+    if (psychScores['EMPATHY'] < 40) areasToExplore.push('habilidades de empatía y relación con clientes')
+    if (psychScores['TEAMWORK'] < 40) areasToExplore.push('dinámica de trabajo en equipo')
+    if (psychScores['ADAPTABILITY'] < 40) areasToExplore.push('adaptabilidad ante cambios')
+  }
+  // Low neuroticism score = high neuroticism (reverse-scored) = area to explore
+  if (hasBigFiveData && bigFiveScores['NEUROTICISM'] < 30) {
+    areasToExplore.push('gestión emocional en entornos laborales')
+  }
 
   let summary = ''
-  if (parts.length > 0) {
-    summary += `Candidato con ${parts.join(', ')}. `
-  }
-  if (concerns.length > 0) {
-    summary += `Se detectaron ${concerns.join(', ')}. `
-  }
 
-  if (app.knowledgeScore !== null) {
-    if (app.knowledgeScore >= 80) {
-      summary += `Excelente dominio de conocimientos técnicos (${app.knowledgeScore}%). `
-    } else if (app.knowledgeScore >= 60) {
-      summary += `Conocimientos técnicos aceptables (${app.knowledgeScore}%). `
-    } else {
-      summary += `Conocimientos técnicos por debajo del estándar (${app.knowledgeScore}%). `
+  // Indicate profile scope
+  if (guidance === 'PERFIL_PARCIAL') {
+    if (!hasBigFiveData && !hasPsychData) {
+      summary += 'Perfil basado únicamente en evaluación de conocimientos. '
+    } else if (!hasBigFiveData) {
+      summary += 'Perfil basado en evaluación psicológica y de conocimientos (sin sección psicométrica por consentimiento del candidato). '
+    } else if (!hasPsychData) {
+      summary += 'Perfil basado en evaluación psicométrica y de conocimientos (sin sección psicológica). '
+    } else if (knowledgeScore === null) {
+      summary += 'Perfil basado en evaluación psicométrica y psicológica (sin sección de conocimientos). '
     }
   }
 
-  summary += `Puntuación general: ${Math.round(overallScore)}. Recomendación: ${recommendation === 'APTO' ? 'Apto' : recommendation === 'ENTREVISTA_ADICIONAL' ? 'Entrevista adicional' : 'No recomendado'}.`
+  if (strengths.length > 0) {
+    summary += `Áreas destacadas: ${strengths.join(', ')}. `
+  }
+
+  if (areasToExplore.length > 0) {
+    summary += `Se sugiere explorar en entrevista: ${areasToExplore.join(', ')}. `
+  }
+
+  if (knowledgeScore !== null) {
+    if (knowledgeScore >= 80) {
+      summary += 'Conocimientos técnicos sobresalientes. '
+    } else if (knowledgeScore >= 60) {
+      summary += 'Conocimientos técnicos sólidos. '
+    } else if (knowledgeScore >= 40) {
+      summary += 'Conocimientos técnicos en desarrollo; puede fortalecerse con capacitación. '
+    } else {
+      summary += 'Conocimientos técnicos con oportunidad de mejora significativa. '
+    }
+  }
+
+  // Neutral closing — NO hiring decision
+  summary += 'Esta evaluación proporciona orientación informativa. La decisión final corresponde al área de Recursos Humanos.'
 
   return summary
 }

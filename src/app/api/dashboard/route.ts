@@ -34,16 +34,27 @@ export async function GET(req: NextRequest) {
       where: { status: { in: ['NOT_STARTED', 'IN_PROGRESS'] } },
     })
 
-    // Recommendation counts
-    const aptoCount = await rlsDb.evaluationResult.count({
+    // Guidance level counts (NOT hiring decisions — orientation only)
+    const perfilCompletoCount = await rlsDb.evaluationResult.count({
+      where: { recommendation: 'PERFIL_COMPLETO' },
+    })
+
+    const perfilParcialCount = await rlsDb.evaluationResult.count({
+      where: { recommendation: 'PERFIL_PARCIAL' },
+    })
+
+    const pendienteCount = await rlsDb.evaluationResult.count({
+      where: { recommendation: 'PENDIENTE' },
+    })
+
+    // Also count legacy values for backward compatibility
+    const legacyAptoCount = await rlsDb.evaluationResult.count({
       where: { recommendation: 'APTO' },
     })
-
-    const entrevistaCount = await rlsDb.evaluationResult.count({
+    const legacyEntrevistaCount = await rlsDb.evaluationResult.count({
       where: { recommendation: 'ENTREVISTA_ADICIONAL' },
     })
-
-    const noRecomendadoCount = await rlsDb.evaluationResult.count({
+    const legacyNoRecomendadoCount = await rlsDb.evaluationResult.count({
       where: { recommendation: 'NO_RECOMENDADO' },
     })
 
@@ -81,9 +92,9 @@ export async function GET(req: NextRequest) {
       totalCandidates,
       completedEvaluations,
       pendingEvaluations,
-      aptoCount,
-      entrevistaCount,
-      noRecomendadoCount,
+      perfilCompletoCount,
+      perfilParcialCount,
+      pendienteCount,
       recentResults,
       positionStats,
     })

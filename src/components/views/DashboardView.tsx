@@ -16,11 +16,11 @@ interface DashboardData {
   totalCandidates: number
   completedEvaluations: number
   pendingEvaluations: number
-  aptoCount: number
-  entrevistaCount: number
-  noRecomendadoCount: number
+  perfilCompletoCount: number
+  perfilParcialCount: number
+  pendienteCount: number
   recentResults: CandidateResult[]
-  positionStats: { positionId: string; positionTitle: string; count: number }[]
+  positionStats: { id: string; title: string; count: number }[]
 }
 
 // Simple CSS-based bar chart (no recharts - avoids infinite re-render bug)
@@ -140,14 +140,14 @@ export default function DashboardView() {
 
   if (!data) return null
 
-  const recommendationSegments = [
-    { name: 'Apto', value: data.aptoCount, color: '#10b981' },
-    { name: 'Entrevista', value: data.entrevistaCount, color: '#f59e0b' },
-    { name: 'No Recomendado', value: data.noRecomendadoCount, color: '#ef4444' },
+  const guidanceSegments = [
+    { name: 'Perfil Completo', value: data.perfilCompletoCount, color: '#10b981' },
+    { name: 'Perfil Parcial', value: data.perfilParcialCount, color: '#f59e0b' },
+    { name: 'Pendiente', value: data.pendienteCount, color: '#9ca3af' },
   ].filter(d => d.value > 0)
 
   const positionBarData = data.positionStats.map(p => ({
-    name: p.positionTitle,
+    name: p.title,
     value: p.count,
     color: '#10b981',
   }))
@@ -209,12 +209,8 @@ export default function DashboardView() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500">Tasa de Aprobación</p>
-                <p className="text-2xl font-bold">
-                  {data.completedEvaluations > 0
-                    ? Math.round((data.aptoCount / data.completedEvaluations) * 100)
-                    : 0}%
-                </p>
+                <p className="text-sm text-gray-500">Perfiles Completos</p>
+                <p className="text-2xl font-bold">{data.perfilCompletoCount}</p>
               </div>
               <TrendingUp className="w-8 h-8 text-purple-500 opacity-60" />
             </div>
@@ -224,13 +220,13 @@ export default function DashboardView() {
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recommendation Donut Chart */}
+        {/* Guidance Distribution Donut Chart */}
         <Card className="shadow-sm">
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg">Distribución de Recomendaciones</CardTitle>
+            <CardTitle className="text-lg">Estado de Evaluaciones</CardTitle>
           </CardHeader>
           <CardContent className="flex justify-center py-4">
-            <SimpleDonutChart segments={recommendationSegments} />
+            <SimpleDonutChart segments={guidanceSegments} />
           </CardContent>
         </Card>
 
@@ -312,19 +308,16 @@ export default function DashboardView() {
                     <Badge
                       variant="secondary"
                       className={
-                        r.recommendation === 'APTO'
+                        r.recommendation === 'PERFIL_COMPLETO'
                           ? 'bg-emerald-100 text-emerald-700'
-                          : r.recommendation === 'ENTREVISTA_ADICIONAL'
+                          : r.recommendation === 'PERFIL_PARCIAL'
                           ? 'bg-amber-100 text-amber-700'
-                          : r.recommendation === 'NO_RECOMENDADO'
-                          ? 'bg-red-100 text-red-700'
                           : 'bg-gray-100 text-gray-700'
                       }
                     >
-                      {r.recommendation === 'APTO' && <CheckCircle2 className="w-3 h-3 mr-1" />}
-                      {r.recommendation === 'ENTREVISTA_ADICIONAL' && <AlertTriangle className="w-3 h-3 mr-1" />}
-                      {r.recommendation === 'NO_RECOMENDADO' && <XCircle className="w-3 h-3 mr-1" />}
-                      {r.recommendation === 'APTO' ? 'Apto' : r.recommendation === 'ENTREVISTA_ADICIONAL' ? 'Entrevista' : r.recommendation === 'NO_RECOMENDADO' ? 'No Recomendado' : 'Pendiente'}
+                      {r.recommendation === 'PERFIL_COMPLETO' && <CheckCircle2 className="w-3 h-3 mr-1" />}
+                      {r.recommendation === 'PERFIL_PARCIAL' && <AlertTriangle className="w-3 h-3 mr-1" />}
+                      {r.recommendation === 'PERFIL_COMPLETO' ? 'Completo' : r.recommendation === 'PERFIL_PARCIAL' ? 'Parcial' : 'Pendiente'}
                     </Badge>
                   </div>
                 </div>

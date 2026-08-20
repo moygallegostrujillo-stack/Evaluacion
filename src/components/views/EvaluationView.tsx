@@ -292,15 +292,24 @@ export default function EvaluationView() {
 
   const handleComplete = async () => {
     if (!sessionId) return
+    setLoading(true)
     try {
-      await apiFetch('/api/evaluations', {
+      const res = await apiFetch('/api/evaluations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId, action: 'complete' }),
       })
+      const data = await res.json().catch(() => ({} as Record<string, unknown>))
+      if (!res.ok) {
+        console.error('Complete evaluation error:', data)
+        // Don't navigate — stay on evaluation so candidate can retry
+        return
+      }
       setCurrentView('evaluation-complete')
     } catch (e) {
       console.error('Error completing evaluation', e)
+    } finally {
+      setLoading(false)
     }
   }
 

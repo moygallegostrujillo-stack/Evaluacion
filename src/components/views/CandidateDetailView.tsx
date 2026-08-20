@@ -100,27 +100,29 @@ export default function CandidateDetailView() {
 
   const getRecIcon = (rec: string) => {
     switch (rec) {
-      case 'APTO': return <CheckCircle2 className="w-5 h-5" />
-      case 'ENTREVISTA_ADICIONAL': return <AlertTriangle className="w-5 h-5" />
-      case 'NO_RECOMENDADO': return <XCircle className="w-5 h-5" />
+      case 'PERFIL_COMPLETO': return <CheckCircle2 className="w-5 h-5" />
+      case 'PERFIL_PARCIAL': return <AlertTriangle className="w-5 h-5" />
       default: return null
     }
   }
 
   const getRecColor = (rec: string) => {
     switch (rec) {
-      case 'APTO': return 'bg-emerald-100 text-emerald-700 border-emerald-200'
-      case 'ENTREVISTA_ADICIONAL': return 'bg-amber-100 text-amber-700 border-amber-200'
-      case 'NO_RECOMENDADO': return 'bg-red-100 text-red-700 border-red-200'
+      case 'PERFIL_COMPLETO': return 'bg-emerald-100 text-emerald-700 border-emerald-200'
+      case 'PERFIL_PARCIAL': return 'bg-amber-100 text-amber-700 border-amber-200'
       default: return 'bg-gray-100 text-gray-700'
     }
   }
 
   const getRecLabel = (rec: string) => {
     switch (rec) {
-      case 'APTO': return 'Candidato Apto'
-      case 'ENTREVISTA_ADICIONAL': return 'Requiere Entrevista Adicional'
-      case 'NO_RECOMENDADO': return 'No Recomendado'
+      case 'PERFIL_COMPLETO': return 'Perfil Completo'
+      case 'PERFIL_PARCIAL': return 'Perfil Parcial'
+      case 'PENDIENTE': return 'Pendiente'
+      // Legacy values — backward compatibility
+      case 'APTO': return 'Perfil Completo (legacy)'
+      case 'ENTREVISTA_ADICIONAL': return 'Perfil Parcial (legacy)'
+      case 'NO_RECOMENDADO': return 'Perfil Parcial (legacy)'
       default: return 'Pendiente'
     }
   }
