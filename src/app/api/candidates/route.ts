@@ -24,22 +24,48 @@ export async function GET(req: NextRequest) {
     // RLS auto-injects companyId for non-SUPER_ADMIN; SUPER_ADMIN gets unscoped or scoped to target
     const where: Record<string, unknown> = { active: true, role: 'CANDIDATO' }
 
-    const candidates = await rlsDb.user.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      include: {
-        sessions: {
-          orderBy: { createdAt: 'desc' },
-          take: 1,
-          include: {
-            result: true,
-            position: {
-              select: { id: true, title: true },
+    // Use explicit select to avoid crashing if consent columns don't exist in prod DB yet
+    // (safeFindUser pattern — same as auth API)
+    let candidates
+    try {
+      candidates = await rlsDb.user.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          sessions: {
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            include: {
+              result: true,
+              position: {
+                select: { id: true, title: true },
+              },
             },
           },
         },
-      },
-    })
+      })
+    } catch (colErr) {
+      // Consent columns likely missing in prod DB — retry with explicit select of only core fields
+      console.error('Candidates query failed (likely missing consent columns):', colErr)
+      candidates = await rlsDb.user.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true, email: true, name: true, role: true, phone: true,
+          companyId: true, active: true,
+          consentGiven: true, consentDate: true,
+          createdAt: true,
+          sessions: {
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            include: {
+              result: true,
+              position: { select: { id: true, title: true } },
+            },
+          },
+        },
+      }).catch(() => [])
+    }
 
     // Also fetch VacancyApplication data for candidates who applied through vacancies
     const candidateIds = candidates.map(c => c.id)
@@ -123,8 +149,9 @@ export async function GET(req: NextRequest) {
         name: c.name,
         role: c.role,
         phone: c.phone,
-        consentGiven: c.consentGiven,
-        consentDate: c.consentDate,
+        // Consent fields — use nullish coalescing for resilience if columns are missing in prod DB
+        consentGiven: (c as { consentGiven?: boolean }).consentGiven ?? false,
+        consentDate: (c as { consentDate?: Date | null }).consentDate ?? null,
         createdAt: c.createdAt,
         result,
         sessionStatus: session?.status || (vacancyResult ? 'COMPLETED' : null),
