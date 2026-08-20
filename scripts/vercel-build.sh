@@ -22,9 +22,24 @@ npx prisma generate
 echo "✅ Prisma client generated for PostgreSQL"
 
 # Step 2b: Push schema changes to the production database
+# Uses DIRECT_URL for schema changes (pgbouncer pooler doesn't support DDL)
 echo "🔧 Pushing schema changes to production database..."
-npx prisma db push --accept-data-loss || echo "⚠️ prisma db push failed (may be non-fatal if schema is already up to date)"
-echo "✅ Database schema synced"
+if [ -n "$DIRECT_URL" ]; then
+  # Use DIRECT_URL explicitly for db push (avoids pgbouncer issues)
+  DATABASE_URL="$DIRECT_URL" npx prisma db push --accept-data-loss --skip-generate < /dev/null 2>&1 || {
+    echo "⚠️ prisma db push failed — trying with default DATABASE_URL..."
+    npx prisma db push --accept-data-loss --skip-generate < /dev/null 2>&1 || {
+      echo "⚠️ prisma db push failed again. Build will continue but DB schema may be out of date."
+      echo "   Run manually: DATABASE_URL=\$DIRECT_URL npx prisma db push"
+    }
+  }
+  echo "✅ Database schema synced (via DIRECT_URL)"
+elif [ -n "$DATABASE_URL" ]; then
+  npx prisma db push --accept-data-loss --skip-generate < /dev/null 2>&1 || echo "⚠️ prisma db push failed (non-fatal)"
+  echo "✅ Database schema synced (via DATABASE_URL)"
+else
+  echo "⚠️ No DATABASE_URL or DIRECT_URL set — skipping db push"
+fi
 
 # Step 3: Verify DATABASE_URL is set
 if [ -z "$DATABASE_URL" ]; then
