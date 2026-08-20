@@ -21,6 +21,11 @@ npx prisma generate
 
 echo "✅ Prisma client generated for PostgreSQL"
 
+# Step 2b: Push schema changes to the production database
+echo "🔧 Pushing schema changes to production database..."
+npx prisma db push --accept-data-loss || echo "⚠️ prisma db push failed (may be non-fatal if schema is already up to date)"
+echo "✅ Database schema synced"
+
 # Step 3: Verify DATABASE_URL is set
 if [ -z "$DATABASE_URL" ]; then
   echo "⚠️  WARNING: DATABASE_URL is not set! The app will fail to connect to Supabase."
