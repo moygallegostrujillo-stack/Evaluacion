@@ -183,11 +183,64 @@ export async function DELETE(req: NextRequest) {
     // DELETE ALL invitations for the company (or all if SUPER_ADMIN)
     if (deleteAll) {
       const where = auth.role === 'SUPER_ADMIN' ? {} : { companyId: auth.companyId }
+
+      // First, find the invitations so we can clean up associated users
+      const invitations = await db.candidateInvitation.findMany({
+        where,
+        select: { id: true, phone: true, candidateName: true, companyId: true },
+      })
+
       const result = await db.candidateInvitation.deleteMany({ where })
+
+      // Clean up associated auto-created candidate users (cand_*.auto emails)
+      // These users would otherwise become orphaned and cause issues when a new
+      // invitation is created with the same phone (auto-login would find the
+      // stale user instead of creating a fresh one)
+      let cleanedUpUsers = 0
+      if (invitations.length > 0) {
+        const phones = invitations.map(i => i.phone).filter(Boolean) as string[]
+        const companyIds = [...new Set(invitations.map(i => i.companyId))]
+
+        if (phones.length > 0) {
+          // Find auto-created candidate users matching these phones
+          const autoUsers = await db.user.findMany({
+            where: {
+              role: 'CANDIDATO',
+              companyId: { in: companyIds },
+              phone: { in: phones },
+              email: { contains: '@evaluhr.auto' },
+            },
+            select: { id: true },
+          }).catch(() => [])
+
+          if (autoUsers.length > 0) {
+            const userIds = autoUsers.map(u => u.id)
+
+            // Delete evaluation sessions first (cascade will handle responses)
+            await db.evaluationSession.deleteMany({
+              where: { candidateId: { in: userIds } },
+            }).catch(() => {})
+
+            // Delete consent logs
+            await db.consentLog.deleteMany({
+              where: { userId: { in: userIds } },
+            }).catch(() => {})
+
+            // Delete the candidate users
+            const userDeleteResult = await db.user.deleteMany({
+              where: { id: { in: userIds } },
+            }).catch(() => ({ count: 0 }))
+
+            cleanedUpUsers = userDeleteResult.count
+          }
+        }
+      }
+
       return NextResponse.json({
         success: true,
         deleted: result.count,
-        message: `${result.count} invitación(es) eliminada(s)`,
+        cleanedUpUsers,
+        message: `${result.count} invitación(es) eliminada(s)${cleanedUpUsers > 0 ? `, ${cleanedUpUsers} usuario(s) candidato(s) limpiado(s)` : ''}`,
       })
     }
 

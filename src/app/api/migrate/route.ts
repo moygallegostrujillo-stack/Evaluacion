@@ -11,6 +11,15 @@ import { getAuthFromHeaders } from '@/lib/auth'
  *
  * This is needed because `prisma db push` in the Vercel build script sometimes fails
  * (pgbouncer/pooler issues), so the production DB schema can get out of sync with code.
+ *
+ * NOTE: This endpoint adds ALL consent-related columns:
+ *   - consentGiven (Boolean, default false)
+ *   - consentDate (DateTime, nullable)
+ *   - consentOption (Text, nullable)
+ *   - anonymousStats (Boolean, default false)
+ *   - consentConfirmed (Boolean, default false)
+ *   - consentWithdrawnAt (DateTime, nullable)
+ *   - consentVersion (Text, nullable)
  */
 export async function POST(req: NextRequest) {
   try {
@@ -27,9 +36,11 @@ export async function POST(req: NextRequest) {
     const results: string[] = []
 
     // ============================================
-    // 1. Add consent columns to "User" table if they don't exist
+    // 1. Add ALL consent columns to "User" table if they don't exist
     // ============================================
     const columns = [
+      { name: 'consentGiven', type: 'BOOLEAN', default: 'false' },
+      { name: 'consentDate', type: 'TIMESTAMP(3)', default: 'NULL' },
       { name: 'consentOption', type: 'TEXT', default: 'NULL' },
       { name: 'anonymousStats', type: 'BOOLEAN', default: 'false' },
       { name: 'consentConfirmed', type: 'BOOLEAN', default: 'false' },
@@ -100,13 +111,58 @@ export async function POST(req: NextRequest) {
       results.push(`✗ Failed to create ConsentLog table: ${tblErr}`)
     }
 
+    // ============================================
+    // 3. Clean up orphaned candidate users (cand_*.auto emails with no invitation)
+    //    This helps fix issues where stale users from deleted invitations cause
+    //    "Usuario no encontrado" errors in the consent flow.
+    // ============================================
+    try {
+      // Find orphaned candidate users (auto-created emails, no matching invitation)
+      const orphanedUsers = await db.$queryRawUnsafe(`
+        SELECT u."id", u."email", u."name", u."companyId"
+        FROM "User" u
+        WHERE u."role" = 'CANDIDATO'
+          AND u."email" LIKE 'cand_%@evaluhr.auto'
+          AND NOT EXISTS (
+            SELECT 1 FROM "CandidateInvitation" ci
+            WHERE ci."phone" IS NOT NULL
+              AND REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(u."email", 'cand_', ''), '@evaluhr.auto', ''), ' ', ''), '-', ''), '+', '') = REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(ci."phone", ' ', ''), '-', ''), '+', ''), '(', ''), ')', '')
+          )
+        LIMIT 100;
+      `) as Array<{ id: string; email: string; name: string; companyId: string }>
+
+      if (orphanedUsers.length > 0) {
+        // Delete evaluation sessions for orphaned users first (FK constraint)
+        const orphanedIds = orphanedUsers.map(u => u.id)
+        await db.$executeRawUnsafe(`
+          DELETE FROM "EvaluationSession" WHERE "candidateId" = ANY($1::text[]);
+        `, orphanedIds).catch(() => {})
+
+        // Delete consent logs for orphaned users
+        await db.$executeRawUnsafe(`
+          DELETE FROM "ConsentLog" WHERE "userId" = ANY($1::text[]);
+        `, orphanedIds).catch(() => {})
+
+        // Delete the orphaned users
+        const deleteResult = await db.$executeRawUnsafe(`
+          DELETE FROM "User" WHERE "id" = ANY($1::text[]);
+        `, orphanedIds)
+
+        results.push(`🧹 Cleaned up ${deleteResult} orphaned candidate user(s)`)
+      } else {
+        results.push('✓ No orphaned candidate users found')
+      }
+    } catch (cleanupErr) {
+      results.push(`⚠️ Orphan cleanup skipped: ${cleanupErr}`)
+    }
+
     // Verify by checking the columns
     let verification
     try {
       verification = await db.$queryRawUnsafe(`
         SELECT column_name, data_type 
         FROM information_schema.columns 
-        WHERE table_name = 'User' AND column_name IN ('consentOption', 'anonymousStats', 'consentConfirmed', 'consentWithdrawnAt', 'consentVersion')
+        WHERE table_name = 'User' AND column_name IN ('consentGiven', 'consentDate', 'consentOption', 'anonymousStats', 'consentConfirmed', 'consentWithdrawnAt', 'consentVersion')
         ORDER BY column_name;
       `)
     } catch {

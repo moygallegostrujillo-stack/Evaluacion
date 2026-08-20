@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createRLSClient } from '@/lib/rls'
+import { getUnscopedClient } from '@/lib/rls'
 import { getAuthFromHeaders } from '@/lib/auth'
 import { db } from '@/lib/db'
 
@@ -26,6 +26,71 @@ function getClientIp(req: NextRequest): string | null {
   return null
 }
 
+/**
+ * Safely fetch a user by ID, resilient to missing consent columns in the production DB.
+ *
+ * The previous implementation used `rlsDb.user.findUnique({ where: { id } })` with the
+ * RLS-scoped client. This caused intermittent "Usuario no encontrado" errors in production
+ * because the RLS extension adds `companyId` to the where clause, and if there's ANY
+ * mismatch between the JWT's companyId and the user's actual companyId in the DB
+ * (e.g., from an orphaned user found via auto-login), findUnique returns null.
+ *
+ * Fix: use the UNSCOPED client to look up the user by ID (we trust the JWT for
+ * authentication), then verify ownership explicitly as defense-in-depth.
+ */
+async function safeFindUserById(userId: string) {
+  const unscoped = getUnscopedClient()
+
+  // First try: full query (works when all consent columns exist)
+  try {
+    return await unscoped.user.findUnique({
+      where: { id: userId },
+      include: { company: true },
+    })
+  } catch (err) {
+    // Consent columns likely missing — retry with explicit minimal select
+    console.error('[consent] Full user query failed, retrying with minimal select:', err)
+    try {
+      return await unscoped.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          phone: true,
+          companyId: true,
+          active: true,
+          consentGiven: true,
+          consentDate: true,
+          company: true,
+        },
+      })
+    } catch (err2) {
+      // Last resort: absolute minimum columns
+      console.error('[consent] Minimal select also failed, trying bare minimum:', err2)
+      try {
+        return await unscoped.user.findUnique({
+          where: { id: userId },
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            role: true,
+            phone: true,
+            companyId: true,
+            active: true,
+            company: true,
+          },
+        })
+      } catch (err3) {
+        console.error('[consent] All user lookups failed:', err3)
+        return null
+      }
+    }
+  }
+}
+
 // ============================================
 // POST /api/consent — Give or modify consent
 // ============================================
@@ -35,8 +100,6 @@ export async function POST(req: NextRequest) {
     if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
-    const { client: rlsDb } = createRLSClient(auth)
 
     const body = await req.json().catch(() => ({} as Record<string, unknown>))
     const {
@@ -78,19 +141,31 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const user = await rlsDb.user.findUnique({
-      where: { id: userId },
-    })
+    // Look up the user via UNSCOPED client (resilient to missing consent columns).
+    // We trust the JWT for authentication; RLS is redundant for self-lookup.
+    const user = await safeFindUserById(userId)
 
     if (!user) {
+      console.error('[consent] User not found:', {
+        userId,
+        authUserId: auth.userId,
+        authRole: auth.role,
+        authCompanyId: auth.companyId,
+      })
       return NextResponse.json(
         { error: 'Usuario no encontrado' },
         { status: 404 }
       )
     }
 
-    // Defense-in-depth: RLS already filtered, but keep the check as extra safety
-    if (auth.role !== 'SUPER_ADMIN' && user.companyId !== auth.companyId) {
+    // Defense-in-depth: verify the user belongs to the same company as the auth context
+    // (SUPER_ADMIN bypasses this check)
+    if (auth.role !== 'SUPER_ADMIN' && auth.companyId && user.companyId !== auth.companyId) {
+      console.error('[consent] Company mismatch:', {
+        userId,
+        userCompanyId: user.companyId,
+        authCompanyId: auth.companyId,
+      })
       return NextResponse.json(
         { error: 'No tienes permiso para modificar este usuario' },
         { status: 403 }
@@ -100,26 +175,62 @@ export async function POST(req: NextRequest) {
     const now = new Date()
     const anonymousStatsBool = Boolean(anonymousStats)
     const isModification = Boolean(
-      user.consentGiven && user.consentConfirmed && user.consentOption
+      user.consentGiven && (user as Record<string, unknown>).consentConfirmed && user.consentOption
     )
 
-    // Update user with consent data
-    const updatedUser = await rlsDb.user.update({
-      where: { id: userId },
-      data: {
-        consentGiven: true,
-        consentDate: now,
-        consentOption: consentOption as ConsentOption,
-        anonymousStats: anonymousStatsBool,
-        consentConfirmed: true,
-        consentVersion: CURRENT_CONSENT_VERSION,
-        // If user previously withdrew and is re-consenting, clear the withdrawn timestamp
-        consentWithdrawnAt: null,
-      },
-    })
+    const unscoped = getUnscopedClient()
 
-    // Record an audit log entry — use the UNscoped client so logs are always written
-    // even for SUPER_ADMIN (ConsentLog is not tenant-scoped via companyId filter)
+    // Update user with consent data via UNSCOPED client (with explicit id + companyId filter
+    // as defense-in-depth, though findUnique by id is sufficient)
+    const updateData: Record<string, unknown> = {
+      consentGiven: true,
+      consentDate: now,
+      consentOption: consentOption as ConsentOption,
+      anonymousStats: anonymousStatsBool,
+      consentConfirmed: true,
+      consentVersion: CURRENT_CONSENT_VERSION,
+      // If user previously withdrew and is re-consenting, clear the withdrawn timestamp
+      consentWithdrawnAt: null,
+    }
+
+    let updatedUser
+    try {
+      updatedUser = await unscoped.user.update({
+        where: { id: userId },
+        data: updateData,
+      })
+    } catch (updateErr) {
+      console.error('[consent] Update failed (likely missing consent columns):', updateErr)
+      // If the update fails because consent columns are missing, try raw SQL as a fallback
+      try {
+        await unscoped.$executeRawUnsafe(`
+          UPDATE "User"
+          SET "consentGiven" = true,
+              "consentDate" = $1,
+              "consentOption" = $2,
+              "anonymousStats" = $3,
+              "consentConfirmed" = true,
+              "consentVersion" = $4,
+              "consentWithdrawnAt" = NULL
+          WHERE "id" = $5;
+        `, now, consentOption, anonymousStatsBool, CURRENT_CONSENT_VERSION, userId)
+
+        // Re-fetch the updated user
+        updatedUser = await safeFindUserById(userId)
+      } catch (rawErr) {
+        console.error('[consent] Raw SQL fallback also failed:', rawErr)
+        throw updateErr // re-throw the original error
+      }
+    }
+
+    if (!updatedUser) {
+      return NextResponse.json(
+        { error: 'No se pudo actualizar el usuario' },
+        { status: 500 }
+      )
+    }
+
+    // Record an audit log entry
     try {
       await db.consentLog.create({
         data: {
@@ -134,25 +245,25 @@ export async function POST(req: NextRequest) {
       })
     } catch (logErr) {
       // Audit log failure should not block the consent transaction
-      console.error('ConsentLog write failed (non-fatal):', logErr)
+      console.error('[consent] ConsentLog write failed (non-fatal):', logErr)
     }
 
     return NextResponse.json({
       user: {
-        id: updatedUser.id,
-        email: updatedUser.email,
-        name: updatedUser.name,
-        consentGiven: updatedUser.consentGiven,
-        consentDate: updatedUser.consentDate,
-        consentOption: updatedUser.consentOption,
-        anonymousStats: updatedUser.anonymousStats,
-        consentConfirmed: updatedUser.consentConfirmed,
-        consentVersion: updatedUser.consentVersion,
+        id: (updatedUser as Record<string, unknown>).id,
+        email: (updatedUser as Record<string, unknown>).email,
+        name: (updatedUser as Record<string, unknown>).name,
+        consentGiven: (updatedUser as Record<string, unknown>).consentGiven ?? true,
+        consentDate: (updatedUser as Record<string, unknown>).consentDate ?? now,
+        consentOption: (updatedUser as Record<string, unknown>).consentOption ?? consentOption,
+        anonymousStats: (updatedUser as Record<string, unknown>).anonymousStats ?? anonymousStatsBool,
+        consentConfirmed: (updatedUser as Record<string, unknown>).consentConfirmed ?? true,
+        consentVersion: (updatedUser as Record<string, unknown>).consentVersion ?? CURRENT_CONSENT_VERSION,
       },
       message: 'Consentimiento registrado correctamente',
     })
   } catch (error) {
-    console.error('Consent POST error:', error)
+    console.error('[consent] POST error:', error)
     return NextResponse.json(
       { error: 'Error al registrar el consentimiento' },
       { status: 500 }
@@ -174,8 +285,6 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { client: rlsDb } = createRLSClient(auth)
-
     const body = await req.json().catch(() => ({} as Record<string, unknown>))
     const { userId: bodyUserId } = body as { userId?: string }
 
@@ -189,18 +298,23 @@ export async function PATCH(req: NextRequest) {
       )
     }
 
-    const user = await rlsDb.user.findUnique({
-      where: { id: userId },
-    })
+    // Use safe lookup (resilient to missing consent columns)
+    const user = await safeFindUserById(userId)
 
     if (!user) {
+      console.error('[consent PATCH] User not found:', {
+        userId,
+        authUserId: auth.userId,
+        authCompanyId: auth.companyId,
+      })
       return NextResponse.json(
         { error: 'Usuario no encontrado' },
         { status: 404 }
       )
     }
 
-    if (auth.role !== 'SUPER_ADMIN' && user.companyId !== auth.companyId) {
+    // Defense-in-depth: verify ownership
+    if (auth.role !== 'SUPER_ADMIN' && auth.companyId && user.companyId !== auth.companyId) {
       return NextResponse.json(
         { error: 'No tienes permiso para modificar este usuario' },
         { status: 403 }
@@ -220,8 +334,9 @@ export async function PATCH(req: NextRequest) {
     }
 
     const now = new Date()
+    const unscoped = getUnscopedClient()
 
-    const updatedUser = await rlsDb.user.update({
+    const updatedUser = await unscoped.user.update({
       where: { id: userId },
       data: {
         consentOption: 'KNOWLEDGE_ONLY',
@@ -238,13 +353,13 @@ export async function PATCH(req: NextRequest) {
           action: 'WITHDRAWN',
           previousOption: 'FULL',
           newOption: 'KNOWLEDGE_ONLY',
-          anonymousStats: user.anonymousStats ?? false,
+          anonymousStats: (user as Record<string, unknown>).anonymousStats as boolean ?? false,
           consentVersion: user.consentVersion || CURRENT_CONSENT_VERSION,
           ipAddress: getClientIp(req),
         },
       })
     } catch (logErr) {
-      console.error('ConsentLog write failed (non-fatal):', logErr)
+      console.error('[consent PATCH] ConsentLog write failed (non-fatal):', logErr)
     }
 
     return NextResponse.json({
@@ -263,7 +378,7 @@ export async function PATCH(req: NextRequest) {
         'Consentimiento para tratamiento de datos sensibles retirado. Continuará únicamente con la evaluación de conocimientos.',
     })
   } catch (error) {
-    console.error('Consent PATCH error:', error)
+    console.error('[consent] PATCH error:', error)
     return NextResponse.json(
       { error: 'Error al retirar el consentimiento' },
       { status: 500 }

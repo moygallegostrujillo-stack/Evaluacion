@@ -276,11 +276,39 @@ export async function POST(req: NextRequest) {
         const phoneClean = (invitation.phone || '').replace(/[^0-9]/g, '')
         const autoEmail = `cand_${phoneClean || invitation.id.slice(0, 12)}@evaluhr.auto`
 
-        // Check if a user with this auto-email already exists
+        // Check if a user with this auto-email already exists (from a previous invitation
+        // with the same phone that was deleted but left an orphaned user)
         const existingAutoUser = await safeFindUser({ email: autoEmail })
 
         if (existingAutoUser) {
-          user = existingAutoUser
+          // Reuse the existing user, BUT ensure their companyId matches the current
+          // invitation's companyId. This fixes the bug where a stale user from a
+          // deleted invitation had a different companyId, causing "Usuario no encontrado"
+          // errors in the consent API (RLS-scoped lookup failed due to companyId mismatch).
+          if (existingAutoUser.companyId !== invitation.companyId) {
+            console.log('[auto-login] Updating orphaned user companyId:', {
+              userId: existingAutoUser.id,
+              oldCompanyId: existingAutoUser.companyId,
+              newCompanyId: invitation.companyId,
+            })
+            try {
+              await db.user.update({
+                where: { id: existingAutoUser.id },
+                data: {
+                  companyId: invitation.companyId,
+                  name: invitation.candidateName || existingAutoUser.name,
+                  phone: invitation.phone || existingAutoUser.phone,
+                },
+              })
+            } catch (updateErr) {
+              console.error('[auto-login] Failed to update user companyId:', updateErr)
+            }
+            // Reload with company relation
+            const reloaded = await safeFindUser({ id: existingAutoUser.id })
+            user = reloaded || existingAutoUser
+          } else {
+            user = existingAutoUser
+          }
         } else {
           // Create user without password — token is their auth
           try {
@@ -296,8 +324,26 @@ export async function POST(req: NextRequest) {
               include: { company: true },
             })
           } catch (createErr) {
-            console.error('User create failed:', createErr)
-            return NextResponse.json({ error: 'Error al crear el usuario' }, { status: 500 })
+            console.error('[auto-login] User create failed:', createErr)
+            // If create fails (e.g., missing consent columns), try with minimal fields
+            try {
+              user = await db.user.create({
+                data: {
+                  email: autoEmail,
+                  name: invitation.candidateName || invitation.phone || 'Candidato',
+                  password: await hashPassword(crypto.randomUUID()),
+                  role: 'CANDIDATO',
+                  phone: invitation.phone,
+                  companyId: invitation.companyId,
+                },
+              })
+              // Reload with company
+              const reloaded = await safeFindUser({ id: user.id })
+              user = reloaded || user
+            } catch (createErr2) {
+              console.error('[auto-login] User create (minimal) also failed:', createErr2)
+              return NextResponse.json({ error: 'Error al crear el usuario' }, { status: 500 })
+            }
           }
         }
 
@@ -324,6 +370,8 @@ export async function POST(req: NextRequest) {
               companyId: invitation.companyId,
               status: 'NOT_STARTED',
             },
+          }).catch((sessionErr: unknown) => {
+            console.error('[auto-login] Failed to create evaluation session:', sessionErr)
           })
         }
       }
