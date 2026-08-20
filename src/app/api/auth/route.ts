@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getUnscopedClient } from '@/lib/rls'
 import { hashPassword, verifyPassword, isLegacyHash } from '@/lib/password'
 import { generateToken } from '@/lib/auth'
+import crypto from 'crypto'
 
 const db = getUnscopedClient()
 
@@ -165,11 +166,173 @@ export async function POST(req: NextRequest) {
           companyId: user.companyId,
           companyName: invitation.company.name,
           companySector: invitation.company.sector,
-          consentGiven: user.consentGiven,
-          consentOption: user.consentOption,
-          anonymousStats: user.anonymousStats,
-          consentConfirmed: user.consentConfirmed,
-          consentVersion: user.consentVersion,
+          consentGiven: false,
+          consentOption: null,
+          anonymousStats: false,
+          consentConfirmed: false,
+          consentVersion: null,
+        },
+        token: jwtToken,
+      })
+
+      response.cookies.set('evaluhr_token', jwtToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 8, // 8 hours
+        path: '/',
+      })
+
+      return response
+    }
+
+    // Auto-login via invitation token — NO registration required
+    // The token IS the auth. RH already provided name + phone.
+    if (action === 'auto-login') {
+      const { token: invitationToken } = body
+
+      if (!invitationToken) {
+        return NextResponse.json({ error: 'Token de invitación requerido' }, { status: 400 })
+      }
+
+      const invitation = await db.candidateInvitation.findUnique({
+        where: { token: invitationToken },
+        include: { position: true, company: true },
+      })
+
+      if (!invitation) {
+        return NextResponse.json({ error: 'Invitación no encontrada' }, { status: 400 })
+      }
+
+      if (invitation.status === 'EXPIRED' || invitation.expiresAt < new Date()) {
+        if (invitation.status !== 'EXPIRED') {
+          await db.candidateInvitation.update({
+            where: { id: invitation.id },
+            data: { status: 'EXPIRED' },
+          })
+        }
+        return NextResponse.json({ error: 'La invitación ha expirado' }, { status: 400 })
+      }
+
+      // If already registered (candidate already auto-logged before), find existing user
+      let user = null
+
+      if (invitation.status === 'REGISTERED' || invitation.status === 'COMPLETED') {
+        // Find existing candidate user for this invitation
+        // Look by phone first (most reliable for WhatsApp invitations)
+        if (invitation.phone) {
+          user = await db.user.findFirst({
+            where: { phone: invitation.phone, companyId: invitation.companyId, role: 'CANDIDATO' },
+            include: { company: true },
+          })
+        }
+        // Fallback: find by email
+        if (!user && invitation.email) {
+          user = await db.user.findUnique({
+            where: { email: invitation.email },
+            include: { company: true },
+          })
+        }
+        // Fallback: find by name + company
+        if (!user && invitation.candidateName) {
+          user = await db.user.findFirst({
+            where: { name: invitation.candidateName, companyId: invitation.companyId, role: 'CANDIDATO' },
+            include: { company: true },
+          })
+        }
+
+        if (!user) {
+          return NextResponse.json({ error: 'No se encontró la cuenta del candidato. Contacta a Recursos Humanos.' }, { status: 400 })
+        }
+      } else if (invitation.status === 'PENDING') {
+        // First time: auto-create the user (no email/password required)
+        // Generate a unique email placeholder for the DB (email is unique in schema)
+        const phoneClean = (invitation.phone || '').replace(/[^0-9]/g, '')
+        const autoEmail = `cand_${phoneClean || invitation.id.slice(0, 12)}@evaluhr.auto`
+
+        // Check if a user with this auto-email already exists
+        const existingAutoUser = await db.user.findUnique({ where: { email: autoEmail } })
+
+        if (existingAutoUser) {
+          user = existingAutoUser
+        } else {
+          // Create user without password — token is their auth
+          user = await db.user.create({
+            data: {
+              email: autoEmail,
+              name: invitation.candidateName || invitation.phone || 'Candidato',
+              password: await hashPassword(crypto.randomUUID()), // Random unusable password
+              role: 'CANDIDATO',
+              phone: invitation.phone,
+              companyId: invitation.companyId,
+            },
+            include: { company: true },
+          })
+        }
+
+        // Mark invitation as REGISTERED
+        await db.candidateInvitation.update({
+          where: { id: invitation.id },
+          data: { status: 'REGISTERED' },
+        })
+
+        // Create evaluation session if not exists
+        const existingSession = await db.evaluationSession.findFirst({
+          where: {
+            candidateId: user.id,
+            positionId: invitation.positionId,
+            companyId: invitation.companyId,
+          },
+        })
+
+        if (!existingSession) {
+          await db.evaluationSession.create({
+            data: {
+              candidateId: user.id,
+              positionId: invitation.positionId,
+              companyId: invitation.companyId,
+              status: 'NOT_STARTED',
+            },
+          })
+        }
+      }
+
+      if (!user) {
+        return NextResponse.json({ error: 'No se pudo autenticar al candidato' }, { status: 400 })
+      }
+
+      // Reload user with company if not already included
+      const fullUser = user.company ? user : await db.user.findUnique({
+        where: { id: user.id },
+        include: { company: true },
+      })
+
+      // Generate JWT
+      const jwtToken = await generateToken({
+        sub: fullUser!.id,
+        email: fullUser!.email,
+        name: fullUser!.name,
+        role: fullUser!.role,
+        companyId: fullUser!.companyId || undefined,
+        companyName: fullUser!.company?.name || undefined,
+        companySector: fullUser!.company?.sector || undefined,
+      })
+
+      const response = NextResponse.json({
+        user: {
+          id: fullUser!.id,
+          email: fullUser!.email,
+          name: fullUser!.name,
+          role: fullUser!.role,
+          companyId: fullUser!.companyId,
+          companyName: fullUser!.company?.name,
+          companySector: fullUser!.company?.sector,
+          consentGiven: fullUser!.consentGiven,
+          consentOption: fullUser!.consentOption,
+          anonymousStats: fullUser!.anonymousStats,
+          consentConfirmed: fullUser!.consentConfirmed,
+          consentVersion: fullUser!.consentVersion,
+          phone: fullUser!.phone,
         },
         token: jwtToken,
       })

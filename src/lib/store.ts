@@ -3,7 +3,6 @@ import { create } from 'zustand'
 export type UserRole = 'SUPER_ADMIN' | 'RH' | 'GERENTE' | 'CANDIDATO'
 export type ViewType = 
   | 'login' 
-  | 'register' 
   | 'consent'
   | 'dashboard' 
   | 'candidates' 
@@ -22,20 +21,22 @@ export type ViewType =
   | 'public-evaluation'
   | 'public-evaluation-complete'
   | 'settings'
+  | 'invitation-welcome'
 
 export interface User {
   id: string
   email: string
   name: string
   role: UserRole
+  phone?: string
   companyId?: string
   companyName?: string
   companySector?: string
   consentGiven: boolean
   consentOption?: string // FULL, KNOWLEDGE_ONLY
-  anonymousStats?: boolean
-  consentConfirmed?: boolean
-  consentVersion?: string
+  anonymousStats?: boolean // Option C
+  consentConfirmed?: boolean // Confirmed reading all options + ARCO
+  consentVersion?: string // Privacy notice version at time of consent
 }
 
 export interface CandidateResult {
@@ -90,6 +91,24 @@ export interface EvaluationTemplate {
   questions: EvaluationQuestion[]
 }
 
+export interface InvitationData {
+  valid: boolean
+  status: string
+  invitationId?: string
+  companyName?: string
+  companySector?: string
+  positionTitle?: string
+  positionDescription?: string | null
+  positionCategory?: string
+  positionSector?: string
+  candidateName?: string | null
+  email?: string | null
+  phone?: string | null
+  channel?: string
+  expiresAt?: string
+  error?: string
+}
+
 interface AppState {
   // Auth
   user: User | null
@@ -125,6 +144,10 @@ interface AppState {
   // Invitation token
   invitationToken: string | null
   setInvitationToken: (token: string | null) => void
+
+  // Invitation details (from public API)
+  invitationData: InvitationData | null
+  setInvitationData: (data: InvitationData | null) => void
 
   // Public vacancy application state
   vacancySlug: string | null
@@ -194,6 +217,8 @@ export const useAppStore = create<AppState>((set) => ({
   // Invitation
   invitationToken: null,
   setInvitationToken: (invitationToken) => set({ invitationToken }),
+  invitationData: null,
+  setInvitationData: (invitationData) => set({ invitationData }),
 
   // Public vacancy application
   vacancySlug: null,

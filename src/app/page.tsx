@@ -16,6 +16,7 @@ import QuestionsManagementView from '@/components/views/QuestionsManagementView'
 import VacancyManagementView from '@/components/views/VacancyManagementView'
 import PublicEvaluationView from '@/components/views/PublicEvaluationView'
 import CompanyManagementView from '@/components/views/CompanyManagementView'
+import InvitationWelcomeView from '@/components/views/InvitationWelcomeView'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -24,7 +25,7 @@ import { Separator } from '@/components/ui/separator'
 import {
   LayoutDashboard, Users, ClipboardCheck, UserPlus,
   BarChart3, Calendar, LogOut, Menu, X, ChevronRight, HelpCircle, Briefcase,
-  CheckCircle2, Building2, Shield
+  CheckCircle2, Building2, Shield, FileDown
 } from 'lucide-react'
 
 // Restore auth from localStorage
@@ -71,14 +72,21 @@ function useAuthRestore() {
 function useInvitationCheck() {
   const setInvitationToken = useAppStore((s) => s.setInvitationToken)
   const setCurrentView = useAppStore((s) => s.setCurrentView)
+  const user = useAppStore((s) => s.user)
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const token = params.get('token')
     if (token) {
       setInvitationToken(token)
-      setCurrentView('register')
-      // Clean URL
+      // If user is already authenticated and hasn't given consent, go to consent directly
+      // Otherwise, show welcome page (which will re-check consent on auto-login)
+      if (user && user.role === 'CANDIDATO' && !user.consentGiven) {
+        setCurrentView('consent')
+      } else {
+        setCurrentView('invitation-welcome')
+      }
+      // Clean URL — keep token in store only
       window.history.replaceState({}, '', '/')
     }
   }, [])
@@ -195,6 +203,22 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
 
       <Separator />
 
+      {/* Legal Documents */}
+      {isRH && (
+        <div className="px-2 py-1">
+          <a
+            href="/api/download?doc=aviso-privacidad"
+            download
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors"
+          >
+            <FileDown className="w-5 h-5" />
+            {!collapsed && <span>Aviso de Privacidad</span>}
+          </a>
+        </div>
+      )}
+
+      <Separator />
+
       {/* User Info */}
       <div className="p-3">
         {!collapsed && (
@@ -247,8 +271,9 @@ function CandidateNav() {
 
 function renderView(view: ViewType) {
   switch (view) {
+    case 'invitation-welcome':
+      return <InvitationWelcomeView />
     case 'login':
-    case 'register':
       return <LoginView />
     case 'consent':
       return <ConsentView />
@@ -305,13 +330,33 @@ export default function Home() {
     return <PublicEvaluationView />
   }
 
-  // Not logged in
+  // Invitation welcome page - no auth required (shows company/position info)
+  // BUT: if user is authenticated candidate without consent, redirect to consent
+  if (currentView === 'invitation-welcome') {
+    if (user && user.role === 'CANDIDATO' && !user.consentGiven) {
+      return <ConsentView />
+    }
+    return <InvitationWelcomeView />
+  }
+
+  // Consent view - renders standalone for candidates coming from invitation flow
+  // (user is already in store via auto-login, just needs to accept consent)
+  if (currentView === 'consent') {
+    return <ConsentView />
+  }
+
+  // Not logged in — show standard login
   if (!user) {
     return <LoginView />
   }
 
-  // Candidate view - simpler layout
+  // Candidate view - simpler layout (auto-logged or logged in)
   if (user.role === 'CANDIDATO') {
+    // If candidate hasn't given consent, show consent first
+    if (!user.consentGiven && currentView !== 'consent') {
+      return <ConsentView />
+    }
+
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col">
         <CandidateNav />

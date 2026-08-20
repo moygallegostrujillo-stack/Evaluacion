@@ -9,6 +9,7 @@ const JWT_SECRET = new TextEncoder().encode(
 const PUBLIC_ROUTES = [
   '/api/auth',           // login/register
   '/api/public',         // public evaluation flow
+  '/api/download',       // document downloads (privacy notice, etc.)
   '/api/seed',           // seed (has its own protection)
   '/api/health',         // health check / diagnostics
 ]

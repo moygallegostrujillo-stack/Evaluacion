@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createRLSClient } from '@/lib/rls'
 import { getAuthFromHeaders } from '@/lib/auth'
+import { db } from '@/lib/db'
 
 /**
  * POST /api/consent/fix
@@ -8,6 +9,8 @@ import { getAuthFromHeaders } from '@/lib/auth'
  * but whose consent wasn't recorded (system error or migration issue).
  *
  * Only RH, GERENTE, or SUPER_ADMIN can call this endpoint.
+ * This is an ADMIN action — it does NOT replace the candidate's own consent.
+ * The note records that this was done retroactively by an administrator.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -23,14 +26,13 @@ export async function POST(req: NextRequest) {
 
     const { client: rlsDb } = createRLSClient(auth)
     const body = await req.json()
-    const { candidateId } = body
+    const { candidateId, consentOption, anonymousStats } = body
 
     if (!candidateId) {
       return NextResponse.json({ error: 'candidateId es requerido' }, { status: 400 })
     }
 
     // Verify the candidate exists and belongs to the admin's company
-    // RLS auto-filters by companyId for non-SUPER_ADMIN
     const candidate = await rlsDb.user.findUnique({
       where: { id: candidateId },
       include: {
@@ -46,13 +48,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Candidato no encontrado' }, { status: 404 })
     }
 
-    // Defense-in-depth: RLS already filtered, but keep the check as extra safety
     if (auth.role !== 'SUPER_ADMIN' && candidate.companyId !== auth.companyId) {
       return NextResponse.json({ error: 'No tienes acceso a este candidato' }, { status: 403 })
     }
 
     // Use the evaluation completion date as consent date, or now if not available
     const consentDate = candidate.sessions[0]?.completedAt || new Date()
+    const option = consentOption || candidate.consentOption || 'FULL'
+    const stats = anonymousStats ?? candidate.anonymousStats ?? false
 
     // Update the candidate's consent
     const updatedUser = await rlsDb.user.update({
@@ -60,8 +63,27 @@ export async function POST(req: NextRequest) {
       data: {
         consentGiven: true,
         consentDate,
+        consentOption: option,
+        anonymousStats: stats,
+        consentConfirmed: true, // Admin is confirming retroactively
       },
     })
+
+    // Create audit log
+    try {
+      await db.consentLog.create({
+        data: {
+          userId: candidateId,
+          action: 'GIVEN',
+          newOption: option,
+          anonymousStats: stats,
+          consentVersion: 'retroactive-fix',
+          ipAddress: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || null,
+        },
+      })
+    } catch (logError) {
+      console.error('Consent log error:', logError)
+    }
 
     return NextResponse.json({
       user: {
@@ -70,9 +92,10 @@ export async function POST(req: NextRequest) {
         name: updatedUser.name,
         consentGiven: updatedUser.consentGiven,
         consentDate: updatedUser.consentDate,
+        consentOption: updatedUser.consentOption,
       },
-      message: 'Consentimiento registrado retroactivamente',
-      note: 'El prospecto completó la evaluación, por lo que necesariamente aceptó los términos y condiciones y el aviso de privacidad previamente.',
+      message: 'Consentimiento registrado retroactivamente por administrador',
+      note: 'Este consentimiento fue registrado retroactivamente por un administrador. El candidato completó la evaluación habiendo aceptado los términos y condiciones y el aviso de privacidad en su momento.',
     })
   } catch (error) {
     console.error('Consent fix POST error:', error)

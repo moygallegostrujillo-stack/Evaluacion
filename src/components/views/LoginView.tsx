@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react'
 import { useAppStore } from '@/lib/store'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -11,15 +11,11 @@ import { apiFetch } from '@/lib/api'
 export default function LoginView() {
   const setAuth = useAppStore((s) => s.setAuth)
   const setCurrentView = useAppStore((s) => s.setCurrentView)
-  const setInvitationToken = useAppStore((s) => s.setInvitationToken)
+
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [inviteToken, setInviteToken] = useState('')
-  const [name, setName] = useState('')
-  const [phone, setPhone] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [mode, setMode] = useState<'login' | 'register'>('login')
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -55,37 +51,6 @@ export default function LoginView() {
     }
   }
 
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError('')
-    try {
-      const res = await apiFetch('/api/auth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'register',
-          email,
-          name,
-          phone: phone || undefined,
-          password,
-          token: inviteToken,
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        setError(data.error || 'Error al registrarse')
-        return
-      }
-      setAuth(data.user, data.token)
-      setCurrentView('consent')
-    } catch {
-      setError('Error de conexión')
-    } finally {
-      setLoading(false)
-    }
-  }
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 via-white to-teal-50 p-4">
       <div className="w-full max-w-md">
@@ -100,24 +65,7 @@ export default function LoginView() {
 
         <Card className="shadow-xl border-0">
           <CardHeader className="pb-4">
-            <div className="flex gap-2">
-              <Button
-                variant={mode === 'login' ? 'default' : 'ghost'}
-                className={mode === 'login' ? 'bg-emerald-600 hover:bg-emerald-700' : ''}
-                onClick={() => setMode('login')}
-                size="sm"
-              >
-                Iniciar Sesión
-              </Button>
-              <Button
-                variant={mode === 'register' ? 'default' : 'ghost'}
-                className={mode === 'register' ? 'bg-emerald-600 hover:bg-emerald-700' : ''}
-                onClick={() => setMode('register')}
-                size="sm"
-              >
-                Registrarse
-              </Button>
-            </div>
+            <p className="text-sm text-gray-500 text-center">Inicia sesión para continuar</p>
           </CardHeader>
           <CardContent>
             {error && (
@@ -126,116 +74,50 @@ export default function LoginView() {
               </div>
             )}
 
-            {mode === 'login' ? (
-              <form onSubmit={handleLogin} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="email">Correo electrónico</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="correo@ejemplo.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="password">Contraseña</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                </div>
-                <Button
-                  type="submit"
-                  className="w-full bg-emerald-600 hover:bg-emerald-700"
-                  disabled={loading}
-                >
-                  {loading ? 'Ingresando...' : 'Ingresar'}
-                </Button>
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Correo electrónico</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="correo@ejemplo.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Contraseña</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
+              <Button
+                type="submit"
+                className="w-full bg-emerald-600 hover:bg-emerald-700"
+                disabled={loading}
+              >
+                {loading ? 'Ingresando...' : 'Ingresar'}
+              </Button>
 
-                {process.env.NODE_ENV === 'development' && (
-                <div className="mt-6 p-4 bg-amber-50 rounded-lg border border-amber-200">
-                  <p className="text-xs font-semibold text-amber-800 mb-2">🔑 Credenciales de demo:</p>
-                  <div className="space-y-1 text-xs text-amber-700">
-                    <p><strong>Admin:</strong> admin@evaluhr.com / admin123</p>
-                    <p><strong>RH Restaurante:</strong> rh@cafedechiapas.com / rh1234</p>
-                    <p><strong>Gerente:</strong> gerente@cafedechiapas.com / gerente1234</p>
-                    <p><strong>RH Retail:</strong> rh@marlui.com / rh1234</p>
-                    <p><strong>Candidato:</strong> juan.perez@email.com / candidato1234</p>
-                  </div>
+              {process.env.NODE_ENV === 'development' && (
+              <div className="mt-6 p-4 bg-amber-50 rounded-lg border border-amber-200">
+                <p className="text-xs font-semibold text-amber-800 mb-2">🔑 Credenciales de demo:</p>
+                <div className="space-y-1 text-xs text-amber-700">
+                  <p><strong>Admin:</strong> admin@evaluhr.com / admin123</p>
+                  <p><strong>RH Restaurante:</strong> rh@cafedechiapas.com / rh1234</p>
+                  <p><strong>Gerente:</strong> gerente@cafedechiapas.com / gerente1234</p>
+                  <p><strong>RH Retail:</strong> rh@marlui.com / rh1234</p>
+                  <p><strong>Candidato:</strong> juan.perez@email.com / candidato1234</p>
                 </div>
-                )}
-              </form>
-            ) : (
-              <form onSubmit={handleRegister} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="token">Token de invitación</Label>
-                  <Input
-                    id="token"
-                    placeholder="Ingresa tu código de invitación"
-                    value={inviteToken}
-                    onChange={(e) => setInviteToken(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="reg-name">Nombre completo</Label>
-                  <Input
-                    id="reg-name"
-                    placeholder="Tu nombre"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="reg-email">Correo electrónico</Label>
-                  <Input
-                    id="reg-email"
-                    type="email"
-                    placeholder="correo@ejemplo.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="reg-phone">Teléfono <span className="text-red-500">*</span></Label>
-                  <Input
-                    id="reg-phone"
-                    type="tel"
-                    placeholder="+52 961 123 4567"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="reg-password">Contraseña</Label>
-                  <Input
-                    id="reg-password"
-                    type="password"
-                    placeholder="Mínimo 6 caracteres"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    minLength={6}
-                  />
-                </div>
-                <Button
-                  type="submit"
-                  className="w-full bg-emerald-600 hover:bg-emerald-700"
-                  disabled={loading}
-                >
-                  {loading ? 'Registrando...' : 'Registrarse'}
-                </Button>
-              </form>
-            )}
+              </div>
+              )}
+            </form>
           </CardContent>
         </Card>
 

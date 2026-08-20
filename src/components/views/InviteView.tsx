@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Send, Copy, Check, MessageSquare, UserPlus, Phone, User, Building2, RefreshCw } from 'lucide-react'
+import { ArrowLeft, Send, Copy, Check, MessageSquare, UserPlus, Phone, User, Building2, Loader2, Trash2, BookOpen, HelpCircle, AlertCircle } from 'lucide-react'
 
 interface Invitation {
   id: string
@@ -23,10 +23,38 @@ interface Invitation {
   createdAt: string
 }
 
+interface PositionWithDetails {
+  id: string
+  title: string
+  sector: string
+  category: string
+  hasKnowledgeTest: boolean
+  evaluationTemplates?: Array<{
+    id: string
+    name: string
+    type: string
+    order: number
+    _count: { questions: number }
+  }>
+}
+
+const CATEGORY_LABELS: Record<string, string> = {
+  MESERO: 'Mesero/a',
+  COCINERO: 'Cocinero/a',
+  BARTENDER: 'Bartender',
+  GERENTE_PISO: 'Gerente de Piso',
+  VENDEDOR: 'Vendedor/a',
+}
+
+const SECTOR_LABELS: Record<string, string> = {
+  RESTAURANT: 'Restaurante',
+  RETAIL: 'Retail',
+}
+
 export default function InviteView() {
   const user = useAppStore((s) => s.user)
   const setCurrentView = useAppStore((s) => s.setCurrentView)
-  const [positions, setPositions] = useState<Position[]>([])
+  const [positions, setPositions] = useState<PositionWithDetails[]>([])
   const [invitations, setInvitations] = useState<Invitation[]>([])
   const [candidateName, setCandidateName] = useState('')
   const [phone, setPhone] = useState('')
@@ -36,10 +64,11 @@ export default function InviteView() {
   const [loadingPositions, setLoadingPositions] = useState(true)
   const [sent, setSent] = useState(false)
   const [copiedToken, setCopiedToken] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [error, setError] = useState('')
 
   // For SUPER_ADMIN: company selector
-  const [companies, setCompanies] = useState<{ id: string; name: string }[]>([])
+  const [companies, setCompanies] = useState<{ id: string; name: string; sector?: string }[]>([])
   const [selectedCompanyId, setSelectedCompanyId] = useState('')
   const isSuperAdmin = user?.role === 'SUPER_ADMIN'
 
@@ -56,7 +85,7 @@ export default function InviteView() {
   }, [isSuperAdmin])
 
   // Load positions when company changes
-  useEffect(() => {
+  const loadPositions = React.useCallback(() => {
     if (!activeCompanyId) {
       setPositions([])
       setLoadingPositions(false)
@@ -77,6 +106,10 @@ export default function InviteView() {
       })
   }, [activeCompanyId])
 
+  useEffect(() => {
+    loadPositions()
+  }, [loadPositions])
+
   // Load existing invitations
   useEffect(() => {
     if (!activeCompanyId) return
@@ -87,6 +120,17 @@ export default function InviteView() {
       .then(data => setInvitations(data.invitations || []))
       .catch(() => {}) // invitations may 404 if no GET handler, that's ok
   }, [activeCompanyId])
+
+  // Get total question count for a position
+  const getQuestionCount = (pos: PositionWithDetails): number => {
+    if (!pos.evaluationTemplates) return 0
+    return pos.evaluationTemplates.reduce((sum, t) => sum + t._count.questions, 0)
+  }
+
+  // Get template count for a position
+  const getTemplateCount = (pos: PositionWithDetails): number => {
+    return pos.evaluationTemplates?.length || 0
+  }
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -139,12 +183,31 @@ export default function InviteView() {
     setTimeout(() => setCopiedToken(null), 2000)
   }
 
-  const copyWhatsAppLink = (token: string, phoneNumber: string) => {
+  const copyWhatsAppMessage = (token: string, positionTitle?: string) => {
     const url = `${window.location.origin}/?token=${token}`
-    const whatsappUrl = `https://wa.me/${phoneNumber.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hola, te comparto el enlace para tu evaluación: ${url}`)}`
-    navigator.clipboard.writeText(whatsappUrl)
+    const companyName = user?.companyName || 'la empresa'
+    const positionText = positionTitle ? `para el puesto de ${positionTitle}` : ''
+    const message = `¡Hola! 🎉\n\nTe invitamos a completar tu evaluación pre-laboral ${positionText} en ${companyName}.\n\nEs un proceso rápido (10-15 min) que incluye evaluaciones de personalidad y competencias.\n\n👉 Haz clic en el siguiente enlace para comenzar:\n${url}\n\nSi tienes dudas, no dudes en preguntar. ¡Te deseamos mucho éxito! 💪`
+    navigator.clipboard.writeText(message)
     setCopiedToken(token)
     setTimeout(() => setCopiedToken(null), 2000)
+  }
+
+  const handleDeleteInvitation = async (invitationId: string) => {
+    setDeletingId(invitationId)
+    try {
+      const res = await apiFetch(`/api/invite?id=${invitationId}`, { method: 'DELETE' })
+      if (res.ok) {
+        setInvitations(prev => prev.filter(inv => inv.id !== invitationId))
+      } else {
+        const data = await res.json()
+        setError(data.error || 'Error al eliminar invitación')
+      }
+    } catch {
+      setError('Error de conexión al eliminar')
+    } finally {
+      setDeletingId(null)
+    }
   }
 
   const getStatusBadge = (status: string) => {
@@ -156,6 +219,9 @@ export default function InviteView() {
       default: return <Badge>{status}</Badge>
     }
   }
+
+  // Find selected position details
+  const selectedPosition = positions.find(p => p.id === positionId)
 
   return (
     <div className="space-y-6">
@@ -196,28 +262,91 @@ export default function InviteView() {
                 </div>
               )}
 
-              {/* Position selector */}
+              {/* Position selector - ONLY existing positions */}
               <div className="space-y-2">
-                <Label>Puesto al que aplica</Label>
+                <Label className="flex items-center gap-1.5">
+                  <Building2 className="w-4 h-4 text-gray-500" />
+                  Puesto al que aplica <span className="text-red-500">*</span>
+                </Label>
                 {!activeCompanyId ? (
                   <p className="text-sm text-gray-400 italic">
                     {isSuperAdmin ? 'Selecciona una empresa primero' : 'No hay empresa asociada'}
                   </p>
                 ) : loadingPositions ? (
-                  <p className="text-sm text-gray-400">Cargando puestos...</p>
+                  <div className="flex items-center gap-2 text-sm text-gray-400">
+                    <Loader2 className="w-4 h-4 animate-spin" /> Cargando puestos...
+                  </div>
                 ) : positions.length === 0 ? (
-                  <p className="text-sm text-amber-600">No hay puestos creados para esta empresa. Crea puestos primero.</p>
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-3">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />
+                      <div>
+                        <p className="text-sm font-medium text-amber-700">No hay puestos creados</p>
+                        <p className="text-xs text-amber-600 mt-1">
+                          Primero necesitas crear puestos con sus preguntas de evaluación. Luego podrás invitar candidatos a esos puestos.
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full border-amber-300 text-amber-700 hover:bg-amber-100"
+                      onClick={() => setCurrentView('questions')}
+                    >
+                      <HelpCircle className="w-4 h-4 mr-1" /> Ir a Preguntas y Puestos
+                    </Button>
+                  </div>
                 ) : (
-                  <Select value={positionId} onValueChange={setPositionId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecciona un puesto" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {positions.map(p => (
-                        <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <>
+                    <Select value={positionId} onValueChange={setPositionId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona un puesto..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {positions.map(p => {
+                          const qCount = getQuestionCount(p)
+                          const tCount = getTemplateCount(p)
+                          return (
+                            <SelectItem key={p.id} value={p.id}>
+                              <div className="flex items-center gap-2">
+                                <span>{p.title}</span>
+                                <span className="text-xs text-gray-400">
+                                  ({CATEGORY_LABELS[p.category] || p.category} · {qCount} preguntas)
+                                </span>
+                              </div>
+                            </SelectItem>
+                          )
+                        })}
+                      </SelectContent>
+                    </Select>
+                    {/* Position info card when selected */}
+                    {selectedPosition && (
+                      <div className="bg-gray-50 rounded-lg p-3 border border-gray-200 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-medium text-gray-700">{selectedPosition.title}</p>
+                          <Badge variant="outline" className="text-xs">
+                            {SECTOR_LABELS[selectedPosition.sector] || selectedPosition.sector}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-4 text-xs text-gray-500">
+                          <span className="flex items-center gap-1">
+                            <BookOpen className="w-3.5 h-3.5" />
+                            {getTemplateCount(selectedPosition)} plantillas
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <HelpCircle className="w-3.5 h-3.5" />
+                            {getQuestionCount(selectedPosition)} preguntas
+                          </span>
+                          {selectedPosition.hasKnowledgeTest && (
+                            <Badge className="bg-teal-100 text-teal-700 text-[10px] px-1.5 py-0">
+                              Con conocimientos
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
 
@@ -272,15 +401,17 @@ export default function InviteView() {
 
               {/* Success */}
               {sent && (
-                <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-200 text-sm text-emerald-700">
-                  ¡Invitación generada exitosamente! Copia el enlace y envíalo por WhatsApp al candidato.
+                <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-200 text-sm text-emerald-700 space-y-2">
+                  <p className="font-medium">✅ ¡Invitación generada exitosamente!</p>
+                  <p>Copia el enlace de WhatsApp y envíalo al candidato para que pueda completar su evaluación.</p>
+                  <p className="text-xs text-emerald-600">El enlace expira en 7 días.</p>
                 </div>
               )}
 
               <Button
                 type="submit"
                 className="w-full bg-emerald-600 hover:bg-emerald-700"
-                disabled={loading || !positionId || !phone.trim()}
+                disabled={loading || !positionId || !phone.trim() || positions.length === 0}
               >
                 {loading ? 'Generando...' : (
                   <>
@@ -328,6 +459,22 @@ export default function InviteView() {
                         <span>Canal: {inv.channel === 'EMAIL' ? '📧 Correo' : '📱 WhatsApp'}</span>
                       </div>
                       <div className="flex gap-1">
+                        {inv.status === 'PENDING' && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteInvitation(inv.id)}
+                            className="text-xs h-7 text-red-500 hover:text-red-700 hover:bg-red-50"
+                            title="Eliminar invitación"
+                            disabled={deletingId === inv.id}
+                          >
+                            {deletingId === inv.id ? (
+                              <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-3 h-3 mr-1" />
+                            )}
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="sm"
@@ -341,17 +488,15 @@ export default function InviteView() {
                             <><Copy className="w-3 h-3 mr-1" /> Enlace</>
                           )}
                         </Button>
-                        {inv.phone && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => copyWhatsAppLink(inv.token, inv.phone!)}
-                            className="text-xs h-7 text-emerald-600"
-                            title="Copiar enlace de WhatsApp"
-                          >
-                            <MessageSquare className="w-3 h-3 mr-1" /> WhatsApp
-                          </Button>
-                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => copyWhatsAppMessage(inv.token, inv.positionTitle)}
+                          className="text-xs h-7 text-emerald-600"
+                          title="Copiar mensaje para WhatsApp"
+                        >
+                          <MessageSquare className="w-3 h-3 mr-1" /> WhatsApp
+                        </Button>
                       </div>
                     </div>
                   </div>
