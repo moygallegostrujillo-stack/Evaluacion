@@ -1,13 +1,15 @@
 # EvaluHR — Documento de Estado del Proyecto
 
-> **Última actualización:** 20 Agosto 2026
+> **Última actualización:** 20 Junio 2025
 > **Propósito:** Contexto completo para futuras sesiones de desarrollo
 
 ---
 
 ## 1. Resumen del Proyecto
 
-**EvaluHR** es una plataforma SaaS multi-tenant de evaluación psicométrica y psicológica para recursos humanos. Permite a empresas (restaurantes y retail) evaluar candidatos mediante tests de personalidad (Big Five), competencias psicológicas y conocimientos técnicos, generando recomendaciones automatizadas (APTO / ENTREVISTA_ADICIONAL / NO_RECOMENDADO).
+**EvaluHR** es una plataforma SaaS multi-tenant de evaluación psicométrica y psicológica para recursos humanos. Permite a empresas (restaurantes y retail) evaluar candidatos mediante tests de personalidad (Big Five), competencias psicológicas y conocimientos técnicos, generando **orientación informativa** al reclutador (PERFIL_COMPLETO / PERFIL_PARCIAL / PENDIENTE).
+
+> **Política clave (Art. 37 Bis LFPDPPP):** El sistema **NO decide** la contratación. Solo ofrece orientación sobre el perfil del candidato. La decisión final corresponde siempre al área de Recursos Humanos.
 
 **Casos de uso principales:**
 - Invitación de candidatos vía WhatsApp/Email con token único
@@ -241,9 +243,13 @@ id, sessionId (unique), candidateId, candidateName, positionId, positionTitle, c
 openness, conscientiousness, extraversion, agreeableness, neuroticism (Big Five 0-100),
 stressLevel, empathy, adaptability, leadership, teamwork (Psicológica 0-100),
 knowledgeScore? (0-100, null si no aplica),
-overallScore (0-100), recommendation (APTO|ENTREVISTA_ADICIONAL|NO_RECOMENDADO|PENDIENTE),
+overallScore (0-100), recommendation (PERFIL_COMPLETO|PERFIL_PARCIAL|PENDIENTE),
 summary?, createdAt
 ```
+
+> **Nota (Junio 2025):** Antes usaba `APTO|ENTREVISTA_ADICIONAL|NO_RECOMENDADO` (decisión de contratación).
+> Cambiado a `PERFIL_COMPLETO|PERFIL_PARCIAL|PENDIENTE` para cumplir Art. 37 Bis LFPDPPP
+> — el sistema orienta, no decide. Ver changelog 20 Junio 2025.
 
 #### InterviewSchedule
 ```
@@ -874,6 +880,58 @@ bun run lint               # ESLint
 ---
 
 ## 15. Changelog
+
+### 20 Junio 2025 — Fix 3 bugs críticos + violación de política (orientación vs decisión)
+
+**Archivos modificados:**
+- `src/app/api/evaluations/route.ts` — Scoring adaptativo, orientación neutral, unscoped client para upsert
+- `src/app/api/public/apply/route.ts` — Mismos fixes de scoring y orientación
+- `src/app/api/dashboard/route.ts` — Nuevos contadores de guidance
+- `src/components/views/DashboardView.tsx` — Vista de orientación en vez de recomendación
+- `src/components/views/CandidatesView.tsx` — Badges de orientación
+- `src/components/views/CandidateDetailView.tsx` — Labels de orientación
+- `src/components/views/EvaluationView.tsx` — Error handling en handleComplete
+
+#### Bug 1: Resultados no aparecen en dashboard
+
+**Síntoma:** Dos candidatos completaron evaluación de conocimientos por invitación pero sus resultados no aparecían en el dashboard del administrador.
+
+**Causa raíz:** `completeEvaluation()` usaba `rlsDb.evaluationResult.upsert({ where: { sessionId } })`. La extensión RLS agregaba automáticamente un filtro `companyId` al `where`, pero `EvaluationResult` tiene `@@unique([sessionId])` — NO `@@unique([sessionId, companyId])`. Prisma rechazaba el upsert porque el `where` no coincidía con la constraint única de la tabla. El error era tragado silenciosamente porque el frontend no verificaba la respuesta del API y navegaba directamente a la pantalla de completado.
+
+**Fix:**
+1. Usar `getUnscopedClient()` para `findUnique` + `create/update` en vez de `upsert` con RLS
+2. Verificar `res.ok` en el frontend (`handleComplete`) antes de navegar
+
+#### Bug 2: Todos clasificados como "no apta"
+
+**Síntoma:** Ambos candidatos fueron clasificados como "no apta" a pesar de haber completado las preguntas de conocimiento.
+
+**Causa raíz:** Cuando faltaban secciones (ej. solo conocimientos completados, sin psicométrica ni psicológica), las categorías sin respuestas obtenían score 0. Con la fórmula `0.30*0 + 0.30*0 + 0.40*conocimiento`, incluso con 100% en conocimientos el máximo posible era 40 (por debajo del umbral de 50 = NO_RECOMENDADO).
+
+**Fix:** Scoring adaptativo — solo promedia las categorías que tienen respuestas reales. Los pesos se ajustan dinámicamente según las secciones disponibles. Si solo hay conocimientos, el overall score refleja solo conocimientos.
+
+#### Bug 3 (Violación de política): Sistema decide en vez de orientar
+
+**Síntoma:** Sistema usaba APTO/ENTREVISTA_ADICIONAL/NO_RECOMENDADO como decisión de contratación, violando el acuerdo de que el sistema solo debe ofrecer orientación (Art. 37 Bis LFPDPPP).
+
+**Causa raíz:** Los valores del enum `recommendation` representaban una decisión binaria sobre la contratación.
+
+**Fix:**
+1. Cambio de valores: `PERFIL_COMPLETO` (todas las secciones completadas) / `PERFIL_PARCIAL` (secciones parciales) / `PENDIENTE` (evaluación incompleta)
+2. Summary ahora describe el perfil del candidato sin emitir juicio de contratación
+3. Cierre neutral obligatorio: "La decisión final corresponde al área de Recursos Humanos."
+4. Dashboard, CandidatesView y CandidateDetailView actualizados con nueva terminología
+5. Mismo cambio aplicado en `/api/public/apply/route.ts` para vacantes públicas
+
+#### Bug 4 (Descubierto durante investigación): Frontend no detectaba errores
+
+**Síntoma:** El frontend navegaba a "evaluation-complete" sin importar si el API había fallado.
+
+**Fix:** Verificar `res.ok` en `handleComplete()` antes de navegar. Mostrar error al usuario si falla.
+
+**Estado:** Commited localmente. Pendiente push a GitHub (requiere token GitHub válido).
+
+---
 
 ### 20 Agosto 2026 — Fix "Usuario no encontrado" en consent flow
 
