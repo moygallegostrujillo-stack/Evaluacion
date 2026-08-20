@@ -11,8 +11,12 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle
+} from '@/components/ui/dialog'
+import {
   CheckCircle2, ChevronRight, Clock, ClipboardList, Brain, BookOpen,
-  Utensils, ShoppingBag, Briefcase, ArrowRight, Users, Shield, Info, Download
+  Utensils, ShoppingBag, Briefcase, ArrowRight, Users, Shield, ShieldAlert,
+  ShieldCheck, Info, Download, Loader2
 } from 'lucide-react'
 
 const LIKERT_OPTIONS = [
@@ -47,8 +51,25 @@ interface CompletedSession {
 
 type ViewPhase = 'LOADING' | 'SELECT_POSITION' | 'CONSENT' | 'SESSION_READY' | 'SECTION_TRANSITION' | 'IN_PROGRESS' | 'SESSIONS_OVERVIEW'
 
+/**
+ * Filter the evaluation templates according to the candidate's consent option.
+ * KNOWLEDGE_ONLY candidates never see the sensitive (PSICOMETRICA / PSICOLOGICA)
+ * sections, so we strip them on the client side after fetching from the API.
+ */
+function filterTemplatesByConsent(
+  allTemplates: EvaluationTemplate[],
+  consentOption?: string
+): EvaluationTemplate[] {
+  if (consentOption === 'KNOWLEDGE_ONLY') {
+    return allTemplates.filter((t) => t.type === 'CONOCIMIENTOS')
+  }
+  return allTemplates
+}
+
 export default function EvaluationView() {
   const user = useAppStore((s) => s.user)
+  const token = useAppStore((s) => s.token)
+  const setAuth = useAppStore((s) => s.setAuth)
   const setCurrentView = useAppStore((s) => s.setCurrentView)
   const [phase, setPhase] = useState<ViewPhase>('LOADING')
   const [sessionId, setSessionId] = useState<string | null>(null)
@@ -60,6 +81,11 @@ export default function EvaluationView() {
   const [positionTitle, setPositionTitle] = useState('')
   const [consentAccepted, setConsentAccepted] = useState(false)
   const [showSectionTransition, setShowSectionTransition] = useState(false)
+
+  // Withdraw-consent dialog state (LFPDPPP — candidate may withdraw sensitive-data consent at any time)
+  const [showWithdrawDialog, setShowWithdrawDialog] = useState(false)
+  const [withdrawing, setWithdrawing] = useState(false)
+  const [withdrawError, setWithdrawError] = useState<string | null>(null)
 
   // Position selection state
   const [availablePositions, setAvailablePositions] = useState<AvailablePosition[]>([])
@@ -109,6 +135,12 @@ export default function EvaluationView() {
       .finally(() => setLoading(false))
   }, [user?.id])
 
+  // Filter templates by consent option — KNOWLEDGE_ONLY candidates never see
+  // the sensitive (PSICOMETRICA / PSICOLOGICA) sections. This is the frontend
+  // mirror of the backend consent gate; the API still returns all templates
+  // for the position, so we strip the sensitive ones here.
+  // (Helper extracted to module scope — see `filterTemplatesByConsent` above.)
+
   // Load templates when we have a session
   useEffect(() => {
     if (!sessionId || phase !== 'IN_PROGRESS') return
@@ -116,7 +148,7 @@ export default function EvaluationView() {
       const res = await apiFetch(`/api/evaluations?sessionId=${sessionId}`)
       const data = await res.json()
       if (data.templates) {
-        setTemplates(data.templates)
+        setTemplates(filterTemplatesByConsent(data.templates, user?.consentOption))
       }
       if (data.session && data.session.status === 'IN_PROGRESS') {
         setCurrentTemplateIndex(Math.max(0, (data.session.currentStep || 1) - 1))
@@ -126,10 +158,17 @@ export default function EvaluationView() {
       }
     }
     fetchTemplates()
-  }, [sessionId, phase])
+  }, [sessionId, phase, user?.consentOption])
 
   const currentTemplate = templates[currentTemplateIndex]
   const currentQuestion = currentTemplate?.questions?.[currentQuestionIndex]
+
+  // IMPORTANT: isInSensitiveSection must be defined AFTER `currentTemplate`
+  // (above). Declaring it earlier would hit a temporal-dead-zone error when
+  // `currentTemplate` is undefined on first render.
+  const isInSensitiveSection =
+    currentTemplate?.type === 'PSICOMETRICA' ||
+    currentTemplate?.type === 'PSICOLOGICA'
 
   const totalQuestions = templates.reduce((sum, t) => sum + (t.questions?.length || 0), 0)
   const answeredCount = templates.slice(0, currentTemplateIndex).reduce((sum, t) => sum + (t.questions?.length || 0), 0) + currentQuestionIndex
@@ -262,6 +301,49 @@ export default function EvaluationView() {
       setCurrentView('evaluation-complete')
     } catch (e) {
       console.error('Error completing evaluation', e)
+    }
+  }
+
+  // Withdraw consent for sensitive-data processing (FULL → KNOWLEDGE_ONLY).
+  // Per LFPDPPP Art. 8 the candidate may revoke consent for sensitive data at
+  // any time. After withdrawal the candidate continues with the CONOCIMIENTOS
+  // section only; sensitive responses already captured are flagged for deletion.
+  const handleWithdrawConsent = async () => {
+    if (!user?.id) return
+    setWithdrawing(true)
+    setWithdrawError(null)
+    try {
+      const res = await apiFetch('/api/consent', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id }),
+      })
+      const data = await res.json().catch(() => ({} as Record<string, unknown>))
+      if (!res.ok) {
+        setWithdrawError(
+          (typeof data.error === 'string' && data.error) ||
+            'No se pudo retirar el consentimiento. Intenta nuevamente.'
+        )
+        return
+      }
+      // Update store so the rest of the app reflects the new consent option
+      if (token) {
+        setAuth({ ...user, consentOption: 'KNOWLEDGE_ONLY' }, token)
+      }
+      // Filter the in-memory template list to only the CONOCIMIENTOS section
+      const knowledgeTemplates = templates.filter(
+        (t) => t.type === 'CONOCIMIENTOS'
+      )
+      setTemplates(knowledgeTemplates)
+      setCurrentTemplateIndex(0)
+      setCurrentQuestionIndex(0)
+      setShowSectionTransition(true)
+      setPhase('SECTION_TRANSITION')
+      setShowWithdrawDialog(false)
+    } catch {
+      setWithdrawError('Error de conexión. Intenta nuevamente.')
+    } finally {
+      setWithdrawing(false)
     }
   }
 
@@ -704,6 +786,7 @@ export default function EvaluationView() {
         setPhase={setPhase}
         setCurrentTemplateIndex={setCurrentTemplateIndex}
         setCurrentQuestionIndex={setCurrentQuestionIndex}
+        consentOption={user?.consentOption}
       />
     )
   }
@@ -887,6 +970,115 @@ export default function EvaluationView() {
           </CardContent>
         </Card>
       )}
+
+      {/* Withdraw consent button — visible only during PSICOMETRICA / PSICOLOGICA
+          sections when the candidate previously chose Option A (FULL consent). */}
+      {isInSensitiveSection && user?.consentOption === 'FULL' && (
+        <div className="flex justify-center pt-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setWithdrawError(null)
+              setShowWithdrawDialog(true)
+            }}
+            className="text-amber-700 hover:text-amber-900 hover:bg-amber-50"
+          >
+            <ShieldAlert className="w-4 h-4 mr-1.5" />
+            Retirar consentimiento de datos sensibles
+          </Button>
+        </div>
+      )}
+
+      {/* Withdraw consent dialog */}
+      <Dialog open={showWithdrawDialog} onOpenChange={setShowWithdrawDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-amber-100 text-amber-600 mx-auto mb-3">
+              <ShieldAlert className="w-6 h-6" />
+            </div>
+            <DialogTitle className="text-center">
+              Retirar consentimiento de datos sensibles
+            </DialogTitle>
+            <DialogDescription className="text-center">
+              ¿Desea retirar su consentimiento para el tratamiento de datos
+              sensibles?
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2">
+            <ul className="text-sm text-gray-700 space-y-2">
+              <li className="flex items-start gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0 mt-1.5" />
+                <span>
+                  Continuará <strong>solo con la evaluación de conocimientos técnicos</strong>.
+                </span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0 mt-1.5" />
+                <span>
+                  Sus respuestas psicométricas y psicológicas serán{' '}
+                  <strong>marcadas para eliminación</strong>.
+                </span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0 mt-1.5" />
+                <span>
+                  <strong>NO afecta</strong> su participación en el proceso de selección.
+                </span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0 mt-1.5" />
+                <span>
+                  Tendrá las <strong>mismas oportunidades</strong> que los demás candidatos.
+                </span>
+              </li>
+            </ul>
+
+            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 flex items-start gap-2">
+              <ShieldCheck className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-emerald-800">
+                Conforme al <strong>Art. 37 Bis LFPDPPP</strong>, su decisión
+                no generará trato discriminatorio.
+              </p>
+            </div>
+
+            {withdrawError && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-700">
+                {withdrawError}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="flex flex-col-reverse sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowWithdrawDialog(false)}
+              disabled={withdrawing}
+              className="w-full sm:w-auto"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleWithdrawConsent}
+              disabled={withdrawing}
+              className="bg-amber-600 hover:bg-amber-700 text-white w-full sm:w-auto"
+            >
+              {withdrawing ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Procesando...
+                </>
+              ) : (
+                <>
+                  <ShieldCheck className="w-4 h-4 mr-2" />
+                  Confirmar Retiro
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -903,6 +1095,7 @@ function SessionReadyView({
   setPhase,
   setCurrentTemplateIndex,
   setCurrentQuestionIndex,
+  consentOption,
 }: {
   sessionId: string
   positionTitle: string
@@ -912,6 +1105,7 @@ function SessionReadyView({
   setPhase: (v: ViewPhase) => void
   setCurrentTemplateIndex: (v: number) => void
   setCurrentQuestionIndex: (v: number) => void
+  consentOption?: string
 }) {
   const [templates, setLocalTemplates] = useState<EvaluationTemplate[]>([])
 
@@ -921,11 +1115,11 @@ function SessionReadyView({
       .then(res => res.json())
       .then(data => {
         if (data.templates) {
-          setLocalTemplates(data.templates)
+          setLocalTemplates(filterTemplatesByConsent(data.templates, consentOption))
         }
       })
       .catch(console.error)
-  }, [sessionId])
+  }, [sessionId, consentOption])
 
   const getStepIcon = (type: string) => {
     switch (type) {
@@ -955,7 +1149,7 @@ function SessionReadyView({
       })
       const data = await res.json()
       if (data.templates) {
-        setTemplates(data.templates)
+        setTemplates(filterTemplatesByConsent(data.templates, consentOption))
         setCurrentTemplateIndex(0)
         setCurrentQuestionIndex(0)
         // Show section transition for the first section
