@@ -11,8 +11,16 @@ import { Checkbox } from '@/components/ui/checkbox'
 import {
   Search, CheckCircle2, AlertTriangle, XCircle,
   ArrowLeft, RefreshCw, UserPlus, BarChart3, Phone, Mail,
-  ShieldCheck, ShieldX, AlertCircle
+  ShieldCheck, ShieldX, AlertCircle, Building2, Users, Eye
 } from 'lucide-react'
+
+interface AggregatedCompany {
+  companyId: string
+  companyName: string
+  candidateCount: number
+  completedCount: number
+  vacancyCount: number
+}
 
 interface CandidateWithResult {
   id: string
@@ -36,19 +44,32 @@ export default function CandidatesView() {
   const compareIds = useAppStore((s) => s.compareIds)
   const setCompareIds = useAppStore((s) => s.setCompareIds)
   const [candidates, setCandidates] = useState<CandidateWithResult[]>([])
+  const [aggregated, setAggregated] = useState<AggregatedCompany[] | null>(null)
+  const [impersonatingCompany, setImpersonatingCompany] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterRec, setFilterRec] = useState<string>('ALL')
 
-  const fetchCandidates = async () => {
+  const fetchCandidates = async (overrideCompanyId?: string) => {
     setLoading(true)
     try {
       const params = new URLSearchParams()
-      if (user?.companyId) params.set('companyId', user.companyId)
+      if (overrideCompanyId) {
+        params.set('companyId', overrideCompanyId)
+      } else if (user?.companyId) {
+        params.set('companyId', user.companyId)
+      }
       if (user?.role) params.set('role', user.role)
       const res = await apiFetch(`/api/candidates?${params.toString()}`)
       const data = await res.json()
-      setCandidates(data.candidates || [])
+      if (data.mode === 'aggregated') {
+        setAggregated(data.aggregated)
+        setCandidates([])
+        setImpersonatingCompany(null)
+      } else {
+        setAggregated(null)
+        setCandidates(data.candidates || [])
+      }
     } catch (e) {
       console.error('Error fetching candidates', e)
     } finally {
@@ -59,6 +80,16 @@ export default function CandidatesView() {
   useEffect(() => {
     fetchCandidates()
   }, [user?.companyId])
+
+  const handleImpersonate = (companyId: string) => {
+    setImpersonatingCompany(companyId)
+    fetchCandidates(companyId)
+  }
+
+  const handleBackToAggregated = () => {
+    setImpersonatingCompany(null)
+    fetchCandidates()
+  }
 
   const filtered = candidates.filter(c => {
     const matchSearch = c.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -93,21 +124,91 @@ export default function CandidatesView() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Candidatos</h1>
-          <p className="text-gray-500 text-sm">{candidates.length} candidatos registrados</p>
+          {impersonatingCompany ? (
+            <p className="text-gray-500 text-sm">Vista como empresa (suplantación SA)</p>
+          ) : aggregated ? (
+            <p className="text-gray-500 text-sm">Vista agregada — {aggregated.length} empresa(s)</p>
+          ) : (
+            <p className="text-gray-500 text-sm">{candidates.length} candidatos registrados</p>
+          )}
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={fetchCandidates}>
+          {impersonatingCompany && (
+            <Button variant="outline" size="sm" onClick={handleBackToAggregated}>
+              <ArrowLeft className="w-4 h-4 mr-1" /> Volver a Agregados
+            </Button>
+          )}
+          <Button variant="outline" size="sm" onClick={() => fetchCandidates(impersonatingCompany || undefined)}>
             <RefreshCw className="w-4 h-4 mr-1" /> Actualizar
           </Button>
-          <Button
-            size="sm"
-            className="bg-emerald-600 hover:bg-emerald-700"
-            onClick={() => setCurrentView('invite')}
-          >
-            <UserPlus className="w-4 h-4 mr-1" /> Invitar
-          </Button>
+          {!aggregated && !impersonatingCompany && (
+            <Button
+              size="sm"
+              className="bg-emerald-600 hover:bg-emerald-700"
+              onClick={() => setCurrentView('invite')}
+            >
+              <UserPlus className="w-4 h-4 mr-1" /> Invitar
+            </Button>
+          )}
         </div>
       </div>
+
+      {/* Aggregated View for SA */}
+      {aggregated && !impersonatingCompany && (
+        <>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2">
+            <ShieldCheck className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
+            <p className="text-xs text-blue-800">
+              Como SUPER_ADMIN, solo ves conteos agregados sin datos personales (PII).
+              Haz clic en <strong>"Ver candidatos"</strong> para suplantar una empresa y ver sus candidatos individuales.
+            </p>
+          </div>
+          <div className="space-y-3">
+            {aggregated.map((c) => (
+              <Card key={c.companyId} className="shadow-sm">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center shrink-0">
+                        <Building2 className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <p className="font-medium">{c.companyName}</p>
+                        <div className="flex gap-4 mt-1">
+                          <span className="text-xs text-gray-500 flex items-center gap-1">
+                            <Users className="w-3 h-3" /> {c.candidateCount} candidatos
+                          </span>
+                          <span className="text-xs text-emerald-600 flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3" /> {c.completedCount} completados
+                          </span>
+                          <span className="text-xs text-blue-500 flex items-center gap-1">
+                            <BarChart3 className="w-3 h-3" /> {c.vacancyCount} vacante(s)
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleImpersonate(c.companyId)}
+                    >
+                      <Eye className="w-4 h-4 mr-1" /> Ver candidatos
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+            {aggregated.length === 0 && (
+              <Card className="shadow-sm">
+                <CardContent className="py-12 text-center text-gray-400">
+                  <Building2 className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                  <p>No hay empresas con candidatos</p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </>
+      )}
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
