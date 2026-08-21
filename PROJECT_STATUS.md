@@ -1,6 +1,6 @@
 # EvaluHR — Documento de Estado del Proyecto
 
-> **Última actualización:** 20 Junio 2025
+> **Última actualización:** 20 Agosto 2026
 > **Propósito:** Contexto completo para futuras sesiones de desarrollo
 
 ---
@@ -880,6 +880,67 @@ bun run lint               # ESLint
 ---
 
 ## 15. Changelog
+
+### 20 Agosto 2026 — Aviso por empresa, Integridad 4to paso, SA agregados, limpieza APTO
+
+**Commit:** `d36b33c` (pushed to main)
+
+**Archivos modificados (19):**
+- `prisma/schema.prisma` + `schema.prod.prisma` — CompanyPrivacyNotice, integrityScore, includeIntegridad
+- `src/lib/privacy-notice.ts` (NUEVO) — Generador aviso LFPDPPP 31+ secciones
+- `src/lib/generate-templates.ts` — INTEGRIDAD_QUESTIONS (10 preguntas) + template INTEGRIDAD
+- `src/app/api/privacy-notice/route.ts` (NUEVO) — GET/PUT/POST regenerate
+- `src/app/api/companies/route.ts` — Auto-crea aviso, candidateCount para SA
+- `src/app/api/evaluations/route.ts` — Scoring adaptativo 4 secciones (0.25/0.25/0.15/0.35)
+- `src/app/api/public/apply/route.ts` — Mismo scoring integridad + HARDCODED_INTEGRIDAD
+- `src/app/api/public/video/route.ts` — Scoring adaptativo, limpieza APTO
+- `src/app/api/candidates/route.ts` — SA aggregated mode
+- `src/app/api/companies/route.ts` — SA audit log
+- `src/app/api/results/route.ts` — SA aggregated mode
+- `src/app/api/dashboard/route.ts` — Limpieza APTO/NO_RECOMENDADO
+- `src/app/api/migrate/route.ts` — integrityScore columns + CompanyPrivacyNotice table
+- `src/components/views/ConsentView.tsx` — Responsable/Encargado
+- `src/components/views/EvaluationView.tsx` — ShieldCheck, INTEGRIDAD en consent filter
+- `src/components/views/CandidatesView.tsx` — Limpieza APTO legacy
+- `src/components/views/CandidateDetailView.tsx` — Limpieza APTO legacy
+- `src/components/views/CompareView.tsx` — Limpieza APTO legacy
+- `src/components/views/VacancyManagementView.tsx` — Limpieza APTO legacy
+
+#### A. Aviso de Privacidad por Empresa
+- Modelo `CompanyPrivacyNotice` con `companyId @unique`, `contentHtml`, `version='2026-01-v2'`, `isCustom`
+- Generador automático con 31+ secciones LFPDPPP (Responsable, Encargado, datos sensibles, ARCO, integridad)
+- Auto-creación al crear empresa (non-fatal)
+- GET público (auto-genera si no existe), PUT (RH edita), POST regenerate
+- ConsentView muestra "Responsable: {companyName}" y "EvaluHR es Encargado"
+
+#### B. Evaluación de Integridad — 4to paso (sensible, orientativa)
+- 10 preguntas LIKERT: INTEGRITY_HONESTY (3), RULES (3), THEFT (2), RESPONSIBILITY (2)
+- Template `type: INTEGRIDAD, order: 3 o 4` según hasKnowledgeTest
+- `integrityScore` en EvaluationResult y VacancyApplication
+- `includeIntegridad` en Vacancy (default true)
+- Scoring adaptativo 4 secciones: 0.25*BigFive + 0.25*Psico + 0.15*Integridad + 0.35*Conocimientos
+- KNOWLEDGE_ONLY oculta integridad (dato sensible)
+- UI: ShieldCheck, labels, "Retirar consentimiento" activo en paso integridad
+- Regla 6 respetada: integridad NUNCA como filtro de descarte automático
+
+#### C. SUPER_ADMIN solo agregados + suplantación explícita
+- SA sin companyId → `{ aggregated: [...], mode: 'aggregated' }` (counts, NO PII)
+- SA con `?companyId=xxx` → vista normal scoped + `[AUDIT]` log
+- Aplica a /api/candidates, /api/companies, /api/results
+
+#### D. Limpieza APTO/NO_RECOMENDADO/ENTREVISTA_ADICIONAL
+- 0 referencias restantes en todo `src/`
+- CompareView, VacancyManagementView, CandidatesView, CandidateDetailView, dashboard, public/video
+
+#### E. Migrate endpoint
+- Agrega integrityScore (EvaluationResult, VacancyApplication), includeIntegridad (Vacancy)
+- Crea tabla CompanyPrivacyNotice con FK, unique, index
+
+#### Post-deploy requerido
+- Ejecutar `POST /api/migrate` como SUPER_ADMIN para aplicar columnas/tablas nuevas en producción
+- Las 6 reglas de NO ROMPER (CHAT_Z_HANDOFF.md) siguen vigentes
+
+---
 
 ### 20 Junio 2025 — Fix 3 bugs críticos + violación de política (orientación vs decisión)
 
