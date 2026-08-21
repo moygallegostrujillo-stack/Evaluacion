@@ -28,6 +28,7 @@ function calculateScores(
   // Group responses by category
   const bigFiveCategories = ['OPENNESS', 'CONSCIENTIOUSNESS', 'EXTRAVERSION', 'AGREEABLENESS', 'NEUROTICISM']
   const psychCategories = ['STRESS', 'EMPATHY', 'ADAPTABILITY', 'LEADERSHIP', 'TEAMWORK']
+  const integrityCategories = ['INTEGRITY_HONESTY', 'INTEGRITY_RULES', 'INTEGRITY_THEFT', 'INTEGRITY_RESPONSIBILITY']
 
   const categoryScores: Record<string, number[]> = {}
 
@@ -108,12 +109,34 @@ function calculateScores(
     knowledgeScore = Math.round((correct / knowledgeResponses.length) * 100)
   }
 
+  // Integrity scores (normalized 0-100, orientative — never as auto-filter)
+  const integrityScores: Record<string, number> = {}
+  let integritySum = 0
+  let integrityCategoriesWithResponses = 0
+
+  for (const cat of integrityCategories) {
+    const scores = categoryScores[cat] || []
+    if (scores.length > 0) {
+      const avg = scores.reduce((a, b) => a + b, 0) / scores.length
+      const normalized = normalizePsychological(avg)
+      integrityScores[cat] = Math.round(Math.max(0, Math.min(100, normalized)) * 100) / 100
+      integritySum += integrityScores[cat]
+      integrityCategoriesWithResponses++
+    } else {
+      integrityScores[cat] = 0
+    }
+  }
+
+  const avgIntegrity = integrityCategoriesWithResponses > 0 ? integritySum / integrityCategoriesWithResponses : 0
+  const hasIntegrityData = integrityCategoriesWithResponses > 0
+
   // Overall score calculation — adaptive weighting based on which sections have data
   // This fixes the bug where missing sections scored 0 and dragged the overall down
   let overallScore: number
   const sectionsWithData: string[] = []
   if (hasBigFiveData) sectionsWithData.push('bigFive')
   if (hasPsychData) sectionsWithData.push('psych')
+  if (hasIntegrityData) sectionsWithData.push('integrity')
   if (knowledgeScore !== null) sectionsWithData.push('knowledge')
 
   if (sectionsWithData.length === 0) {
@@ -122,21 +145,40 @@ function calculateScores(
     // Only one section — use its score directly
     if (knowledgeScore !== null) overallScore = knowledgeScore
     else if (hasBigFiveData) overallScore = avgBigFive
-    else overallScore = avgPsychological
-  } else if (knowledgeScore !== null && hasBigFiveData && hasPsychData) {
-    // All three sections — original weights
+    else if (hasPsychData) overallScore = avgPsychological
+    else overallScore = avgIntegrity
+  } else if (sectionsWithData.length === 2) {
+    // Two sections — equal split
+    const active: number[] = []
+    if (hasBigFiveData) active.push(avgBigFive)
+    if (hasPsychData) active.push(avgPsychological)
+    if (hasIntegrityData) active.push(avgIntegrity)
+    if (knowledgeScore !== null) active.push(knowledgeScore)
+    overallScore = active.reduce((a, b) => a + b, 0) / active.length
+  } else if (hasBigFiveData && hasPsychData && hasIntegrityData && knowledgeScore !== null) {
+    // All 4 sections
+    overallScore = 0.25 * avgBigFive + 0.25 * avgPsychological + 0.15 * avgIntegrity + 0.35 * knowledgeScore
+  } else if (hasBigFiveData && hasPsychData && hasIntegrityData && knowledgeScore === null) {
+    // 3 present, no knowledge
+    overallScore = 0.30 * avgBigFive + 0.30 * avgPsychological + 0.40 * avgIntegrity
+  } else if (hasBigFiveData && hasPsychData && !hasIntegrityData && knowledgeScore !== null) {
+    // 3 present, no integrity (legacy path)
     overallScore = 0.30 * avgBigFive + 0.30 * avgPsychological + 0.40 * knowledgeScore
-  } else if (knowledgeScore !== null && (hasBigFiveData || hasPsychData)) {
-    // Knowledge + one behavioral section
-    const behavioralAvg = hasBigFiveData && hasPsychData
-      ? (avgBigFive + avgPsychological) / 2
-      : hasBigFiveData ? avgBigFive : avgPsychological
+  } else if (knowledgeScore !== null && (hasBigFiveData || hasPsychData || hasIntegrityData)) {
+    // Knowledge + one or two behavioral/integrity sections
+    const behavioralScores: number[] = []
+    if (hasBigFiveData) behavioralScores.push(avgBigFive)
+    if (hasPsychData) behavioralScores.push(avgPsychological)
+    if (hasIntegrityData) behavioralScores.push(avgIntegrity)
+    const behavioralAvg = behavioralScores.reduce((a, b) => a + b, 0) / behavioralScores.length
     overallScore = 0.50 * behavioralAvg + 0.50 * knowledgeScore
   } else {
-    // Only behavioral sections (no knowledge)
-    overallScore = hasBigFiveData && hasPsychData
-      ? 0.50 * avgBigFive + 0.50 * avgPsychological
-      : hasBigFiveData ? avgBigFive : avgPsychological
+    // Only behavioral/integrity sections (no knowledge)
+    const behavioralScores: number[] = []
+    if (hasBigFiveData) behavioralScores.push(avgBigFive)
+    if (hasPsychData) behavioralScores.push(avgPsychological)
+    if (hasIntegrityData) behavioralScores.push(avgIntegrity)
+    overallScore = behavioralScores.reduce((a, b) => a + b, 0) / behavioralScores.length
   }
 
   // Guidance level — NOT a hiring decision, just informational orientation
@@ -146,7 +188,7 @@ function calculateScores(
   let guidance: string
   if (sectionsWithData.length === 0) {
     guidance = 'PENDIENTE'
-  } else if (hasBigFiveData && hasPsychData && knowledgeScore !== null) {
+  } else if (hasBigFiveData && hasPsychData && hasIntegrityData && knowledgeScore !== null) {
     guidance = 'PERFIL_COMPLETO'
   } else {
     guidance = 'PERFIL_PARCIAL'
@@ -164,10 +206,12 @@ function calculateScores(
     leadership: psychScores['LEADERSHIP'] || 0,
     teamwork: psychScores['TEAMWORK'] || 0,
     knowledgeScore,
+    integrityScore: hasIntegrityData ? Math.round(avgIntegrity * 100) / 100 : 0,
     overallScore: Math.round(overallScore * 100) / 100,
     recommendation: guidance, // Keep field name for DB compatibility, but value is now guidance
     summary: generateSummary(
-      bigFiveScores, psychScores, knowledgeScore, guidance, hasBigFiveData, hasPsychData
+      bigFiveScores, psychScores, knowledgeScore, guidance, hasBigFiveData, hasPsychData,
+      hasIntegrityData ? Math.round(avgIntegrity * 100) / 100 : null, hasIntegrityData
     ),
   }
 }
@@ -186,7 +230,9 @@ function generateSummary(
   knowledgeScore: number | null,
   guidance: string,
   hasBigFiveData: boolean,
-  hasPsychData: boolean
+  hasPsychData: boolean,
+  integrityScore: number | null,
+  hasIntegrityData: boolean
 ): string {
   const strengths: string[] = []
   const areasToExplore: string[] = []
@@ -222,18 +268,32 @@ function generateSummary(
     areasToExplore.push('gestión emocional en entornos laborales')
   }
 
+  // Integrity — orientative, never as disqualification (LFPDPPP Art. 37 Bis)
+  if (hasIntegrityData && integrityScore !== null) {
+    if (integrityScore >= 70) strengths.push('integridad sobresaliente')
+    if (integrityScore < 40) areasToExplore.push('se sugiere explorar en entrevista aspectos relacionados con integridad y honradez')
+  }
+
   let summary = ''
 
   // Indicate profile scope
   if (guidance === 'PERFIL_PARCIAL') {
-    if (!hasBigFiveData && !hasPsychData) {
+    if (!hasBigFiveData && !hasPsychData && !hasIntegrityData) {
       summary += 'Perfil basado únicamente en evaluación de conocimientos. '
-    } else if (!hasBigFiveData) {
+    } else if (!hasBigFiveData && !hasIntegrityData) {
       summary += 'Perfil basado en evaluación psicológica y de conocimientos (sin sección psicométrica por consentimiento del candidato). '
+    } else if (!hasBigFiveData && knowledgeScore === null) {
+      summary += 'Perfil basado en evaluación psicológica y de integridad (sin sección psicométrica ni de conocimientos). '
+    } else if (!hasBigFiveData) {
+      summary += 'Perfil basado en evaluación psicológica, de integridad y de conocimientos (sin sección psicométrica por consentimiento del candidato). '
+    } else if (!hasPsychData && !hasIntegrityData) {
+      summary += 'Perfil basado en evaluación psicométrica y de conocimientos (sin sección psicológica ni de integridad). '
     } else if (!hasPsychData) {
-      summary += 'Perfil basado en evaluación psicométrica y de conocimientos (sin sección psicológica). '
+      summary += 'Perfil basado en evaluación psicométrica, de integridad y de conocimientos (sin sección psicológica). '
+    } else if (!hasIntegrityData) {
+      summary += 'Perfil basado en evaluación psicométrica, psicológica y de conocimientos (sin sección de integridad). '
     } else if (knowledgeScore === null) {
-      summary += 'Perfil basado en evaluación psicométrica y psicológica (sin sección de conocimientos). '
+      summary += 'Perfil basado en evaluación psicométrica, psicológica y de integridad (sin sección de conocimientos). '
     }
   }
 

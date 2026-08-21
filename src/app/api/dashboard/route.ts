@@ -47,17 +47,6 @@ export async function GET(req: NextRequest) {
       where: { recommendation: 'PENDIENTE' },
     })
 
-    // Also count legacy values for backward compatibility
-    const legacyAptoCount = await rlsDb.evaluationResult.count({
-      where: { recommendation: 'APTO' },
-    })
-    const legacyEntrevistaCount = await rlsDb.evaluationResult.count({
-      where: { recommendation: 'ENTREVISTA_ADICIONAL' },
-    })
-    const legacyNoRecomendadoCount = await rlsDb.evaluationResult.count({
-      where: { recommendation: 'NO_RECOMENDADO' },
-    })
-
     // Recent results
     const recentResults = await rlsDb.evaluationResult.findMany({
       orderBy: { createdAt: 'desc' },

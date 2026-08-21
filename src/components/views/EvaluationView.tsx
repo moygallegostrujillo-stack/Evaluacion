@@ -53,7 +53,7 @@ type ViewPhase = 'LOADING' | 'SELECT_POSITION' | 'CONSENT' | 'SESSION_READY' | '
 
 /**
  * Filter the evaluation templates according to the candidate's consent option.
- * KNOWLEDGE_ONLY candidates never see the sensitive (PSICOMETRICA / PSICOLOGICA)
+ * KNOWLEDGE_ONLY candidates never see the sensitive (PSICOMETRICA / PSICOLOGICA / INTEGRIDAD)
  * sections, so we strip them on the client side after fetching from the API.
  */
 function filterTemplatesByConsent(
@@ -136,7 +136,7 @@ export default function EvaluationView() {
   }, [user?.id])
 
   // Filter templates by consent option — KNOWLEDGE_ONLY candidates never see
-  // the sensitive (PSICOMETRICA / PSICOLOGICA) sections. This is the frontend
+  // the sensitive (PSICOMETRICA / PSICOLOGICA / INTEGRIDAD) sections. This is the frontend
   // mirror of the backend consent gate; the API still returns all templates
   // for the position, so we strip the sensitive ones here.
   // (Helper extracted to module scope — see `filterTemplatesByConsent` above.)
@@ -168,7 +168,8 @@ export default function EvaluationView() {
   // `currentTemplate` is undefined on first render.
   const isInSensitiveSection =
     currentTemplate?.type === 'PSICOMETRICA' ||
-    currentTemplate?.type === 'PSICOLOGICA'
+    currentTemplate?.type === 'PSICOLOGICA' ||
+    currentTemplate?.type === 'INTEGRIDAD'
 
   const totalQuestions = templates.reduce((sum, t) => sum + (t.questions?.length || 0), 0)
   const answeredCount = templates.slice(0, currentTemplateIndex).reduce((sum, t) => sum + (t.questions?.length || 0), 0) + currentQuestionIndex
@@ -361,6 +362,7 @@ export default function EvaluationView() {
       case 'PSICOMETRICA': return <Brain className="w-5 h-5" />
       case 'PSICOLOGICA': return <ClipboardList className="w-5 h-5" />
       case 'CONOCIMIENTOS': return <BookOpen className="w-5 h-5" />
+      case 'INTEGRIDAD': return <ShieldCheck className="w-5 h-5" />
       default: return null
     }
   }
@@ -370,6 +372,7 @@ export default function EvaluationView() {
       case 'PSICOMETRICA': return 'Psicométrica'
       case 'PSICOLOGICA': return 'Psicológica'
       case 'CONOCIMIENTOS': return 'Conocimientos'
+      case 'INTEGRIDAD': return 'Integridad'
       default: return type
     }
   }
@@ -379,6 +382,7 @@ export default function EvaluationView() {
       case 'PSICOMETRICA': return 'Evalúa tu perfil de personalidad a través del modelo Big Five: apertura a la experiencia, responsabilidad, extraversión, amabilidad y neuroticismo.'
       case 'PSICOLOGICA': return 'Evalúa aspectos psicológicos relevantes para el trabajo: manejo de estrés, empatía, adaptabilidad, liderazgo y trabajo en equipo.'
       case 'CONOCIMIENTOS': return 'Evalúa tus conocimientos técnicos específicos para el puesto al que estás aplicando.'
+      case 'INTEGRIDAD': return 'Evaluación de Integridad (dato sensible, orientativo). Indicadores de honestidad, cumplimiento de normas, responsabilidad y prevención de robos.'
       default: return 'Evaluación de competencias para el puesto.'
     }
   }
@@ -1026,7 +1030,7 @@ export default function EvaluationView() {
               <li className="flex items-start gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0 mt-1.5" />
                 <span>
-                  Sus respuestas psicométricas y psicológicas serán{' '}
+                  Sus respuestas psicométricas, psicológicas y de integridad serán{' '}
                   <strong>marcadas para eliminación</strong>.
                 </span>
               </li>
@@ -1135,6 +1139,7 @@ function SessionReadyView({
       case 'PSICOMETRICA': return <Brain className="w-5 h-5" />
       case 'PSICOLOGICA': return <ClipboardList className="w-5 h-5" />
       case 'CONOCIMIENTOS': return <BookOpen className="w-5 h-5" />
+      case 'INTEGRIDAD': return <ShieldCheck className="w-5 h-5" />
       default: return null
     }
   }
@@ -1144,6 +1149,7 @@ function SessionReadyView({
       case 'PSICOMETRICA': return 'Psicométrica'
       case 'PSICOLOGICA': return 'Psicológica'
       case 'CONOCIMIENTOS': return 'Conocimientos'
+      case 'INTEGRIDAD': return 'Integridad'
       default: return type
     }
   }

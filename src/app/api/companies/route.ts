@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUnscopedClient } from '@/lib/rls'
 import { getAuthFromHeaders } from '@/lib/auth'
+import { generatePrivacyNoticeHtml, CURRENT_PRIVACY_VERSION } from '@/lib/privacy-notice'
 
 export async function GET(req: NextRequest) {
   try {
@@ -13,6 +14,7 @@ export async function GET(req: NextRequest) {
 
     // SUPER_ADMIN can see all companies with full data; others only see their own
     if (auth.role === 'SUPER_ADMIN') {
+      console.log('[AUDIT] SA viewing all companies aggregated by', auth.userId)
       const companies = await db.company.findMany({
         where: { active: true },
         select: {
@@ -29,7 +31,7 @@ export async function GET(req: NextRequest) {
           maxCandidatesPerMonth: true,
           _count: {
             select: {
-              users: true,
+              users: { where: { role: 'CANDIDATO' } },
               positions: true,
               vacancies: true,
             },
@@ -92,6 +94,20 @@ export async function POST(req: NextRequest) {
         active: true,
       },
     })
+
+    // Auto-create privacy notice for the new company (non-fatal)
+    try {
+      await db.companyPrivacyNotice.create({
+        data: {
+          companyId: company.id,
+          contentHtml: generatePrivacyNoticeHtml(company),
+          version: CURRENT_PRIVACY_VERSION,
+          isCustom: false,
+        },
+      })
+    } catch (noticeErr) {
+      console.error('Auto-create privacy notice failed (non-fatal):', noticeErr)
+    }
 
     return NextResponse.json({ company }, { status: 201 })
   } catch (error) {

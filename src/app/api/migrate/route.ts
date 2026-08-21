@@ -20,7 +20,14 @@ import { getAuthFromHeaders } from '@/lib/auth'
  *   - consentConfirmed (Boolean, default false)
  *   - consentWithdrawnAt (DateTime, nullable)
  *   - consentVersion (Text, nullable)
+ *
+ * Also adds integrity columns and CompanyPrivacyNotice table (Aug 2026):
+ *   - EvaluationResult.integrityScore (Float, default 0)
+ *   - VacancyApplication.integrityScore (Float, default 0)
+ *   - Vacancy.includeIntegridad (Boolean, default true)
+ *   - CompanyPrivacyNotice table
  */
+
 export async function POST(req: NextRequest) {
   try {
     const auth = getAuthFromHeaders(req.headers)
@@ -156,12 +163,92 @@ export async function POST(req: NextRequest) {
       results.push(`⚠️ Orphan cleanup skipped: ${cleanupErr}`)
     }
 
+    // ============================================
+    // 4. Add integrityScore columns (Aug 2026)
+    // ============================================
+    const integrityColumns = [
+      { table: 'EvaluationResult', name: 'integrityScore', type: 'DOUBLE PRECISION', default: '0' },
+      { table: 'VacancyApplication', name: 'integrityScore', type: 'DOUBLE PRECISION', default: '0' },
+      { table: 'Vacancy', name: 'includeIntegridad', type: 'BOOLEAN', default: 'true' },
+    ]
+
+    for (const col of integrityColumns) {
+      try {
+        await db.$executeRawUnsafe(`SELECT "${col.name}" FROM "${col.table}" LIMIT 0;`)
+        results.push(`✓ Column "${col.table}.${col.name}" already exists`)
+      } catch {
+        try {
+          await db.$executeRawUnsafe(
+            `ALTER TABLE "${col.table}" ADD COLUMN IF NOT EXISTS "${col.name}" ${col.type} DEFAULT ${col.default};`
+          )
+          results.push(`✓ Added column "${col.table}.${col.name}" (${col.type})`)
+        } catch (addErr) {
+          results.push(`✗ Failed to add column "${col.table}.${col.name}": ${addErr}`)
+        }
+      }
+    }
+
+    // ============================================
+    // 5. Create CompanyPrivacyNotice table (Aug 2026)
+    // ============================================
+    try {
+      await db.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "CompanyPrivacyNotice" (
+          "id" TEXT NOT NULL,
+          "companyId" TEXT NOT NULL,
+          "contentHtml" TEXT NOT NULL,
+          "version" TEXT NOT NULL DEFAULT '2026-01-v2',
+          "isCustom" BOOLEAN NOT NULL DEFAULT false,
+          "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" TIMESTAMP(3) NOT NULL,
+          CONSTRAINT "CompanyPrivacyNotice_pkey" PRIMARY KEY ("id")
+        );
+      `)
+      results.push('✓ CompanyPrivacyNotice table created (or already exists)')
+
+      // Add unique constraint on companyId
+      try {
+        await db.$executeRawUnsafe(`
+          ALTER TABLE "CompanyPrivacyNotice"
+          ADD CONSTRAINT IF NOT EXISTS "CompanyPrivacyNotice_companyId_key"
+          UNIQUE ("companyId");
+        `)
+        results.push('✓ CompanyPrivacyNotice unique constraint added')
+      } catch (fkErr) {
+        results.push(`⚠️ CompanyPrivacyNotice unique: ${fkErr}`)
+      }
+
+      // Add FK
+      try {
+        await db.$executeRawUnsafe(`
+          ALTER TABLE "CompanyPrivacyNotice"
+          ADD CONSTRAINT IF NOT EXISTS "CompanyPrivacyNotice_companyId_fkey"
+          FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+        `)
+        results.push('✓ CompanyPrivacyNotice FK added')
+      } catch (fkErr) {
+        results.push(`⚠️ CompanyPrivacyNotice FK: ${fkErr}`)
+      }
+
+      // Index
+      try {
+        await db.$executeRawUnsafe(`
+          CREATE INDEX IF NOT EXISTS "CompanyPrivacyNotice_companyId_idx" ON "CompanyPrivacyNotice"("companyId");
+        `)
+        results.push('✓ CompanyPrivacyNotice index created')
+      } catch (idxErr) {
+        results.push(`⚠️ CompanyPrivacyNotice index: ${idxErr}`)
+      }
+    } catch (tblErr) {
+      results.push(`✗ Failed to create CompanyPrivacyNotice: ${tblErr}`)
+    }
+
     // Verify by checking the columns
     let verification
     try {
       verification = await db.$queryRawUnsafe(`
-        SELECT column_name, data_type 
-        FROM information_schema.columns 
+        SELECT column_name, data_type
+        FROM information_schema.columns
         WHERE table_name = 'User' AND column_name IN ('consentGiven', 'consentDate', 'consentOption', 'anonymousStats', 'consentConfirmed', 'consentWithdrawnAt', 'consentVersion')
         ORDER BY column_name;
       `)
@@ -173,7 +260,7 @@ export async function POST(req: NextRequest) {
       success: true,
       results,
       verification,
-      message: 'Migración completada. El sistema de consentimiento debería funcionar ahora.',
+      message: 'Migración completada. Consentimiento + Integridad + Aviso de privacidad listos.',
     })
   } catch (error) {
     console.error('Migration error:', error)

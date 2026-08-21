@@ -119,10 +119,6 @@ export default function CandidateDetailView() {
       case 'PERFIL_COMPLETO': return 'Perfil Completo'
       case 'PERFIL_PARCIAL': return 'Perfil Parcial'
       case 'PENDIENTE': return 'Pendiente'
-      // Legacy values — backward compatibility
-      case 'APTO': return 'Perfil Completo (legacy)'
-      case 'ENTREVISTA_ADICIONAL': return 'Perfil Parcial (legacy)'
-      case 'NO_RECOMENDADO': return 'Perfil Parcial (legacy)'
       default: return 'Pendiente'
     }
   }
@@ -518,16 +514,16 @@ export default function CandidateDetailView() {
       )}
 
       {/* Schedule Interview */}
-      {result.recommendation === 'ENTREVISTA_ADICIONAL' && (
+      {result.recommendation === 'PERFIL_PARCIAL' && (
         <Card className="shadow-sm border-amber-200">
           <CardHeader className="pb-2">
             <CardTitle className="text-lg flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-amber-600" /> Programar Entrevista
+              <Calendar className="w-5 h-5 text-amber-600" /> Agendar Revisión
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-gray-500 mb-4">
-              Este candidato requiere una entrevista adicional. Programe una fecha y se le notificará.
+              El perfil de este candidato está incompleto. Puede agendar una revisión para explorar más a fondo.
             </p>
 
             {/* Show prospect info for the interview */}
@@ -577,7 +573,7 @@ export default function CandidateDetailView() {
             {scheduleSuccess && (
               <div className="mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-2 text-sm text-emerald-700">
                 <CheckCircle2 className="w-4 h-4" />
-                Entrevista programada exitosamente. El candidato será notificado.
+                Revisión agendada exitosamente. El candidato será notificado.
               </div>
             )}
 
@@ -594,7 +590,7 @@ export default function CandidateDetailView() {
               onClick={handleScheduleInterview}
               disabled={!interviewDate || scheduling}
             >
-              {scheduling ? 'Programando...' : 'Programar Entrevista'}
+              {scheduling ? 'Programando...' : 'Agendar Revisión'}
             </Button>
           </CardContent>
         </Card>

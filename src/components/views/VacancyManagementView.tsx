@@ -107,10 +107,9 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bgClass: str
   CLOSED: { label: 'Cerrada', color: 'text-red-700', bgClass: 'bg-red-50 border-red-200' },
 }
 
-const RECOMMENDATION_CONFIG: Record<string, { label: string; color: string; bgClass: string }> = {
-  APTO: { label: 'Apto', color: 'text-emerald-700', bgClass: 'bg-emerald-50 border-emerald-200' },
-  ENTREVISTA_ADICIONAL: { label: 'Entrevista', color: 'text-amber-700', bgClass: 'bg-amber-50 border-amber-200' },
-  NO_RECOMENDADO: { label: 'No Recomendado', color: 'text-red-700', bgClass: 'bg-red-50 border-red-200' },
+const GUIDANCE_CONFIG: Record<string, { label: string; color: string; bgClass: string }> = {
+  PERFIL_COMPLETO: { label: 'Perfil completo', color: 'text-emerald-700', bgClass: 'bg-emerald-50 border-emerald-200' },
+  PERFIL_PARCIAL: { label: 'Perfil parcial', color: 'text-amber-700', bgClass: 'bg-amber-50 border-amber-200' },
   PENDIENTE: { label: 'Pendiente', color: 'text-gray-700', bgClass: 'bg-gray-50 border-gray-200' },
 }
 
@@ -474,7 +473,7 @@ export default function VacancyManagementView() {
   }
 
   const renderRecommendationBadge = (rec: string) => {
-    const cfg = RECOMMENDATION_CONFIG[rec] || RECOMMENDATION_CONFIG.PENDIENTE
+    const cfg = GUIDANCE_CONFIG[rec] || GUIDANCE_CONFIG.PENDIENTE
     return (
       <Badge variant="outline" className={`${cfg.bgClass} ${cfg.color} border text-xs`}>
         {cfg.label}

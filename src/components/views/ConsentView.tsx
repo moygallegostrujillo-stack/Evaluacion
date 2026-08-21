@@ -174,18 +174,34 @@ export default function ConsentView() {
               </div>
             </div>
 
-            {/* Data controller info */}
-            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+            {/* Data controller info — Responsable / Encargado (LFPDPPP) */}
+            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 space-y-3">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                Responsable del Tratamiento
+                Responsable y Encargado del Tratamiento
               </p>
-              <p className="text-sm text-gray-800 font-medium">
-                {user?.companyName || 'Empresa evaluadora'}
-              </p>
-              <p className="text-xs text-gray-500 mt-1">
+              <div className="space-y-2">
+                <div>
+                  <p className="text-xs text-gray-500">Responsable (empresa contratante):</p>
+                  <p className="text-sm text-gray-800 font-medium">
+                    {user?.companyName || 'la empresa solicitante'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Encargado del tratamiento:</p>
+                  <p className="text-sm text-gray-800 font-medium">
+                    EvaluHR (plataforma de evaluación)
+                  </p>
+                </div>
+              </div>
+              <div className="bg-emerald-50 border border-emerald-200 rounded-md p-3">
+                <p className="text-xs text-emerald-800 leading-relaxed">
+                  <strong>Nota:</strong> La decisión final sobre la contratación corresponde al Responsable ({user?.companyName || 'la empresa solicitante'}). EvaluHR proporciona únicamente orientación informativa.
+                </p>
+              </div>
+              <p className="text-xs text-gray-500">
                 Tuxtla Gutiérrez, Chiapas, México
               </p>
-              <p className="text-xs text-gray-500 mt-1 flex items-center gap-1.5">
+              <p className="text-xs text-gray-500 flex items-center gap-1.5">
                 <Mail className="w-3 h-3" />
                 recursos.humanos@cafedechiapas.mx
               </p>

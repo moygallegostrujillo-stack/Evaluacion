@@ -82,13 +82,6 @@ export default function CandidatesView() {
         return <Badge className="bg-emerald-100 text-emerald-700"><CheckCircle2 className="w-3 h-3 mr-1" />Completo</Badge>
       case 'PERFIL_PARCIAL':
         return <Badge className="bg-amber-100 text-amber-700"><AlertTriangle className="w-3 h-3 mr-1" />Parcial</Badge>
-      // Legacy values — backward compatibility
-      case 'APTO':
-        return <Badge className="bg-emerald-100 text-emerald-700"><CheckCircle2 className="w-3 h-3 mr-1" />Completo</Badge>
-      case 'ENTREVISTA_ADICIONAL':
-        return <Badge className="bg-amber-100 text-amber-700"><AlertTriangle className="w-3 h-3 mr-1" />Parcial</Badge>
-      case 'NO_RECOMENDADO':
-        return <Badge className="bg-amber-100 text-amber-700"><AlertTriangle className="w-3 h-3 mr-1" />Parcial</Badge>
       default:
         return <Badge className="bg-gray-100 text-gray-700">Pendiente</Badge>
     }

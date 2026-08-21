@@ -164,12 +164,12 @@ export default function CompareView() {
               <div className="flex items-center justify-between">
                 <span className="text-2xl font-bold">{Math.round(r.overallScore)}</span>
                 <Badge className={
-                  r.recommendation === 'APTO' ? 'bg-emerald-100 text-emerald-700' :
-                  r.recommendation === 'ENTREVISTA_ADICIONAL' ? 'bg-amber-100 text-amber-700' :
-                  'bg-red-100 text-red-700'
+                  r.recommendation === 'PERFIL_COMPLETO' ? 'bg-emerald-100 text-emerald-700' :
+                  r.recommendation === 'PERFIL_PARCIAL' ? 'bg-amber-100 text-amber-700' :
+                  'bg-gray-100 text-gray-700'
                 }>
-                  {r.recommendation === 'APTO' ? 'Apto' :
-                   r.recommendation === 'ENTREVISTA_ADICIONAL' ? 'Entrevista' : 'No Rec.'}
+                  {r.recommendation === 'PERFIL_COMPLETO' ? 'Completo' :
+                   r.recommendation === 'PERFIL_PARCIAL' ? 'Parcial' : 'Pendiente'}
                 </Badge>
               </div>
             </CardContent>

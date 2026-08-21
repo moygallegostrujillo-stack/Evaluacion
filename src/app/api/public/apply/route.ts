@@ -33,6 +33,7 @@ interface ScoredResponse {
 function calculateScores(responses: ScoredResponse[]) {
   const bigFiveCategories = ['OPENNESS', 'CONSCIENTIOUSNESS', 'EXTRAVERSION', 'AGREEABLENESS', 'NEUROTICISM']
   const psychCategories = ['STRESS', 'EMPATHY', 'ADAPTABILITY', 'LEADERSHIP', 'TEAMWORK']
+  const integrityCategories = ['INTEGRITY_HONESTY', 'INTEGRITY_RULES', 'INTEGRITY_THEFT', 'INTEGRITY_RESPONSIBILITY']
 
   const categoryScores: Record<string, number[]> = {}
 
@@ -116,12 +117,34 @@ function calculateScores(responses: ScoredResponse[]) {
     knowledgeScore = Math.round((correct / knowledgeResponses.length) * 100 * 100) / 100
   }
 
+  // Integrity scores (normalized 0-100, orientative — never as auto-filter)
+  const integrityScores: Record<string, number> = {}
+  let integritySum = 0
+  let integrityCategoriesWithResponses = 0
+
+  for (const cat of integrityCategories) {
+    const scores = categoryScores[cat] || []
+    if (scores.length > 0) {
+      const avg = scores.reduce((a, b) => a + b, 0) / scores.length
+      const normalized = normalizePsychological(avg)
+      integrityScores[cat] = Math.round(Math.max(0, Math.min(100, normalized)) * 100) / 100
+      integritySum += integrityScores[cat]
+      integrityCategoriesWithResponses++
+    } else {
+      integrityScores[cat] = 0
+    }
+  }
+
+  const avgIntegrity = integrityCategoriesWithResponses > 0 ? integritySum / integrityCategoriesWithResponses : 0
+  const hasIntegrityData = integrityCategoriesWithResponses > 0
+
   // Overall score calculation — adaptive weighting based on which sections have data
   // This fixes the bug where missing sections scored 0 and dragged the overall down
   let overallScore: number
   const sectionsWithData: string[] = []
   if (hasBigFiveData) sectionsWithData.push('bigFive')
   if (hasPsychData) sectionsWithData.push('psych')
+  if (hasIntegrityData) sectionsWithData.push('integrity')
   if (knowledgeScore !== null) sectionsWithData.push('knowledge')
 
   if (sectionsWithData.length === 0) {
@@ -130,21 +153,40 @@ function calculateScores(responses: ScoredResponse[]) {
     // Only one section — use its score directly
     if (knowledgeScore !== null) overallScore = knowledgeScore
     else if (hasBigFiveData) overallScore = psicometricaAvg
-    else overallScore = psicologicaAvg
-  } else if (knowledgeScore !== null && hasBigFiveData && hasPsychData) {
-    // All three sections — original weights
+    else if (hasPsychData) overallScore = psicologicaAvg
+    else overallScore = avgIntegrity
+  } else if (sectionsWithData.length === 2) {
+    // Two sections — equal split
+    const active: number[] = []
+    if (hasBigFiveData) active.push(psicometricaAvg)
+    if (hasPsychData) active.push(psicologicaAvg)
+    if (hasIntegrityData) active.push(avgIntegrity)
+    if (knowledgeScore !== null) active.push(knowledgeScore)
+    overallScore = active.reduce((a, b) => a + b, 0) / active.length
+  } else if (hasBigFiveData && hasPsychData && hasIntegrityData && knowledgeScore !== null) {
+    // All 4 sections
+    overallScore = 0.25 * psicometricaAvg + 0.25 * psicologicaAvg + 0.15 * avgIntegrity + 0.35 * knowledgeScore
+  } else if (hasBigFiveData && hasPsychData && hasIntegrityData && knowledgeScore === null) {
+    // 3 present, no knowledge
+    overallScore = 0.30 * psicometricaAvg + 0.30 * psicologicaAvg + 0.40 * avgIntegrity
+  } else if (hasBigFiveData && hasPsychData && !hasIntegrityData && knowledgeScore !== null) {
+    // 3 present, no integrity (legacy path)
     overallScore = 0.30 * psicometricaAvg + 0.30 * psicologicaAvg + 0.40 * knowledgeScore
-  } else if (knowledgeScore !== null && (hasBigFiveData || hasPsychData)) {
-    // Knowledge + one behavioral section
-    const behavioralAvg = hasBigFiveData && hasPsychData
-      ? (psicometricaAvg + psicologicaAvg) / 2
-      : hasBigFiveData ? psicometricaAvg : psicologicaAvg
+  } else if (knowledgeScore !== null && (hasBigFiveData || hasPsychData || hasIntegrityData)) {
+    // Knowledge + one or two behavioral/integrity sections
+    const behavioralScores: number[] = []
+    if (hasBigFiveData) behavioralScores.push(psicometricaAvg)
+    if (hasPsychData) behavioralScores.push(psicologicaAvg)
+    if (hasIntegrityData) behavioralScores.push(avgIntegrity)
+    const behavioralAvg = behavioralScores.reduce((a, b) => a + b, 0) / behavioralScores.length
     overallScore = 0.50 * behavioralAvg + 0.50 * knowledgeScore
   } else {
-    // Only behavioral sections (no knowledge)
-    overallScore = hasBigFiveData && hasPsychData
-      ? 0.50 * psicometricaAvg + 0.50 * psicologicaAvg
-      : hasBigFiveData ? psicometricaAvg : psicologicaAvg
+    // Only behavioral/integrity sections (no knowledge)
+    const behavioralScores: number[] = []
+    if (hasBigFiveData) behavioralScores.push(psicometricaAvg)
+    if (hasPsychData) behavioralScores.push(psicologicaAvg)
+    if (hasIntegrityData) behavioralScores.push(avgIntegrity)
+    overallScore = behavioralScores.reduce((a, b) => a + b, 0) / behavioralScores.length
   }
 
   // Guidance level — NOT a hiring decision, just informational orientation
@@ -154,7 +196,7 @@ function calculateScores(responses: ScoredResponse[]) {
   let guidance: string
   if (sectionsWithData.length === 0) {
     guidance = 'PENDIENTE'
-  } else if (hasBigFiveData && hasPsychData && knowledgeScore !== null) {
+  } else if (hasBigFiveData && hasPsychData && hasIntegrityData && knowledgeScore !== null) {
     guidance = 'PERFIL_COMPLETO'
   } else {
     guidance = 'PERFIL_PARCIAL'
@@ -172,6 +214,7 @@ function calculateScores(responses: ScoredResponse[]) {
     leadership: psychScores['LEADERSHIP'] || 0,
     teamwork: psychScores['TEAMWORK'] || 0,
     knowledgeScore,
+    integrityScore: hasIntegrityData ? Math.round(avgIntegrity * 100) / 100 : 0,
     overallScore: Math.round(overallScore * 100) / 100,
     recommendation: guidance, // Keep field name for DB compatibility, but value is now guidance
     psicometricaAvg: Math.round(psicometricaAvg * 100) / 100,
@@ -209,17 +252,35 @@ const HARDCODED_PSYCHOLOGICAL = [
   { id: 'hw-ps-10', text: 'Escucho y respeto las opiniones de mis compañeros aunque no esté de acuerdo', category: 'TEAMWORK', type: 'LIKERT', reverseScored: false, order: 10 },
 ]
 
+// ── Integrity questions (orientative, never auto-filter — same as generate-templates.ts) ──
+const HARDCODED_INTEGRIDAD = [
+  // INTEGRITY_HONESTY (3 questions)
+  { id: 'hw-int-1', text: 'Si cometo un error en el trabajo, lo comunico a mi supervisor de inmediato', category: 'INTEGRITY_HONESTY', type: 'LIKERT', reverseScored: false, order: 1 },
+  { id: 'hw-int-2', text: 'Considero que decir la verdad es más importante que evitar un problema temporal', category: 'INTEGRITY_HONESTY', type: 'LIKERT', reverseScored: false, order: 2 },
+  { id: 'hw-int-3', text: 'En situaciones de presión, he ocultado información para evitar consecuencias', category: 'INTEGRITY_HONESTY', type: 'LIKERT', reverseScored: true, order: 3 },
+  // INTEGRITY_RULES (3 questions)
+  { id: 'hw-int-4', text: 'Sigo los procedimientos establecidos aunque nadie me esté observando', category: 'INTEGRITY_RULES', type: 'LIKERT', reverseScored: false, order: 4 },
+  { id: 'hw-int-5', text: 'Respeto las políticas de la empresa aunque considere que alguna no es necesaria', category: 'INTEGRITY_RULES', type: 'LIKERT', reverseScored: false, order: 5 },
+  { id: 'hw-int-6', text: 'He justificado no cumplir una norma porque "no hacía daño a nadie"', category: 'INTEGRITY_RULES', type: 'LIKERT', reverseScored: true, order: 6 },
+  // INTEGRITY_THEFT (2 questions)
+  { id: 'hw-int-7', text: 'Considero que tomar pequeños artículos del trabajo sin permiso es aceptable si son de bajo valor', category: 'INTEGRITY_THEFT', type: 'LIKERT', reverseScored: true, order: 7 },
+  { id: 'hw-int-8', text: 'He utilizado recursos de la empresa (tiempo, materiales) para fines personales sin autorización', category: 'INTEGRITY_THEFT', type: 'LIKERT', reverseScored: true, order: 8 },
+  // INTEGRITY_RESPONSIBILITY (2 questions)
+  { id: 'hw-int-9', text: 'Cuando algo sale mal en mi área, asumo mi parte de responsabilidad sin buscar culpables', category: 'INTEGRITY_RESPONSIBILITY', type: 'LIKERT', reverseScored: false, order: 9 },
+  { id: 'hw-int-10', text: 'Si un compañero comete una falta, prefiero no involucrarme para evitar conflictos', category: 'INTEGRITY_RESPONSIBILITY', type: 'LIKERT', reverseScored: true, order: 10 },
+]
+
 // ============================================
 // HELPER: Get system questions for a company's vacancy
 // ============================================
 
-async function getSystemQuestions(companyId: string) {
+async function getSystemQuestions(companyId: string, includeIntegridad: boolean = true) {
   // Find any Position belonging to the vacancy's company
   const position = await db.position.findFirst({
     where: { companyId },
     include: {
       evaluationTemplates: {
-        where: { type: { in: ['PSICOMETRICA', 'PSICOLOGICA', 'CONOCIMIENTOS'] } },
+        where: { type: { in: ['PSICOMETRICA', 'PSICOLOGICA', 'CONOCIMIENTOS', 'INTEGRIDAD'] } },
         include: { questions: true },
       },
     },
@@ -250,6 +311,14 @@ async function getSystemQuestions(companyId: string) {
     correctAnswer: number | null
     order: number
   }> = []
+  let integrityQuestions: Array<{
+    id: string
+    text: string
+    category: string
+    type: string
+    reverseScored: boolean
+    order: number
+  }> = []
 
   if (position) {
     const psicometricaTemplate = position.evaluationTemplates.find(
@@ -260,6 +329,9 @@ async function getSystemQuestions(companyId: string) {
     )
     const conocimientosTemplate = position.evaluationTemplates.find(
       (t) => t.type === 'CONOCIMIENTOS'
+    )
+    const integridadTemplate = position.evaluationTemplates.find(
+      (t) => t.type === 'INTEGRIDAD'
     )
 
     if (psicometricaTemplate) {
@@ -295,6 +367,17 @@ async function getSystemQuestions(companyId: string) {
         order: q.order,
       }))
     }
+
+    if (includeIntegridad && integridadTemplate) {
+      integrityQuestions = integridadTemplate.questions.map((q) => ({
+        id: q.id,
+        text: q.text,
+        category: q.category,
+        type: q.type,
+        reverseScored: q.reverseScored,
+        order: q.order,
+      }))
+    }
   }
 
   // Fallback to hardcoded if no templates found
@@ -304,8 +387,11 @@ async function getSystemQuestions(companyId: string) {
   if (psychologicalQuestions.length === 0) {
     psychologicalQuestions = HARDCODED_PSYCHOLOGICAL
   }
+  if (includeIntegridad && integrityQuestions.length === 0) {
+    integrityQuestions = HARDCODED_INTEGRIDAD
+  }
 
-  return { bigFiveQuestions, psychologicalQuestions, knowledgeQuestions }
+  return { bigFiveQuestions, psychologicalQuestions, knowledgeQuestions, integrityQuestions }
 }
 
 // ============================================
@@ -331,8 +417,7 @@ async function calculateStepScores(
 
   if (completedStep === 1) {
     // Psicometrica - Big Five
-    const systemQuestions = await getSystemQuestions(companyId)
-    const bigFiveIds = new Set(systemQuestions.bigFiveQuestions.map((q) => q.id))
+    const systemQuestions = await getSystemQuestions(companyId, vacancy.includeIntegridad ?? true)
 
     const psicometricaResponses = responses.filter((r) => r.section.toUpperCase() === 'PSICOMETRICA')
 
@@ -362,7 +447,7 @@ async function calculateStepScores(
 
   if (completedStep === 2) {
     // Psicologica
-    const systemQuestions = await getSystemQuestions(companyId)
+    const systemQuestions = await getSystemQuestions(companyId, vacancy.includeIntegridad ?? true)
 
     const psicologicaResponses = responses.filter((r) => r.section.toUpperCase() === 'PSICOLOGICA')
 
@@ -390,11 +475,34 @@ async function calculateStepScores(
   }
 
   if (completedStep === 3) {
+    // Integridad (new step)
+    const systemQuestions = await getSystemQuestions(companyId, vacancy.includeIntegridad ?? true)
+
+    const integridadResponses = responses.filter((r) => r.section.toUpperCase() === 'INTEGRIDAD')
+
+    const scoredResponses: ScoredResponse[] = integridadResponses.map((r) => {
+      const systemQ = systemQuestions.integrityQuestions.find((q) => q.id === r.questionId)
+      return {
+        section: r.section,
+        category: systemQ?.category || 'INTEGRITY_HONESTY',
+        type: systemQ?.type || 'LIKERT',
+        reverseScored: systemQ?.reverseScored || false,
+        numericValue: r.numericValue,
+        value: r.value,
+        correctAnswer: null,
+      }
+    })
+
+    const scores = calculateScores(scoredResponses)
+    return { integrityScore: scores.integrityScore }
+  }
+
+  if (completedStep === 4) {
     // Conocimientos - handle both VacancyQuestion and system Question responses
     const knowledgeResponses = responses.filter((r) => r.section.toUpperCase() === 'CONOCIMIENTOS')
 
     // Get system questions to find correct answers for template-based questions
-    const systemQuestions = await getSystemQuestions(companyId)
+    const systemQuestions = await getSystemQuestions(companyId, vacancy.includeIntegridad ?? true)
     const systemKnowledgeMap = new Map(
       systemQuestions.knowledgeQuestions.map((q) => [q.id, q])
     )
@@ -447,6 +555,7 @@ async function calculateOverallScore(applicationId: string) {
     application.adaptability > 0 || application.leadership > 0 ||
     application.teamwork > 0
   )
+  const hasIntegrityData = (vacancy.includeIntegridad ?? true) === true && application.integrityScore > 0
   const hasKnowledgeData = application.knowledgeScore !== null
 
   // Big Five average — adaptive (only categories with responses)
@@ -460,11 +569,15 @@ async function calculateOverallScore(applicationId: string) {
   const nonZeroPsych = psychValues.filter(s => s > 0)
   const psicologicaAvg = nonZeroPsych.length > 0 ? nonZeroPsych.reduce((a, b) => a + b, 0) / nonZeroPsych.length : 0
 
+  // Integrity score from DB
+  const avgIntegrity = application.integrityScore || 0
+
   // Overall score — adaptive weighting based on which sections have data
   let overallScore: number
   const sectionsWithData: string[] = []
   if (hasBigFiveData) sectionsWithData.push('bigFive')
   if (hasPsychData) sectionsWithData.push('psych')
+  if (hasIntegrityData) sectionsWithData.push('integrity')
   if (hasKnowledgeData) sectionsWithData.push('knowledge')
 
   if (sectionsWithData.length === 0) {
@@ -472,25 +585,46 @@ async function calculateOverallScore(applicationId: string) {
   } else if (sectionsWithData.length === 1) {
     if (hasKnowledgeData) overallScore = application.knowledgeScore!
     else if (hasBigFiveData) overallScore = psicometricaAvg
-    else overallScore = psicologicaAvg
-  } else if (hasKnowledgeData && hasBigFiveData && hasPsychData) {
+    else if (hasPsychData) overallScore = psicologicaAvg
+    else overallScore = avgIntegrity
+  } else if (sectionsWithData.length === 2) {
+    const active: number[] = []
+    if (hasBigFiveData) active.push(psicometricaAvg)
+    if (hasPsychData) active.push(psicologicaAvg)
+    if (hasIntegrityData) active.push(avgIntegrity)
+    if (hasKnowledgeData) active.push(application.knowledgeScore!)
+    overallScore = active.reduce((a, b) => a + b, 0) / active.length
+  } else if (hasBigFiveData && hasPsychData && hasIntegrityData && hasKnowledgeData) {
+    // All 4 sections
+    overallScore = 0.25 * psicometricaAvg + 0.25 * psicologicaAvg + 0.15 * avgIntegrity + 0.35 * application.knowledgeScore!
+  } else if (hasBigFiveData && hasPsychData && hasIntegrityData && !hasKnowledgeData) {
+    // 3 present, no knowledge
+    overallScore = 0.30 * psicometricaAvg + 0.30 * psicologicaAvg + 0.40 * avgIntegrity
+  } else if (hasBigFiveData && hasPsychData && !hasIntegrityData && hasKnowledgeData) {
+    // 3 present, no integrity (legacy path)
     overallScore = 0.30 * psicometricaAvg + 0.30 * psicologicaAvg + 0.40 * application.knowledgeScore!
-  } else if (hasKnowledgeData && (hasBigFiveData || hasPsychData)) {
-    const behavioralAvg = hasBigFiveData && hasPsychData
-      ? (psicometricaAvg + psicologicaAvg) / 2
-      : hasBigFiveData ? psicometricaAvg : psicologicaAvg
+  } else if (hasKnowledgeData && (hasBigFiveData || hasPsychData || hasIntegrityData)) {
+    // Knowledge + one or two behavioral/integrity sections
+    const behavioralScores: number[] = []
+    if (hasBigFiveData) behavioralScores.push(psicometricaAvg)
+    if (hasPsychData) behavioralScores.push(psicologicaAvg)
+    if (hasIntegrityData) behavioralScores.push(avgIntegrity)
+    const behavioralAvg = behavioralScores.reduce((a, b) => a + b, 0) / behavioralScores.length
     overallScore = 0.50 * behavioralAvg + 0.50 * application.knowledgeScore!
   } else {
-    overallScore = hasBigFiveData && hasPsychData
-      ? 0.50 * psicometricaAvg + 0.50 * psicologicaAvg
-      : hasBigFiveData ? psicometricaAvg : psicologicaAvg
+    // Only behavioral/integrity sections (no knowledge)
+    const behavioralScores: number[] = []
+    if (hasBigFiveData) behavioralScores.push(psicometricaAvg)
+    if (hasPsychData) behavioralScores.push(psicologicaAvg)
+    if (hasIntegrityData) behavioralScores.push(avgIntegrity)
+    overallScore = behavioralScores.reduce((a, b) => a + b, 0) / behavioralScores.length
   }
 
   // Guidance level — NOT a hiring decision, just informational orientation
   let guidance: string
   if (sectionsWithData.length === 0) {
     guidance = 'PENDIENTE'
-  } else if (hasBigFiveData && hasPsychData && hasKnowledgeData) {
+  } else if (hasBigFiveData && hasPsychData && hasIntegrityData && hasKnowledgeData) {
     guidance = 'PERFIL_COMPLETO'
   } else {
     guidance = 'PERFIL_PARCIAL'
@@ -512,7 +646,11 @@ async function calculateOverallScore(applicationId: string) {
     TEAMWORK: application.teamwork,
   }
 
-  const summary = generateSummary(bigFiveScores, psychScores, application.knowledgeScore, guidance, hasBigFiveData, hasPsychData)
+  const summary = generateSummary(
+    bigFiveScores, psychScores, application.knowledgeScore, guidance,
+    hasBigFiveData, hasPsychData,
+    hasIntegrityData ? application.integrityScore : null, hasIntegrityData
+  )
 
   return {
     overallScore: Math.round(overallScore * 100) / 100,
@@ -522,7 +660,7 @@ async function calculateOverallScore(applicationId: string) {
 }
 
 /**
- * Generates an ORIENTATION summary — describes the candidate’s profile
+ * Generates an ORIENTATION summary — describes the candidate's profile
  * without making a hiring decision. The system provides guidance to the
  * recruiter, who makes the final decision.
  *
@@ -535,7 +673,9 @@ function generateSummary(
   knowledgeScore: number | null,
   guidance: string,
   hasBigFiveData: boolean,
-  hasPsychData: boolean
+  hasPsychData: boolean,
+  integrityScore: number | null,
+  hasIntegrityData: boolean
 ): string {
   const strengths: string[] = []
   const areasToExplore: string[] = []
@@ -571,18 +711,32 @@ function generateSummary(
     areasToExplore.push('gestión emocional en entornos laborales')
   }
 
+  // Integrity — orientative, never as disqualification (LFPDPPP Art. 37 Bis)
+  if (hasIntegrityData && integrityScore !== null) {
+    if (integrityScore >= 70) strengths.push('integridad sobresaliente')
+    if (integrityScore < 40) areasToExplore.push('se sugiere explorar en entrevista aspectos relacionados con integridad y honradez')
+  }
+
   let summary = ''
 
   // Indicate profile scope
   if (guidance === 'PERFIL_PARCIAL') {
-    if (!hasBigFiveData && !hasPsychData) {
+    if (!hasBigFiveData && !hasPsychData && !hasIntegrityData) {
       summary += 'Perfil basado únicamente en evaluación de conocimientos. '
-    } else if (!hasBigFiveData) {
+    } else if (!hasBigFiveData && !hasIntegrityData) {
       summary += 'Perfil basado en evaluación psicológica y de conocimientos (sin sección psicométrica por consentimiento del candidato). '
+    } else if (!hasBigFiveData && knowledgeScore === null) {
+      summary += 'Perfil basado en evaluación psicológica y de integridad (sin sección psicométrica ni de conocimientos). '
+    } else if (!hasBigFiveData) {
+      summary += 'Perfil basado en evaluación psicológica, de integridad y de conocimientos (sin sección psicométrica por consentimiento del candidato). '
+    } else if (!hasPsychData && !hasIntegrityData) {
+      summary += 'Perfil basado en evaluación psicométrica y de conocimientos (sin sección psicológica ni de integridad). '
     } else if (!hasPsychData) {
-      summary += 'Perfil basado en evaluación psicométrica y de conocimientos (sin sección psicológica). '
+      summary += 'Perfil basado en evaluación psicométrica, de integridad y de conocimientos (sin sección psicológica). '
+    } else if (!hasIntegrityData) {
+      summary += 'Perfil basado en evaluación psicométrica, psicológica y de conocimientos (sin sección de integridad). '
     } else if (knowledgeScore === null) {
-      summary += 'Perfil basado en evaluación psicométrica y psicológica (sin sección de conocimientos). '
+      summary += 'Perfil basado en evaluación psicométrica, psicológica y de integridad (sin sección de conocimientos). '
     }
   }
 
@@ -659,7 +813,7 @@ export async function GET(req: NextRequest) {
     // Step 1: psicometrica (Big Five from system questions)
     if (currentStep === 1) {
       if (vacancy.includePsicometrica) {
-        const systemQuestions = await getSystemQuestions(vacancy.companyId)
+        const systemQuestions = await getSystemQuestions(vacancy.companyId, vacancy.includeIntegridad ?? true)
         return NextResponse.json({
           step: 1,
           stepName: 'psicometrica',
@@ -694,7 +848,7 @@ export async function GET(req: NextRequest) {
     // Step 2: psicologica
     if (currentStep === 2) {
       if (vacancy.includePsicologica) {
-        const systemQuestions = await getSystemQuestions(vacancy.companyId)
+        const systemQuestions = await getSystemQuestions(vacancy.companyId, vacancy.includeIntegridad ?? true)
         return NextResponse.json({
           step: 2,
           stepName: 'psicologica',
@@ -726,9 +880,44 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    // Step 3: conocimientos (vacancy questions + position template questions)
+    // Step 3: integridad (new step)
     if (currentStep === 3) {
-      const systemQuestions = await getSystemQuestions(vacancy.companyId)
+      if (vacancy.includeIntegridad !== false) {
+        const systemQuestions = await getSystemQuestions(vacancy.companyId, vacancy.includeIntegridad ?? true)
+        return NextResponse.json({
+          step: 3,
+          stepName: 'integridad',
+          applicationId: application.id,
+          questions: systemQuestions.integrityQuestions.map((q) => ({
+            id: q.id,
+            questionId: q.id,
+            text: q.text,
+            type: q.type,
+            category: q.category,
+            reverseScored: q.reverseScored,
+            order: q.order,
+            options: [
+              'Totalmente en desacuerdo',
+              'En desacuerdo',
+              'Neutral',
+              'De acuerdo',
+              'Totalmente de acuerdo',
+            ],
+          })),
+        })
+      }
+      // includeIntegridad is false — return empty questions so frontend can skip
+      return NextResponse.json({
+        step: 3,
+        stepName: 'integridad',
+        applicationId: application.id,
+        questions: [],
+      })
+    }
+
+    // Step 4: conocimientos (vacancy questions + position template questions)
+    if (currentStep === 4) {
+      const systemQuestions = await getSystemQuestions(vacancy.companyId, vacancy.includeIntegridad ?? true)
 
       // Start with vacancy custom questions
       const allQuestions = vacancy.questions.map((q) => ({
@@ -759,26 +948,26 @@ export async function GET(req: NextRequest) {
       }
 
       return NextResponse.json({
-        step: 3,
+        step: 4,
         stepName: 'conocimientos',
         applicationId: application.id,
         questions: allQuestions,
       })
     }
 
-    // Step 4: done (video step removed - evaluation goes directly to completion)
-    if (currentStep === 4) {
+    // Step 5: done
+    if (currentStep === 5) {
       return NextResponse.json({
-        step: 4,
+        step: 5,
         stepName: 'done',
         applicationId: application.id,
         status: application.status,
       })
     }
 
-    // Step 5: done
+    // Step 6+ is also done (backward compat)
     return NextResponse.json({
-      step: 5,
+      step: application.currentStep,
       stepName: 'done',
       applicationId: application.id,
       status: application.status,
@@ -866,7 +1055,7 @@ export async function POST(req: NextRequest) {
       // Determine first step
       let firstStep = 0 // data step is step 0
       // After data, check which steps are included
-      // Steps: 0=data, 1=psicometrica, 2=psicologica, 3=conocimientos, 4=done (video step removed)
+      // Steps: 0=data, 1=psicometrica, 2=psicologica, 3=integridad, 4=conocimientos, 5=done
 
       const application = await db.vacancyApplication.create({
         data: {
@@ -1009,40 +1198,47 @@ export async function POST(req: NextRequest) {
       }
 
       if (completedStep === 3 && stepScores) {
+        // Integridad scores
+        const s = stepScores as { integrityScore: number }
+        updateData.integrityScore = s.integrityScore
+      }
+
+      if (completedStep === 4 && stepScores) {
         // Knowledge score
         const s = stepScores as { knowledgeScore: number | null }
         updateData.knowledgeScore = s.knowledgeScore
       }
 
       // Determine next step
+      // Steps: 0=data, 1=psicometrica, 2=psicologica, 3=integridad, 4=conocimientos, 5=done
       let nextStep = completedStep + 1
       let completed = false
 
       // Skip steps that are not included
       if (nextStep === 1 && !vacancy.includePsicometrica) nextStep = 2
       if (nextStep === 2 && !vacancy.includePsicologica) nextStep = 3
+      if (nextStep === 3 && (vacancy.includeIntegridad === false)) nextStep = 4
 
       // Check if there are knowledge questions (from vacancy or position template)
-      if (nextStep === 3) {
+      if (nextStep === 4) {
         const questionCount = await db.vacancyQuestion.count({
           where: { vacancyId: vacancy.id },
         })
         if (questionCount === 0) {
           // Also check if position has CONOCIMIENTOS template questions
-          const systemQuestions = await getSystemQuestions(vacancy.companyId)
+          const systemQuestions = await getSystemQuestions(vacancy.companyId, vacancy.includeIntegridad ?? true)
           if (systemQuestions.knowledgeQuestions.length === 0) {
-            nextStep = 4
+            nextStep = 5
           }
         }
       }
 
-      // Skip video step (step 4) - go directly to completion
-      // Step 4 is now completion (video step removed)
-      if (nextStep === 4) {
+      // Step 5 is completion
+      if (nextStep === 5) {
         completed = true
         updateData.status = 'COMPLETED'
         updateData.completedAt = new Date()
-        updateData.currentStep = 4
+        updateData.currentStep = 5
         updateData.videoType = 'SKIPPED'
         updateData.videoUrl = null
 
@@ -1055,12 +1251,12 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // Step 5 is also done (backward compat)
-      if (nextStep >= 5) {
+      // Step 6+ is also done (backward compat)
+      if (nextStep >= 6) {
         completed = true
         updateData.status = 'COMPLETED'
         updateData.completedAt = new Date()
-        updateData.currentStep = 5
+        updateData.currentStep = nextStep
 
         // Calculate overall score
         const overall = await calculateOverallScore(applicationId)
@@ -1155,6 +1351,7 @@ export async function POST(req: NextRequest) {
                   leadership: updatedApp.leadership,
                   teamwork: updatedApp.teamwork,
                   knowledgeScore: updatedApp.knowledgeScore,
+                  integrityScore: updatedApp.integrityScore || 0,
                   overallScore: updatedApp.overallScore || 0,
                   recommendation: updatedApp.recommendation || 'PENDIENTE',
                   summary: updatedApp.summary,

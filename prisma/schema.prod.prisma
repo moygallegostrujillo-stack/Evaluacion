@@ -31,6 +31,7 @@ model Company {
   questions   Question[]
   vacancies   Vacancy[]
   vacancyApplications VacancyApplication[]
+  privacyNotice CompanyPrivacyNotice?
 }
 
 model User {
@@ -60,6 +61,20 @@ model User {
   consentLogs      ConsentLog[]
 }
 
+model CompanyPrivacyNotice {
+  id          String   @id @default(cuid())
+  companyId   String   @unique
+  contentHtml String
+  version     String   @default("2026-01-v2")
+  isCustom    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+}
+
 model Position {
   id               String   @id @default(cuid())
   title            String
@@ -83,7 +98,7 @@ model Position {
 model EvaluationTemplate {
   id          String   @id @default(cuid())
   name        String
-  type        String   // PSICOMETRICA, PSICOLOGICA, CONOCIMIENTOS
+  type        String   // PSICOMETRICA, PSICOLOGICA, CONOCIMIENTOS, INTEGRIDAD
   description String?
   order       Int      @default(1)
   active      Boolean  @default(true)
@@ -100,7 +115,7 @@ model Question {
   text                 String
   type                 String   // LIKERT, MULTIPLE_CHOICE, YES_NO
   options              String?  // JSON para opciones de multiple choice
-  category             String   // OPENNESS, CONSCIENTIOUSNESS, EXTRAVERSION, AGREEABLENESS, NEUROTICISM, STRESS, EMPATHY, ADAPTABILITY, LEADERSHIP, TEAMWORK, KNOWLEDGE
+  category             String   // OPENNESS, CONSCIENTIOUSNESS, EXTRAVERSION, AGREEABLENESS, NEUROTICISM, STRESS, EMPATHY, ADAPTABILITY, LEADERSHIP, TEAMWORK, KNOWLEDGE, INTEGRITY_HONESTY, INTEGRITY_RULES, INTEGRITY_THEFT, INTEGRITY_RESPONSIBILITY
   reverseScored        Boolean  @default(false)
   order                Int
   evaluationTemplateId String
@@ -193,9 +208,12 @@ model EvaluationResult {
   // Conocimientos (0-100, null si no aplica)
   knowledgeScore    Float?
 
+  // Integridad (0-100)
+  integrityScore    Float    @default(0)
+
   // General
   overallScore      Float    @default(0)
-  recommendation    String   @default("PENDIENTE") // APTO, ENTREVISTA_ADICIONAL, NO_RECOMENDADO, PENDIENTE
+  recommendation    String   @default("PENDIENTE") // PERFIL_COMPLETO, PERFIL_PARCIAL, PENDIENTE
   summary           String?
 
   createdAt         DateTime @default(now())
@@ -233,6 +251,7 @@ model Vacancy {
   status              String   @default("ACTIVE") // ACTIVE, PAUSED, CLOSED
   includePsicometrica Boolean  @default(true)
   includePsicologica  Boolean  @default(true)
+  includeIntegridad   Boolean  @default(true)
   maxVideoSeconds     Int      @default(60)
   companyId           String
   createdAt           DateTime @default(now())
@@ -292,9 +311,12 @@ model VacancyApplication {
   // Knowledge score (0-100, null if no questions)
   knowledgeScore     Float?
 
+  // Integrity score (0-100)
+  integrityScore     Float     @default(0)
+
   // Overall
   overallScore       Float     @default(0)
-  recommendation     String    @default("PENDIENTE")
+  recommendation     String    @default("PENDIENTE") // PERFIL_COMPLETO, PERFIL_PARCIAL, PENDIENTE
   summary            String?
 
   vacancy    Vacancy                      @relation(fields: [vacancyId], references: [id])

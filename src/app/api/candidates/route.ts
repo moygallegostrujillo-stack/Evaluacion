@@ -11,11 +11,64 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // For SUPER_ADMIN with a specific target companyId from query param, scope to that company
-    // For non-SUPER_ADMIN, RLS handles scoping automatically
+    // ── SA aggregated mode (no personal data, counts only) ──
+    if (auth.role === 'SUPER_ADMIN' && !auth.companyId && !req.nextUrl.searchParams.get('companyId')) {
+      console.log('[AUDIT] SA aggregated view accessed by', auth.userId)
+      const db = getUnscopedClient()
+
+      // Count candidates per company
+      const candidateGroups = await db.user.groupBy({
+        by: ['companyId'],
+        where: { role: 'CANDIDATO', active: true },
+        _count: true,
+      })
+
+      // Count completed sessions per company
+      const completedGroups = await db.evaluationSession.groupBy({
+        by: ['companyId'],
+        where: { status: 'COMPLETED' },
+        _count: true,
+      })
+      const completedMap = new Map(completedGroups.map(g => [g.companyId, g._count]))
+
+      // Count active positions per company
+      const positionGroups = await db.position.groupBy({
+        by: ['companyId'],
+        where: { active: true },
+        _count: true,
+      })
+      const positionMap = new Map(positionGroups.map(g => [g.companyId, g._count]))
+
+      // Resolve company names
+      const companyIds = candidateGroups.map(g => g.companyId)
+      const companies = companyIds.length > 0
+        ? await db.company.findMany({
+            where: { id: { in: companyIds } },
+            select: { id: true, name: true },
+          })
+        : []
+      const companyMap = new Map(companies.map(c => [c.id, c.name]))
+
+      const aggregated = candidateGroups.map(g => ({
+        companyId: g.companyId,
+        companyName: companyMap.get(g.companyId) || 'Unknown',
+        candidateCount: g._count,
+        completedCount: completedMap.get(g.companyId) || 0,
+        vacancyCount: positionMap.get(g.companyId) || 0,
+      }))
+
+      return NextResponse.json({ aggregated, mode: 'aggregated' })
+    }
+
+    // ── SA impersonation mode (scoped to ?companyId=xxx) ──
     const targetCompanyId = auth.role === 'SUPER_ADMIN'
       ? req.nextUrl.searchParams.get('companyId')
       : null
+
+    if (auth.role === 'SUPER_ADMIN' && targetCompanyId) {
+      console.log('[AUDIT] SA impersonating company', targetCompanyId, 'by', auth.userId)
+    }
+
     const { client: rlsDb } = targetCompanyId
       ? createRLSClient({ ...auth, companyId: targetCompanyId })
       : createRLSClient(auth)

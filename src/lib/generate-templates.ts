@@ -1,6 +1,6 @@
 /**
  * Auto-generate evaluation templates and questions for a position.
- * Every position gets: PSICOMETRICA (Big Five) + PSICOLOGICA
+ * Every position gets: PSICOMETRICA (Big Five) + PSICOLOGICA + INTEGRIDAD
  * If hasKnowledgeTest: also CONOCIMIENTOS with category-specific questions
  */
 
@@ -32,6 +32,24 @@ const PSICOLOGICA_QUESTIONS = [
   { text: 'Mis compañeros me piden ayuda para organizar el trabajo', category: 'LEADERSHIP', order: 8 },
   { text: 'Prefiero colaborar con otros para alcanzar una meta que hacerlo solo/a', category: 'TEAMWORK', order: 9 },
   { text: 'Escucho y respeto las opiniones de mis compañeros aunque no esté de acuerdo', category: 'TEAMWORK', order: 10 },
+]
+
+// ── Integrity questions (shared across all positions — orientative, never auto-filter) ──
+const INTEGRIDAD_QUESTIONS = [
+  // INTEGRITY_HONESTY (3 questions)
+  { text: 'Si cometo un error en el trabajo, lo comunico a mi supervisor de inmediato', category: 'INTEGRITY_HONESTY', order: 1 },
+  { text: 'Considero que decir la verdad es más importante que evitar un problema temporal', category: 'INTEGRITY_HONESTY', order: 2 },
+  { text: 'En situaciones de presión, he ocultado información para evitar consecuencias', category: 'INTEGRITY_HONESTY', order: 3, reverseScored: true },
+  // INTEGRITY_RULES (3 questions)
+  { text: 'Sigo los procedimientos establecidos aunque nadie me esté observando', category: 'INTEGRITY_RULES', order: 4 },
+  { text: 'Respeto las políticas de la empresa aunque considere que alguna no es necesaria', category: 'INTEGRITY_RULES', order: 5 },
+  { text: 'He justificado no cumplir una norma porque "no hacía daño a nadie"', category: 'INTEGRITY_RULES', order: 6, reverseScored: true },
+  // INTEGRITY_THEFT (2 questions)
+  { text: 'Considero que tomar pequeños artículos del trabajo sin permiso es aceptable si son de bajo valor', category: 'INTEGRITY_THEFT', order: 7, reverseScored: true },
+  { text: 'He utilizado recursos de la empresa (tiempo, materiales) para fines personales sin autorización', category: 'INTEGRITY_THEFT', order: 8, reverseScored: true },
+  // INTEGRITY_RESPONSIBILITY (2 questions)
+  { text: 'Cuando algo sale mal en mi área, asumo mi parte de responsabilidad sin buscar culpables', category: 'INTEGRITY_RESPONSIBILITY', order: 9 },
+  { text: 'Si un compañero comete una falta, prefiero no involucrarme para evitar conflictos', category: 'INTEGRITY_RESPONSIBILITY', order: 10, reverseScored: true },
 ]
 
 // ── Knowledge questions by category ──
@@ -238,6 +256,33 @@ export async function generateTemplatesForPosition(
         questionsCreated++
       }
     }
+  }
+
+  // 4. Create INTEGRIDAD template (always)
+  const integridadTemplate = await db.evaluationTemplate.create({
+    data: {
+      name: `Evaluación de Integridad - ${categoryName}`,
+      type: 'INTEGRIDAD',
+      description: `Evaluación de integridad y honradez para ${categoryName} (dato sensible, orientativo)`,
+      order: hasKnowledgeTest ? 4 : 3,
+      positionId,
+      active: true,
+    },
+  })
+  templatesCreated++
+
+  for (const q of INTEGRIDAD_QUESTIONS) {
+    await db.question.create({
+      data: {
+        text: q.text,
+        type: 'LIKERT',
+        category: q.category,
+        reverseScored: q.reverseScored || false,
+        order: q.order,
+        evaluationTemplateId: integridadTemplate.id,
+      },
+    })
+    questionsCreated++
   }
 
   return { templatesCreated, questionsCreated }

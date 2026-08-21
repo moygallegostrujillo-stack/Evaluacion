@@ -57,6 +57,13 @@ export async function POST(req: NextRequest) {
 
     // Calculate final scores if all steps are done
     if (application.overallScore === 0) {
+      // Determine which sections have data
+      const hasBigFive = application.openness > 0 || application.conscientiousness > 0 ||
+        application.extraversion > 0 || application.agreeableness > 0 || application.neuroticism > 0
+      const hasPsych = application.stressLevel > 0 || application.empathy > 0 ||
+        application.adaptability > 0 || application.leadership > 0 || application.teamwork > 0
+      const hasKnowledge = application.knowledgeScore !== null && application.knowledgeScore > 0
+
       // Psicometrica average
       const psicometricaAvg =
         (100 - application.neuroticism +
@@ -73,23 +80,34 @@ export async function POST(req: NextRequest) {
           application.leadership +
           application.teamwork) / 5
 
+      // Adaptive scoring — only average sections with data
       let overallScore: number
-      if (application.knowledgeScore !== null) {
-        overallScore = 0.30 * psicometricaAvg + 0.30 * psicologicaAvg + 0.40 * application.knowledgeScore
+      const sectionScores: { score: number; weight: number }[] = []
+      if (hasBigFive) sectionScores.push({ score: psicometricaAvg, weight: 0.30 })
+      if (hasPsych) sectionScores.push({ score: psicologicaAvg, weight: 0.30 })
+      if (hasKnowledge) sectionScores.push({ score: application.knowledgeScore!, weight: 0.40 })
+
+      if (sectionScores.length === 0) {
+        overallScore = 0
+      } else if (sectionScores.length === 1) {
+        overallScore = sectionScores[0].score
       } else {
-        overallScore = 0.50 * psicometricaAvg + 0.50 * psicologicaAvg
+        const totalWeight = sectionScores.reduce((s, x) => s + x.weight, 0)
+        overallScore = sectionScores.reduce((s, x) => s + x.score * (x.weight / totalWeight), 0)
       }
 
-      let recommendation: string
-      if (overallScore >= 70) {
-        recommendation = 'APTO'
-      } else if (overallScore >= 50) {
-        recommendation = 'ENTREVISTA_ADICIONAL'
+      // Guidance based on section completeness (NOT hiring decision)
+      let guidance: string
+      const totalSections = [hasBigFive, hasPsych, hasKnowledge].filter(Boolean).length
+      if (totalSections === 0) {
+        guidance = 'PENDIENTE'
+      } else if (hasBigFive && hasPsych && hasKnowledge) {
+        guidance = 'PERFIL_COMPLETO'
       } else {
-        recommendation = 'NO_RECOMENDADO'
+        guidance = 'PERFIL_PARCIAL'
       }
 
-      // Generate summary
+      // Generate neutral summary (orientation, not decision)
       const parts: string[] = []
       const concerns: string[] = []
 
@@ -110,22 +128,23 @@ export async function POST(req: NextRequest) {
 
       let summary = ''
       if (parts.length > 0) summary += `Candidato con ${parts.join(', ')}. `
-      if (concerns.length > 0) summary += `Se detectaron ${concerns.join(', ')}. `
+      if (concerns.length > 0) summary += `Áreas a explorar: ${concerns.join(', ')}. `
 
       if (application.knowledgeScore !== null) {
         if (application.knowledgeScore >= 80) {
-          summary += `Excelente dominio de conocimientos técnicos (${application.knowledgeScore}%). `
+          summary += `Dominio de conocimientos técnicos: ${application.knowledgeScore}%. `
         } else if (application.knowledgeScore >= 60) {
-          summary += `Conocimientos técnicos aceptables (${application.knowledgeScore}%). `
+          summary += `Conocimientos técnicos: ${application.knowledgeScore}%. `
         } else {
-          summary += `Conocimientos técnicos por debajo del estándar (${application.knowledgeScore}%). `
+          summary += `Conocimientos técnicos: ${application.knowledgeScore}%. `
         }
       }
 
-      summary += `Puntuación general: ${Math.round(overallScore)}. Recomendación: ${recommendation === 'APTO' ? 'Apto' : recommendation === 'ENTREVISTA_ADICIONAL' ? 'Entrevista adicional' : 'No recomendado'}.`
+      const perfilScope = guidance === 'PERFIL_COMPLETO' ? 'completo' : 'parcial'
+      summary += `Puntuación general: ${Math.round(overallScore)}. Alcance del perfil: ${perfilScope}. La decisión final corresponde al área de Recursos Humanos.`
 
       updateData.overallScore = Math.round(overallScore * 100) / 100
-      updateData.recommendation = recommendation
+      updateData.recommendation = guidance
       updateData.summary = summary
       updateData.status = 'COMPLETED'
       updateData.completedAt = new Date()
