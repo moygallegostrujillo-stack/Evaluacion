@@ -24,14 +24,31 @@ function getStoredToken(): string | null {
 
 /**
  * Handle 401 response - clear auth and redirect to login
+ * FIX: Do NOT reload if there is an invitation token in the URL or in the
+ * sessionStorage. During the invitation flow, the auto-login hasn't completed
+ * yet, and a 401 from a stale token should not destroy the entire page.
+ * The invitation flow will handle auth via auto-login.
  */
 function handleUnauthorized() {
   if (typeof window === 'undefined') return
-  
+
+  // Check if we're in an invitation flow — don't destroy it
+  const params = new URLSearchParams(window.location.search)
+  const hasInvitationToken = params.get('token')
+    || sessionStorage.getItem('evaluhr_invitation_active') === 'true'
+
+  if (hasInvitationToken) {
+    // Just clear the stale token — don't reload the page.
+    // The invitation flow's auto-login will set the correct token.
+    localStorage.removeItem('evaluhr_token')
+    localStorage.removeItem('evaluhr_user')
+    return
+  }
+
   // Clear stored auth data
   localStorage.removeItem('evaluhr_token')
   localStorage.removeItem('evaluhr_user')
-  
+
   // Force page reload to reset app state (goes to login)
   // Only if we're not already on a public evaluation page
   if (!window.location.pathname.startsWith('/evaluar/')) {

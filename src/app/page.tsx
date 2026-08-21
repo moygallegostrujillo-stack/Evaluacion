@@ -29,6 +29,10 @@ import {
 } from 'lucide-react'
 
 // Restore auth from localStorage
+// IMPORTANT: This hook MUST NOT run when there is an invitation token in the URL.
+// The invitation flow (useInvitationCheck) will handle auth via auto-login.
+// Running both causes a race condition where stale auth is restored before
+// the invitation can clean it up, leading to 401s → page reload → login screen.
 function useAuthRestore() {
   const setAuth = useAppStore((s) => s.setAuth)
   const setCurrentView = useAppStore((s) => s.setCurrentView)
@@ -45,6 +49,11 @@ function useAuthRestore() {
     const params = new URLSearchParams(window.location.search)
     if (params.get('v')) return
     if (localStorage.getItem('evaluhr_vacancy_slug')) return
+    // CRITICAL FIX: If there is an invitation token in the URL, do NOT restore
+    // stale auth from localStorage. The invitation flow will handle everything.
+    // This prevents the race condition where useAuthRestore restores a stale
+    // session before useInvitationCheck can clear it and do auto-login.
+    if (params.get('token')) return
 
     const token = localStorage.getItem('evaluhr_token')
     const userStr = localStorage.getItem('evaluhr_user')
@@ -69,23 +78,33 @@ function useAuthRestore() {
 }
 
 // Check for invitation token in URL
+// CRITICAL FIX: When an invitation token is detected, clear any stale auth
+// from localStorage before proceeding. This ensures the invitation flow
+// starts completely clean — no leftover tokens from previous sessions that
+// could cause 401s or wrong user context.
 function useInvitationCheck() {
   const setInvitationToken = useAppStore((s) => s.setInvitationToken)
   const setCurrentView = useAppStore((s) => s.setCurrentView)
-  const user = useAppStore((s) => s.user)
+  const clearAuth = useAppStore((s) => s.clearAuth)
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const token = params.get('token')
     if (token) {
+      // Clear any stale auth before starting the invitation flow.
+      // This prevents stale tokens from interfering with auto-login.
+      localStorage.removeItem('evaluhr_token')
+      localStorage.removeItem('evaluhr_user')
+      clearAuth()
+
+      // Set a session flag so api.ts handleUnauthorized knows not to
+      // reload the page if a stale 401 happens during the invitation flow.
+      sessionStorage.setItem('evaluhr_invitation_active', 'true')
+
       setInvitationToken(token)
-      // If user is already authenticated and hasn't given consent, go to consent directly
-      // Otherwise, show welcome page (which will re-check consent on auto-login)
-      if (user && user.role === 'CANDIDATO' && !user.consentGiven) {
-        setCurrentView('consent')
-      } else {
-        setCurrentView('invitation-welcome')
-      }
+      // Always show the invitation welcome page first.
+      // The welcome page will handle auto-login and consent routing.
+      setCurrentView('invitation-welcome')
       // Clean URL — keep token in store only
       window.history.replaceState({}, '', '/')
     }
@@ -331,11 +350,9 @@ export default function Home() {
   }
 
   // Invitation welcome page - no auth required (shows company/position info)
-  // BUT: if user is authenticated candidate without consent, redirect to consent
+  // After useInvitationCheck clears stale auth, user is always null here.
+  // The InvitationWelcomeView handles auto-login → consent → evaluation routing.
   if (currentView === 'invitation-welcome') {
-    if (user && user.role === 'CANDIDATO' && !user.consentGiven) {
-      return <ConsentView />
-    }
     return <InvitationWelcomeView />
   }
 

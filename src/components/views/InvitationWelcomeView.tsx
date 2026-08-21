@@ -67,6 +67,8 @@ export default function InvitationWelcomeView() {
       }
       // Set auth in store
       setAuth(result.user, result.token)
+      // Clear the invitation-active flag — auth is now valid
+      sessionStorage.removeItem('evaluhr_invitation_active')
       // Navigate based on consent status
       if (result.user.consentGiven) {
         setCurrentView('take-evaluation')

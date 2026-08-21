@@ -9,14 +9,13 @@ import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
-import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle
 } from '@/components/ui/dialog'
 import {
   CheckCircle2, ChevronRight, Clock, ClipboardList, Brain, BookOpen,
   Utensils, ShoppingBag, Briefcase, ArrowRight, Users, Shield, ShieldAlert,
-  ShieldCheck, Info, Download, Loader2
+  ShieldCheck, Loader2
 } from 'lucide-react'
 
 const LIKERT_OPTIONS = [
@@ -49,7 +48,7 @@ interface CompletedSession {
   position: { id: string; title: string; category: string; sector: string }
 }
 
-type ViewPhase = 'LOADING' | 'SELECT_POSITION' | 'CONSENT' | 'SESSION_READY' | 'SECTION_TRANSITION' | 'IN_PROGRESS' | 'SESSIONS_OVERVIEW'
+type ViewPhase = 'LOADING' | 'SELECT_POSITION' | 'SESSION_READY' | 'SECTION_TRANSITION' | 'IN_PROGRESS' | 'SESSIONS_OVERVIEW'
 
 /**
  * Filter the evaluation templates according to the candidate's consent option.
@@ -79,7 +78,6 @@ export default function EvaluationView() {
   const [answers, setAnswers] = useState<Record<string, number | string>>({})
   const [loading, setLoading] = useState(false)
   const [positionTitle, setPositionTitle] = useState('')
-  const [consentAccepted, setConsentAccepted] = useState(false)
   const [showSectionTransition, setShowSectionTransition] = useState(false)
 
   // Withdraw-consent dialog state (LFPDPPP — candidate may withdraw sensitive-data consent at any time)
@@ -91,6 +89,10 @@ export default function EvaluationView() {
   const [availablePositions, setAvailablePositions] = useState<AvailablePosition[]>([])
   const [completedSessions, setCompletedSessions] = useState<CompletedSession[]>([])
   const [selectedPositionId, setSelectedPositionId] = useState<string | null>(null)
+
+  // Track if user arrived via invitation (to restrict behavior)
+  const invitationToken = useAppStore((s) => s.invitationToken)
+  const isInvitedCandidate = !!invitationToken
 
   // Load candidate data on mount
   useEffect(() => {
@@ -112,15 +114,27 @@ export default function EvaluationView() {
             setCurrentQuestionIndex(activeSession.currentQuestionIndex || 0)
             setPhase('IN_PROGRESS')
           } else if (activeSession.status === 'NOT_STARTED') {
-            setPhase('CONSENT')
+            // FIX: Go directly to SESSION_READY. The candidate already went
+            // through the full ConsentView (Option A/B/C + ARCO) before arriving
+            // here. The old CONSENT phase inside EvaluationView was redundant,
+            // had a broken API call (only sent {userId}), and showed a simplified
+            // consent that didn't respect the chosen option.
+            setPhase('SESSION_READY')
           }
         } else if (data.completedSessions?.length > 0 && data.availablePositions?.length === 0) {
           // All evaluations completed, no more positions
           setCurrentView('evaluation-complete')
         } else if (data.availablePositions?.length > 0) {
           // No active session, has positions to apply for
-          if (data.completedSessions?.length > 0) {
-            // Has completed evaluations and more available - show overview
+          // FIX: Invited candidates should NOT see SESSIONS_OVERVIEW or
+          // SELECT_POSITION for other companies' positions. They were invited
+          // to a specific position — if that session is complete, show completion.
+          if (isInvitedCandidate) {
+            // Invited candidate with no active session and completed sessions
+            // → their invited evaluation is done, show completion screen
+            setCurrentView('evaluation-complete')
+          } else if (data.completedSessions?.length > 0) {
+            // Non-invited: has completed evaluations and more available
             setPhase('SESSIONS_OVERVIEW')
           } else {
             // First time - show position selection
@@ -198,14 +212,14 @@ export default function EvaluationView() {
           if (data.session.status === 'IN_PROGRESS') {
             setPhase('IN_PROGRESS')
           } else {
-            setPhase('CONSENT')
+            setPhase('SESSION_READY')
           }
         }
         return
       }
       setSessionId(data.session.id)
       setPositionTitle(data.session.positionTitle || '')
-      setPhase('CONSENT')
+      setPhase('SESSION_READY')
     } catch (e) {
       console.error('Error creating session', e)
     } finally {
@@ -655,131 +669,6 @@ export default function EvaluationView() {
             </Button>
           </>
         )}
-      </div>
-    )
-  }
-
-  // ============================================
-  // CONSENT: Show consent/terms screen before evaluation
-  // ============================================
-  if (phase === 'CONSENT') {
-    return (
-      <div className="max-w-lg mx-auto space-y-6">
-        <div className="text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white mb-4">
-            <Shield className="w-8 h-8" />
-          </div>
-          <h1 className="text-2xl font-bold">Consentimiento Informado</h1>
-          <p className="text-gray-500 mt-1">Puesto: <strong>{positionTitle}</strong></p>
-        </div>
-
-        <Card className="shadow-sm border-2 border-emerald-200">
-          <CardContent className="p-6 space-y-4">
-            <div className="bg-amber-50 p-4 rounded-lg border border-amber-200 space-y-3">
-              <p className="text-sm text-amber-900 font-medium">
-                Está a punto de realizar una evaluación que incluye pruebas psicométricas, psicológicas y de conocimientos.
-              </p>
-              <p className="text-sm text-amber-800">
-                Los resultados serán utilizados exclusivamente para el proceso de selección laboral.
-              </p>
-              <div className="flex items-start gap-2 bg-amber-100/50 p-2 rounded-md">
-                <Info className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                <p className="text-xs text-amber-700">
-                  Sus datos son considerados <strong>Datos Personales Sensibles</strong> conforme a la Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP) y la NOM-035-STPS-2018.
-                </p>
-              </div>
-            </div>
-
-            <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-700 space-y-3 max-h-64 overflow-y-auto">
-              <p className="font-semibold">AVISO DE PRIVACIDAD Y CONSENTIMIENTO</p>
-              <p>
-                De conformidad con la Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP),
-                se le informa que sus datos personales serán tratados de manera confidencial.
-              </p>
-              <p><strong>Datos que se recopilan:</strong></p>
-              <ul className="list-disc list-inside space-y-1 ml-2">
-                <li>Nombre completo y correo electrónico</li>
-                <li>Teléfono (opcional)</li>
-                <li>Respuestas a evaluaciones psicométricas y psicológicas</li>
-                <li>Resultados de evaluaciones de conocimientos</li>
-              </ul>
-              <p><strong>Finalidad del tratamiento:</strong></p>
-              <ul className="list-disc list-inside space-y-1 ml-2">
-                <li>Realizar pre-evaluaciones para procesos de reclutamiento</li>
-                <li>Generar perfiles de competencias y recomendaciones</li>
-                <li>Facilitar el proceso de selección laboral</li>
-              </ul>
-              <p><strong>Base legal:</strong></p>
-              <ul className="list-disc list-inside space-y-1 ml-2">
-                <li>LFPDPPP Art. 8: Consentimiento expreso y por escrito para datos personales sensibles</li>
-                <li>NOM-035-STPS-2018: Identificación de factores de riesgo psicosocial</li>
-                <li>LFT Art. 132: Obligaciones del patrón en la relación laboral</li>
-              </ul>
-              <p><strong>Quién puede ver sus resultados:</strong></p>
-              <ul className="list-disc list-inside space-y-1 ml-2">
-                <li>Personal de Recursos Humanos de la empresa</li>
-                <li>Gerentes del área correspondiente</li>
-              </ul>
-              <p><strong>Sus derechos ARCO:</strong></p>
-              <ul className="list-disc list-inside space-y-1 ml-2">
-                <li><strong>A</strong>cceder a sus datos personales</li>
-                <li><strong>R</strong>ectificar datos inexactos</li>
-                <li><strong>C</strong>ancelar sus datos</li>
-                <li><strong>O</strong>ponerse al tratamiento de sus datos</li>
-              </ul>
-              <p>
-                Al aceptar, usted consiente el tratamiento de sus datos personales para los fines señalados.
-                Sus datos no serán compartidos con terceros sin su autorización expresa.
-              </p>
-              <p className="text-xs text-gray-500">
-                Responsable: {user?.companyName || 'La empresa correspondiente'}<br/>
-                Tuxtla Gutiérrez, Chiapas, México
-              </p>
-            </div>
-
-            <div className="flex items-start space-x-3 bg-emerald-50 p-3 rounded-lg border border-emerald-200">
-              <Checkbox
-                id="consent-eval"
-                checked={consentAccepted}
-                onCheckedChange={(checked) => setConsentAccepted(checked as boolean)}
-                className="mt-0.5"
-              />
-              <label htmlFor="consent-eval" className="text-sm text-emerald-900 cursor-pointer leading-tight">
-                Acepto que mis respuestas serán tratadas como datos personales sensibles y consiento someterme a esta evaluación de forma voluntaria.
-                Entiendo que los resultados serán confidenciales y utilizados solo para el proceso de selección.
-              </label>
-            </div>
-
-            <Button
-              className="w-full bg-emerald-600 hover:bg-emerald-700"
-              size="lg"
-              disabled={!consentAccepted || loading}
-              onClick={() => {
-                // Save consent to backend
-                if (user?.id) {
-                  apiFetch('/api/consent', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId: user.id }),
-                  }).catch(() => {})
-                }
-                setPhase('SESSION_READY')
-              }}
-            >
-              Aceptar y Continuar
-              <ChevronRight className="w-4 h-4 ml-1" />
-            </Button>
-
-            <a
-              href="/Aviso_de_Privacidad_Consentimiento_EvaluHR.pdf"
-              download
-              className="flex items-center justify-center gap-2 text-sm text-emerald-600 hover:text-emerald-800 hover:underline w-full mt-2"
-            >
-              <Download className="w-4 h-4" />
-              Descargar Aviso de Privacidad completo (PDF)
-            </a>
-          </CardContent>
-        </Card>
       </div>
     )
   }

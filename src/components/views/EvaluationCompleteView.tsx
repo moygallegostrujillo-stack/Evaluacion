@@ -13,12 +13,14 @@ import {
 export default function EvaluationCompleteView() {
   const user = useAppStore((s) => s.user)
   const setCurrentView = useAppStore((s) => s.setCurrentView)
-  const [loading, setLoading] = useState(true)
+  const invitationToken = useAppStore((s) => s.invitationToken)
+  const isInvitedCandidate = !!invitationToken
+  const [loading, setLoading] = useState(!isInvitedCandidate)
   const [availablePositions, setAvailablePositions] = useState<any[]>([])
   const [completedCount, setCompletedCount] = useState(0)
 
   useEffect(() => {
-    if (!user?.id) return
+    if (!user?.id || isInvitedCandidate) return
     Promise.all([
       apiFetch(`/api/interviews?candidateId=${user.id}`).then(r => r.json()),
       apiFetch(`/api/evaluations?candidateId=${user.id}`).then(r => r.json()),
