@@ -11,7 +11,7 @@ import { Separator } from '@/components/ui/separator'
 import {
   ArrowLeft, CheckCircle2, AlertTriangle, XCircle,
   Calendar, MapPin, FileText, Mail, Phone, User,
-  ShieldCheck, ShieldX, Scale, AlertCircle, RefreshCw, Download
+  ShieldCheck, ShieldX, Scale, AlertCircle, RefreshCw, Download, Info
 } from 'lucide-react'
 import {
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
@@ -90,9 +90,12 @@ export default function CandidateDetailView() {
     { dimension: 'Trabajo en Equipo', valor: result.teamwork, fullMark: 100 },
   ]
 
+  const hasIntegrity = result.integrityScore !== undefined && result.integrityScore !== null && result.integrityScore > 0
+
   const scoresBarData = [
     { name: 'Big Five', puntaje: Math.round((result.openness + result.conscientiousness + result.extraversion + result.agreeableness + (100 - result.neuroticism)) / 5) },
     { name: 'Psicológica', puntaje: Math.round((result.stressLevel + result.empathy + result.adaptability + result.leadership + result.teamwork) / 5) },
+    ...(hasIntegrity ? [{ name: 'Integridad', puntaje: Math.round(result.integrityScore!) }] : []),
     ...(result.knowledgeScore !== null && result.knowledgeScore !== undefined
       ? [{ name: 'Conocimientos', puntaje: Math.round(result.knowledgeScore) }]
       : []),
@@ -395,52 +398,23 @@ export default function CandidateDetailView() {
         </CardContent>
       </Card>
 
-      {/* Scoring Criteria Explanation */}
+      {/* Scoring Criteria Explanation — LFPDPPP Art. 37 Bis */}
       <Card className="shadow-sm border-blue-200 bg-blue-50/30">
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg">📋 Criterios de Evaluación</CardTitle>
+          <CardTitle className="text-lg">📋 Secciones Evaluadas</CardTitle>
         </CardHeader>
         <CardContent className="text-sm space-y-3">
           <div>
-            <p className="font-semibold text-gray-700 mb-1">Puntaje General se calcula con:</p>
-            {result.knowledgeScore != null && result.knowledgeScore > 0 ? (
-              <ul className="list-disc pl-5 text-gray-600 space-y-0.5">
-                <li><strong>30%</strong> Evaluación Psicométrica (Big Five)</li>
-                <li><strong>30%</strong> Evaluación Psicológica</li>
-                <li><strong>40%</strong> Prueba de Conocimientos</li>
-              </ul>
-            ) : (
-              <ul className="list-disc pl-5 text-gray-600 space-y-0.5">
-                <li><strong>50%</strong> Evaluación Psicométrica (Big Five)</li>
-                <li><strong>50%</strong> Evaluación Psicológica</li>
-              </ul>
-            )}
+            <p className="font-semibold text-gray-700 mb-1">Puntaje General (adaptativo):</p>
+            <p className="text-gray-600">El sistema calcula el puntaje promediando únicamente las secciones que el candidato completó. Los pesos se ajustan dinámicamente según las secciones disponibles.</p>
           </div>
           <Separator />
-          <div>
-            <p className="font-semibold text-gray-700 mb-1">Recomendación según puntaje:</p>
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                <span><strong>≥ 70</strong> → <Badge className="bg-emerald-100 text-emerald-700">Apto</Badge> Aceptado directamente</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-amber-500" />
-                <span><strong>50 - 69</strong> → <Badge className="bg-amber-100 text-amber-700">Entrevista Adicional</Badge> Requiere entrevista presencial</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-red-500" />
-                <span><strong>&lt; 50</strong> → <Badge className="bg-red-100 text-red-700">No Recomendado</Badge> No se recomienda para el puesto</span>
-              </div>
-            </div>
-          </div>
-          <Separator />
-          <div>
-            <p className="font-semibold text-gray-700 mb-1">Reglas especiales:</p>
-            <ul className="list-disc pl-5 text-gray-600 space-y-0.5">
-              <li>Roles de servicio (Mesero, Bartender, Vendedor): Si <strong>Empatía &lt; 40</strong> y <strong>Trabajo en Equipo &lt; 40</strong> → No Recomendado</li>
-              <li>Estrés alto (&gt;80): Si era Apto → baja a Entrevista Adicional</li>
-            </ul>
+          <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <Info className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
+            <p className="text-xs text-blue-800">
+              <strong>Art. 37 Bis LFPDPPP:</strong> Esta evaluación proporciona orientación informativa únicamente.
+              No constituye una decisión de contratación. La decisión final corresponde al área de Recursos Humanos.
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -509,6 +483,29 @@ export default function CandidateDetailView() {
               </div>
               <Progress value={result.knowledgeScore} className="flex-1 h-3" />
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Integrity Score */}
+      {hasIntegrity && (
+        <Card className="shadow-sm border-emerald-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-emerald-600" /> Evaluación de Integridad
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-4">
+              <div className={`text-4xl font-bold ${getScoreColor(result.integrityScore!)}`}>
+                {Math.round(result.integrityScore!)}%
+              </div>
+              <Progress value={result.integrityScore} className="flex-1 h-3" />
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              Dato sensible (LFPDPPP). Indicador orientativo de honestidad, cumplimiento normativo y responsabilidad.
+              Nunca se utiliza como filtro automático.
+            </p>
           </CardContent>
         </Card>
       )}

@@ -61,6 +61,7 @@ export interface CandidateResult {
   leadership: number
   teamwork: number
   knowledgeScore?: number
+  integrityScore?: number
   createdAt: string
 }
 

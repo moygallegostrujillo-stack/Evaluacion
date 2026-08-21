@@ -157,6 +157,7 @@ export async function GET(req: NextRequest) {
       leadership: number
       teamwork: number
       knowledgeScore: number | null
+      integrityScore: number
       source: 'vacancy'
     }>()
 
@@ -183,6 +184,7 @@ export async function GET(req: NextRequest) {
           leadership: app.leadership,
           teamwork: app.teamwork,
           knowledgeScore: app.knowledgeScore,
+          integrityScore: app.integrityScore,
           source: 'vacancy',
         })
       }

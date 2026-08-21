@@ -342,7 +342,7 @@ model VacancyApplicationResponse {
   applicationId    String
   questionId       String?  // for system questions from EvaluationTemplate
   vacancyQuestionId String? // for custom vacancy questions
-  section          String   // PSICOMETRICA, PSICOLOGICA, CONOCIMIENTOS
+  section          String   // PSICOMETRICA, PSICOLOGICA, CONOCIMIENTOS, INTEGRIDAD
   value            String
   numericValue     Int?
   createdAt        DateTime @default(now())
