@@ -154,7 +154,7 @@ export default function CandidatesView() {
       </div>
 
       {/* Aggregated View for SA */}
-      {aggregated && !impersonatingCompany && (
+      {aggregated && !impersonatingCompany ? (
         <>
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2">
             <ShieldCheck className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
@@ -208,8 +208,8 @@ export default function CandidatesView() {
             )}
           </div>
         </>
-      )}
-
+      ) : (
+      <>
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
@@ -348,6 +348,8 @@ export default function CandidatesView() {
             </Card>
           ))}
         </div>
+      )}
+      </>
       )}
     </div>
   )
