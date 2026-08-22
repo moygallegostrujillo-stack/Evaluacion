@@ -41,7 +41,7 @@ function buildUserResponse(user: Record<string, unknown> | null) {
   if (!user) return null
   return {
     id: user.id as string,
-    email: user.email as string,
+    email: (user.email as string) || '',
     name: user.name as string,
     role: user.role as string,
     companyId: (user.companyId as string) || undefined,
@@ -130,97 +130,6 @@ export async function POST(req: NextRequest) {
       return response
     }
 
-    if (action === 'register') {
-      const { email, name, password, token, phone } = body
-
-      const invitation = await db.candidateInvitation.findUnique({
-        where: { token },
-        include: { position: true, company: true },
-      })
-
-      if (!invitation || invitation.status !== 'PENDING') {
-        return NextResponse.json({ error: 'Invitación inválida o expirada' }, { status: 400 })
-      }
-
-      if (invitation.expiresAt < new Date()) {
-        await db.candidateInvitation.update({
-          where: { id: invitation.id },
-          data: { status: 'EXPIRED' },
-        })
-        return NextResponse.json({ error: 'La invitación ha expirado' }, { status: 400 })
-      }
-
-      const existingUser = await db.user.findUnique({ where: { email } })
-      if (existingUser) {
-        return NextResponse.json({ error: 'El correo ya está registrado' }, { status: 400 })
-      }
-
-      const hashedPassword = await hashPassword(password)
-      const user = await db.user.create({
-        data: {
-          email,
-          name,
-          password: hashedPassword,
-          role: 'CANDIDATO',
-          phone,
-          companyId: invitation.companyId,
-        },
-      })
-
-      await db.candidateInvitation.update({
-        where: { id: invitation.id },
-        data: { status: 'REGISTERED' },
-      })
-
-      await db.evaluationSession.create({
-        data: {
-          candidateId: user.id,
-          positionId: invitation.positionId,
-          companyId: invitation.companyId,
-          status: 'NOT_STARTED',
-        },
-      })
-
-      // Generate real JWT token
-      const jwtToken = await generateToken({
-        sub: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        companyId: user.companyId || undefined,
-        companyName: invitation.company.name || undefined,
-        companySector: invitation.company.sector || undefined,
-      })
-
-      const response = NextResponse.json({
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role,
-          companyId: user.companyId,
-          companyName: invitation.company.name,
-          companySector: invitation.company.sector,
-          consentGiven: false,
-          consentOption: null,
-          anonymousStats: false,
-          consentConfirmed: false,
-          consentVersion: null,
-        },
-        token: jwtToken,
-      })
-
-      response.cookies.set('evaluhr_token', jwtToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 8, // 8 hours
-        path: '/',
-      })
-
-      return response
-    }
-
     // Auto-login via invitation token — NO registration required
     // The token IS the auth. RH already provided name + phone.
     if (action === 'auto-login') {
@@ -257,10 +166,6 @@ export async function POST(req: NextRequest) {
         // Look by phone first (most reliable for WhatsApp invitations)
         if (invitation.phone) {
           user = await safeFindUser({ phone: invitation.phone, companyId: invitation.companyId, role: 'CANDIDATO' })
-        }
-        // Fallback: find by email
-        if (!user && invitation.email) {
-          user = await safeFindUser({ email: invitation.email })
         }
         // Fallback: find by name + company
         if (!user && invitation.candidateName) {

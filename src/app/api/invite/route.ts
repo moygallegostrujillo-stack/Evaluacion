@@ -28,7 +28,6 @@ export async function GET(req: NextRequest) {
       select: {
         id: true,
         candidateName: true,
-        email: true,
         phone: true,
         token: true,
         status: true,
@@ -42,7 +41,6 @@ export async function GET(req: NextRequest) {
       invitations: invitations.map(inv => ({
         id: inv.id,
         candidateName: inv.candidateName,
-        email: inv.email,
         phone: inv.phone,
         token: inv.token,
         status: inv.status,
@@ -65,7 +63,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { candidateName, email, phone, positionId, channel } = body
+    const { candidateName, phone, positionId, channel } = body
 
     // For SUPER_ADMIN with a specific target companyId from body, scope to that company
     const targetCompanyId = auth.role === 'SUPER_ADMIN'
@@ -81,9 +79,9 @@ export async function POST(req: NextRequest) {
       ? (body.invitedBy || auth.userId)
       : auth.userId
 
-    // At least phone or email is required
-    if ((!email && !phone) || !companyId || !positionId || !invitedBy) {
-      return NextResponse.json({ error: 'Se requiere al menos teléfono o correo, companyId, positionId e invitedBy' }, { status: 400 })
+    // Phone is required
+    if (!phone || !companyId || !positionId || !invitedBy) {
+      return NextResponse.json({ error: 'Se requiere teléfono, companyId, positionId e invitedBy' }, { status: 400 })
     }
 
     // Verify position exists
@@ -124,7 +122,6 @@ export async function POST(req: NextRequest) {
     const invitation = await rlsDb.candidateInvitation.create({
       data: {
         candidateName: candidateName || null,
-        email: email || null,
         phone: phone || null,
         token,
         status: 'PENDING',
@@ -149,7 +146,6 @@ export async function POST(req: NextRequest) {
       invitation: {
         id: invitation.id,
         candidateName: invitation.candidateName,
-        email: invitation.email,
         phone: invitation.phone,
         token: invitation.token,
         status: invitation.status,
