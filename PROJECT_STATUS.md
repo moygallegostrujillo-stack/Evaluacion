@@ -1,6 +1,6 @@
 # EvaluHR — Documento de Estado del Proyecto
 
-> **Última actualización:** 20 Agosto 2026
+> **Última actualización:** 21 Agosto 2026
 > **Propósito:** Contexto completo para futuras sesiones de desarrollo
 
 ---
@@ -594,28 +594,47 @@ Todos los archivos `.tsx` con sufijo `View`. Los más complejos:
 
 ## 10. Cambios Recientes (Esta Sesión)
 
-### Gestión de usuarios
-- **Nuevo endpoint `/api/users`** con GET (listar), POST (crear RH/GERENTE), PUT (editar), PATCH (toggle_access, change_password, delete), DELETE
-- `CompanyManagementView` mejorada con UI completa para gestión de usuarios por empresa
-- Solo SUPER_ADMIN puede crear/editar/eliminar usuarios
-- RH puede editar usuarios dentro de su empresa (campos limitados)
-- Protección: no puedes eliminar tu propia cuenta ni remover tu rol SUPER_ADMIN
+### 🔴 CRITICAL FIX: RLS Bypass en SUPER_ADMIN con empresa seleccionada (21 Ago 2026)
 
-### Flujo de invitación
-- **`candidateName` y `email` ahora son nullable** en `CandidateInvitation` — permite invitaciones solo con teléfono (WhatsApp)
-- Link de invitación: `?token=xxx` — el candidato se registra con email+password
-- Expiración: 7 días desde creación
+**Causa raíz:** Cuando SUPER_ADMIN seleccionaba una empresa específica, `createRLSClient({ ...auth, companyId: targetCompanyId })` preservaba `isSuperAdmin=true` desde el objeto `auth`. La extensión RLS tiene la lógica `if (!isSuperAdmin ...)` que salta TODOS los filtros cuando `isSuperAdmin=true`. Resultado: se devolvían datos de TODAS las empresas en vez de solo la seleccionada.
 
-### Generación de preguntas con IA
-- **Endpoint `/api/vacancies/[id]/generate-questions`** usa `z-ai-web-dev-sdk` para generar preguntas de conocimiento automáticamente
-- Se envía el título de la vacante y sector como contexto
-- Las preguntas generadas se guardan como `VacancyQuestion` con `isCustom: true`
+**Ejemplo:** El dropdown de "Invitar Candidato" mostraba "Test Integridad" (de otra empresa) en vez de "Cajero" (de la empresa seleccionada).
 
-### Vacantes públicas
-- Link compartible: `dominio/?v=slug-vacante`
-- Flujo sin auth: datos personales → evaluación psicométrica → psicológica → conocimientos → video → done
-- Persistencia en localStorage para sobrevivir recargas
-- Verificación de ownership en endpoints públicos mediante slug token
+**Fix:** Usar `createSuperAdminRLSClient(targetCompanyId)` que internamente fuerza `isSuperAdmin=false` para que el RLS sí aplique filtros por `companyId`.
+
+**Archivos corregidos (16 ocurrencias en 8 endpoints):**
+- `/api/positions` (GET, POST, DELETE)
+- `/api/questions` (GET, POST, PUT, DELETE)
+- `/api/candidates` (GET, POST)
+- `/api/vacancies` (GET, POST)
+- `/api/results` (GET)
+- `/api/invite` (POST)
+- `/api/interviews` (GET, POST)
+- `/api/dashboard` (GET)
+
+**Regla actualizada para desarrolladores:** Cuando SUPER_ADMIN opera en un tenant específico, SIEMPRE usar `createSuperAdminRLSClient(targetCompanyId)` en vez de `createRLSClient({ ...auth, companyId: targetCompanyId })`.
+
+### Limpieza de email del flujo de candidatos (21 Ago 2026)
+- El candidato SOLO proporciona nombre + teléfono. NUNCA email.
+- Email es exclusivo para usuarios de plataforma (RH, GERENTE, SUPER_ADMIN).
+- Se eliminó la acción `register` de `/api/auth` (91 líneas de código muerto).
+- El email auto-generado (`cand_XXX@evaluhr.auto`) es un detalle técnico invisible.
+
+### Botón eliminar puesto (21 Ago 2026)
+- `QuestionsManagementView` ahora tiene botón "Eliminar Puesto" con diálogo de confirmación.
+- Ejecuta `DELETE /api/positions?id=xxx` que hace soft-delete (`active=false`).
+
+### Limpieza de producción (21 Ago 2026)
+- Endpoint `/api/cleanup` creado (SUPER_ADMIN only, con `dryRun` support).
+- Ejecutado en producción: eliminados 4 resultados, 4 sesiones, 4 invitaciones, 70 preguntas, 7 plantillas, 2 puestos, 3 candidatos de Café DeChiapas.
+- DB de producción limpia, lista para empezar desde cero.
+
+### Sesiones anteriores (resumen)
+
+- **Gestión de usuarios:** `/api/users` CRUD completo, solo SUPER_ADMIN crea/edita/elimina
+- **Flujo de invitación:** Solo nombre+teléfono, token único, expiración 7 días
+- **Generación de preguntas con IA:** `/api/vacancies/[id]/generate-questions` con z-ai-web-dev-sdk
+- **Vacantes públicas:** Link compartible `?v=slug`, flujo sin auth, persistencia en localStorage
 
 ---
 
@@ -875,11 +894,36 @@ bun run lint               # ESLint
 - **API routes:** Usar `createRLSClient(auth)` para queries scoped, `getUnscopedClient()` solo cuando sea necesario
 - **Nuevas vistas:** Añadir al tipo `ViewType` en `store.ts`, crear componente en `views/`, añadir caso en `renderView()` en `page.tsx`
 - **Nuevos modelos:** Actualizar ambos schemas (`schema.prisma` y `schema.prod.prisma`), añadir a `TENANT_SCOPED_MODELS` en `rls.ts` si tiene `companyId`
-- **SUPER_ADMIN scoping:** Siempre pasar `companyId` explícito cuando SUPER_ADMIN opera en un tenant específico
+- **SUPER_ADMIN scoping:** Usar `createSuperAdminRLSClient(targetCompanyId)` cuando SUPER_ADMIN opera en un tenant específico. NUNCA usar `createRLSClient({ ...auth, companyId: targetCompanyId })` porque preserva `isSuperAdmin=true` y el RLS no filtra (bug corregido 21 Ago 2026)
 
 ---
 
 ## 15. Changelog
+
+### 21 Agosto 2026 — Fix RLS bypass SUPER_ADMIN + Limpieza de producción
+
+**Commits:** `a8be259` → `fa3d4ad` → `0e89348` (pushed to main)
+
+**Archivos modificados (10):**
+- `src/app/api/positions/route.ts` — createSuperAdminRLSClient + DELETE endpoint + import fix
+- `src/app/api/questions/route.ts` — createSuperAdminRLSClient (4 handlers)
+- `src/app/api/candidates/route.ts` — createSuperAdminRLSClient (2 handlers)
+- `src/app/api/vacancies/route.ts` — createSuperAdminRLSClient (2 handlers)
+- `src/app/api/results/route.ts` — createSuperAdminRLSClient
+- `src/app/api/invite/route.ts` — createSuperAdminRLSClient
+- `src/app/api/interviews/route.ts` — createSuperAdminRLSClient (2 handlers)
+- `src/app/api/dashboard/route.ts` — createSuperAdminRLSClient
+- `src/app/api/cleanup/route.ts` (NUEVO) — SUPER_ADMIN cleanup endpoint
+- `src/components/views/QuestionsManagementView.tsx` — Botón eliminar puesto
+- `src/app/api/auth/route.ts` — Eliminada acción register (código muerto)
+- `src/app/api/invite/route.ts` — Email eliminado del flujo de invitación
+
+**Estado de producción:**
+- Café DeChiapas: DB limpia (0 puestos, 0 candidatos, 0 invitaciones)
+- Usuarios RH/GERENTE preservados
+- Deploy Vercel: ✅ activo en `evaluacion-murex.vercel.app`
+
+---
 
 ### 20 Agosto 2026 — Aviso por empresa, Integridad 4to paso, SA agregados, limpieza APTO
 
