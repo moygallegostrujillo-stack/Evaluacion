@@ -12,13 +12,14 @@
 > **Política clave (Art. 37 Bis LFPDPPP):** El sistema **NO decide** la contratación. Solo ofrece orientación sobre el perfil del candidato. La decisión final corresponde siempre al área de Recursos Humanos.
 
 **Casos de uso principales:**
-- Invitación de candidatos vía WhatsApp/Email con token único
-- Evaluación en 3 pasos: psicométrica → psicológica → conocimientos
+- Invitación de candidatos vía WhatsApp/Email con nombre + teléfono y token único
+- Evaluación en pasos: psicométrica → psicológica → integridad → conocimientos
 - Comparación lado a lado de candidatos
-- Vacantes públicas con link compartible (`?v=slug`) para aplicación directa
-- Grabación/subida de video como paso final en vacantes
+- Gestión de vacantes con preguntas técnicas (IA o manuales)
 - Gestión de entrevistas post-evaluación
 - Panel SUPER_ADMIN para administrar múltiples empresas
+
+> **Flujo único de entrada:** Todo candidato debe ser invitado con nombre + teléfono por RH. No hay links públicos. La evaluación siempre se inicia desde una invitación con token único (`?token=xxx`).
 
 **Stack tecnológico:**
 
@@ -466,16 +467,8 @@ const { client: rlsDb } = targetCompanyId
 | `POST /api/consent/fix` | POST | Sí (Admin) | Registrar consentimiento retroactivamente |
 | `GET/POST /api/vacancies` | GET, POST | Sí | Listar vacantes / Crear vacante con preguntas |
 | `GET/PUT/DELETE /api/vacancies/[id]` | GET, PUT, DELETE | Sí | Detalle / Editar / Eliminar vacante |
-| `GET/POST /api/vacancies/[id]/applications` | GET, POST | Sí | Listar aplicaciones / (crear es público vía /api/public/apply) |
-| `GET/POST/PUT/DELETE /api/vacancies/[id]/questions` | — | Sí | CRUD de preguntas de vacante |
-| `POST /api/vacancies/[id]/generate-questions` | POST | Sí | Generar preguntas con IA (z-ai-web-dev-sdk) |
-| `GET /api/public/vacancy` | GET | No | Obtener vacante pública por slug |
-| `POST /api/public/apply` | POST | No | Aplicar a vacante pública (crear aplicación, enviar respuestas, completar) |
-| `POST /api/public/video` | POST | No | Marcar paso de video completado (verificación por slug token) |
-| `GET /api/rls-audit` | GET | Sí (SA) | Auditoría RLS: verify, stats, cross-tenant |
-
-### Detalle del flujo de evaluación (`/api/evaluations`)
-
+| `GET/POST /api/vacancies/[id]/applications` | GET, POST | Si | Listar aplicaciones de vacante |
+| `GET /api/public/invitation` | GET | No | Validar token de invitacion (flujo `?token=xxx`) |
 - `GET /api/evaluations?sessionId=xxx` → Obtiene sesión con preguntas del paso actual
 - `POST /api/evaluations` con body:
   - `{ action: "start", sessionId }` → Inicia sesión (status → IN_PROGRESS)
@@ -515,20 +508,17 @@ const { client: rlsDb } = targetCompanyId
 | `questions` | `QuestionsManagementView` | RH, GERENTE | Gestión de preguntas personalizadas |
 | `interviews` | `InterviewsView` | RH | Calendario/gestión de entrevistas |
 | `companies` | `CompanyManagementView` | SUPER_ADMIN | CRUD de empresas + gestión de usuarios por empresa |
-| `public-evaluation` | `PublicEvaluationView` | Público | Evaluación pública vía vacante (`?v=slug`) |
-| `public-evaluation-complete` | Inline | Público | Confirmación de evaluación pública completada |
 
 ### Navegación
 
 - **RH/GERENTE/SA:** Sidebar con menú condicional según rol
 - **CANDIDATO:** Barra de navegación simple (sin sidebar)
-- **Público:** Sin navegación (flujo autocontenido)
+- **Publico (solo invitacion):** Sin navegacion, flujo autocontenido
 
 ### Hooks de inicialización (en `page.tsx`)
 
 1. `useAuthRestore()` — Restaura auth desde localStorage al recargar
 2. `useInvitationCheck()` — Detecta `?token=xxx` en URL para registro
-3. `useVacancyLinkCheck()` — Detecta `?v=slug` en URL o localStorage para evaluación pública
 
 ---
 
@@ -584,7 +574,6 @@ const { client: rlsDb } = targetCompanyId
 
 Todos los archivos `.tsx` con sufijo `View`. Los más complejos:
 - `EvaluationView.tsx` — Test multi-paso con progress bar y diferentes tipos de pregunta
-- `PublicEvaluationView.tsx` — Flujo público completo (datos → psicométrica → psicológica → conocimientos → video → done)
 - `CandidatesView.tsx` — Tabla con filtros, búsqueda, y resultados inline
 - `VacancyManagementView.tsx` — CRUD completo con drag & drop para reordenar preguntas
 - `CompanyManagementView.tsx` — Panel SUPER_ADMIN con gestión de empresas y usuarios
@@ -593,6 +582,25 @@ Todos los archivos `.tsx` con sufijo `View`. Los más complejos:
 ---
 
 ## 10. Cambios Recientes (Esta Sesión)
+
+### Eliminacion del flujo de vacante publica (22 Ago 2026)
+
+**Motivo:** El link publico `?v=slug` permitia que cualquier persona accediera a la evaluacion sin proporcionar nombre ni telefono, inconsistente con el modelo de negocio donde RH siempre identifica al candidato antes de invitar. Ademas tenia scoring duplicado, consentimiento mal almacenado (`consentGiven: false`), y ningun mecanismo de verificacion.
+
+**Lo que se elimino:**
+- `PublicEvaluationView.tsx` (996 lineas) — UI completa de evaluacion publica
+- `/api/public/apply/route.ts` — Endpoint con scoring duplicado
+- `/api/public/vacancy/route.ts` — Endpoint publico de vacante
+- `/api/public/video/route.ts` — Endpoint publico de video
+- Tarjeta "Link para compartir" y boton "Copiar Link" de VacancyManagementView
+- Hook `useVacancyLinkCheck` y routing `public-evaluation` de page.tsx
+- Estado `vacancySlug`, `vacancyApplicationId`, `vacancyAnswers` del store
+- ViewTypes `public-evaluation`, `public-evaluation-complete`
+
+**Lo que se conserva:**
+- `/api/public/invitation/route.ts` — Flujo de invitacion con `?token=xxx`
+
+**Regla para desarrolladores:** El unico punto de entrada de candidatos es la invitacion con nombre + telefono. No crear endpoints publicos que permitan evaluacion sin identificacion previa.
 
 ### 🔴 CRITICAL FIX: RLS Bypass en SUPER_ADMIN con empresa seleccionada (21 Ago 2026)
 
@@ -674,7 +682,7 @@ ZAI_TOKEN        — Token de sesión Z.ai
 |-------|---------|-----------|
 | Middleware deprecated warning | Next.js 16 muestra warning sobre `middleware.ts` config matcher. No rompe funcionalidad pero debe ajustarse en futura versión. | Media |
 | DB-level RLS no activado | `prisma/rls-policies.sql` existe pero no se ha ejecutado en producción. Solo App-level RLS (Prisma Extension) está activo. **Recomendación:** ejecutar SQL contra Supabase y activar `db-rls-session.ts`. | Alta |
-| Seguridad de endpoints públicos | `/api/public/apply` y `/api/public/video` usan verificación por slug token (ligera). Considerar rate limiting y CAPTCHA. | Alta |
+| Seguridad de endpoints | Solo /api/public/invitation es publico (valida token). Considerar rate limiting y CAPTCHA. | Media |
 | Endpoint /api/cleanup expuesto | Endpoint temporal de limpieza aún existe en código. Debe eliminarse o deshabilitarse. | Media |
 
 ### Auditoría legal (31 secciones)
