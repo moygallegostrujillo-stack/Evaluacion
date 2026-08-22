@@ -92,7 +92,9 @@ export async function POST(req: NextRequest) {
       report.vacancies_other = (report.vacancies_other || 0)
         + (await db.vacancy.deleteMany({ where: { companyId: otherId } })).count
 
-      // Evaluation chain
+      // Evaluation chain — order: Results first, then Responses, then Sessions
+      report.evalResults_other = (report.evalResults_other || 0)
+        + (await db.evaluationResult.deleteMany({ where: { companyId: otherId } })).count
       const sessions = await db.evaluationSession.findMany({
         where: { companyId: otherId },
         select: { id: true },
@@ -103,8 +105,6 @@ export async function POST(req: NextRequest) {
       }
       report.evalSessions_other = (report.evalSessions_other || 0)
         + (await db.evaluationSession.deleteMany({ where: { companyId: otherId } })).count
-      report.evalResults_other = (report.evalResults_other || 0)
-        + (await db.evaluationResult.deleteMany({ where: { companyId: otherId } })).count
 
       // Interviews
       report.interviews_other = (report.interviews_other || 0)
@@ -178,7 +178,8 @@ export async function POST(req: NextRequest) {
     }
     report.vacancies_keep = (await db.vacancy.deleteMany({ where: { companyId: keepCompanyId } })).count
 
-    // Evaluation chain
+    // Evaluation chain — order: Results first, then Responses, then Sessions
+    report.evalResults_keep = (await db.evaluationResult.deleteMany({ where: { companyId: keepCompanyId } })).count
     const kSessions = await db.evaluationSession.findMany({
       where: { companyId: keepCompanyId },
       select: { id: true },
@@ -188,7 +189,6 @@ export async function POST(req: NextRequest) {
         + (await db.evaluationResponse.deleteMany({ where: { sessionId: s.id } })).count
     }
     report.evalSessions_keep = (await db.evaluationSession.deleteMany({ where: { companyId: keepCompanyId } })).count
-    report.evalResults_keep = (await db.evaluationResult.deleteMany({ where: { companyId: keepCompanyId } })).count
 
     // Interviews
     report.interviews_keep = (await db.interviewSchedule.deleteMany({ where: { companyId: keepCompanyId } })).count
