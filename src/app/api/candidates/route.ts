@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createRLSClient, getUnscopedClient } from '@/lib/rls'
+import { createRLSClient, createSuperAdminRLSClient, getUnscopedClient } from '@/lib/rls'
 import { getAuthFromHeaders } from '@/lib/auth'
 
 import { hashPassword } from '@/lib/password'
@@ -70,7 +70,7 @@ export async function GET(req: NextRequest) {
     }
 
     const { client: rlsDb } = targetCompanyId
-      ? createRLSClient({ ...auth, companyId: targetCompanyId })
+      ? createSuperAdminRLSClient(targetCompanyId)
       : createRLSClient(auth)
 
     // Always filter for CANDIDATO role - the candidates tab shows candidates, not RH/GERENTE users
@@ -237,7 +237,7 @@ export async function POST(req: NextRequest) {
       ? body.companyId
       : null
     const { client: rlsDb } = targetCompanyId
-      ? createRLSClient({ ...auth, companyId: targetCompanyId })
+      ? createSuperAdminRLSClient(targetCompanyId)
       : createRLSClient(auth)
     const companyId = targetCompanyId || auth.companyId
 

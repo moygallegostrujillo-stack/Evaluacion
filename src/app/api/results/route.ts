@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createRLSClient, getUnscopedClient } from '@/lib/rls'
+import { createRLSClient, createSuperAdminRLSClient, getUnscopedClient } from '@/lib/rls'
 import { getAuthFromHeaders } from '@/lib/auth'
 
 export async function GET(req: NextRequest) {
@@ -74,7 +74,7 @@ export async function GET(req: NextRequest) {
     }
 
     const { client: rlsDb } = targetCompanyId
-      ? createRLSClient({ ...auth, companyId: targetCompanyId })
+      ? createSuperAdminRLSClient(targetCompanyId)
       : createRLSClient(auth)
 
     const candidateId = req.nextUrl.searchParams.get('candidateId')

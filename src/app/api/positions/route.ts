@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createRLSClient, getUnscopedClient } from '@/lib/rls'
+import { createRLSClient, createSuperAdminRLSClient, getUnscopedClient } from '@/lib/rls'
 import { getAuthFromHeaders } from '@/lib/auth'
 import { generateTemplatesForPosition } from '@/lib/generate-templates'
 
@@ -75,7 +75,7 @@ export async function GET(req: NextRequest) {
 
     // Standard list — RLS handles scoping
     const { client: rlsDb } = targetCompanyId
-      ? createRLSClient({ ...auth, companyId: targetCompanyId })
+      ? createSuperAdminRLSClient(targetCompanyId)
       : createRLSClient(auth)
 
     const positions = await rlsDb.position.findMany({
@@ -120,7 +120,7 @@ export async function POST(req: NextRequest) {
       ? body.companyId
       : null
     const { client: rlsDb } = targetCompanyId
-      ? createRLSClient({ ...auth, companyId: targetCompanyId })
+      ? createSuperAdminRLSClient(targetCompanyId)
       : createRLSClient(auth)
     const companyId = targetCompanyId || auth.companyId
 
@@ -174,7 +174,7 @@ export async function DELETE(req: NextRequest) {
       ? req.nextUrl.searchParams.get('companyId')
       : null
     const { client: rlsDb } = targetCompanyId
-      ? createRLSClient({ ...auth, companyId: targetCompanyId })
+      ? createSuperAdminRLSClient(targetCompanyId)
       : createRLSClient(auth)
 
     // Check position exists and belongs to this company

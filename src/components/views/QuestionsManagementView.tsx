@@ -16,6 +16,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
 import {
@@ -38,7 +39,7 @@ import {
 import {
   Plus, Trash2, Edit3, BookOpen, Brain, ClipboardList,
   Utensils, ShoppingBag, Briefcase, CheckCircle2, XCircle,
-  HelpCircle, ChevronDown, ChevronRight
+  HelpCircle, ChevronDown, ChevronRight, Loader2
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
@@ -107,6 +108,25 @@ interface SelectorItem {
   icon: React.ReactNode
 }
 
+// Posibles categorías de puestos
+const POSITION_CATEGORIES = [
+  { value: 'MESERO', label: 'Mesero/a' },
+  { value: 'COCINERO', label: 'Cocinero/a' },
+  { value: 'BARTENDER', label: 'Bartender' },
+  { value: 'GERENTE_PISO', label: 'Gerente de Piso' },
+  { value: 'VENDEDOR', label: 'Vendedor/a' },
+  { value: 'CAJERO', label: 'Cajero/a' },
+  { value: 'HOSTESS', label: 'Hostess' },
+  { value: 'LAVAPLATOS', label: 'Lavaplatos' },
+  { value: 'GENERAL', label: 'General' },
+]
+
+const POSITION_SECTORS = [
+  { value: 'RESTAURANT', label: 'Restaurante' },
+  { value: 'RETAIL', label: 'Retail / Tiendas' },
+  { value: 'SERVICIOS', label: 'Servicios' },
+  { value: 'OTRO', label: 'Otro' },
+]
 // ============================================
 // Component
 // ============================================
@@ -143,6 +163,14 @@ export default function QuestionsManagementView() {
   const [formText, setFormText] = useState('')
   const [formOptions, setFormOptions] = useState(['', '', '', ''])
   const [formCorrectAnswer, setFormCorrectAnswer] = useState<number>(0)
+
+  // Create Position form state
+  const [showCreatePositionDialog, setShowCreatePositionDialog] = useState(false)
+  const [newPositionTitle, setNewPositionTitle] = useState('')
+  const [newPositionSector, setNewPositionSector] = useState('RESTAURANT')
+  const [newPositionCategory, setNewPositionCategory] = useState('MESERO')
+  const [newPositionHasKnowledge, setNewPositionHasKnowledge] = useState(true)
+  const [creatingPosition, setCreatingPosition] = useState(false)
 
   // ============================================
   // Load positions and vacancies
@@ -565,6 +593,52 @@ export default function QuestionsManagementView() {
   }
 
   // ============================================
+  // Create Position handler
+  // ============================================
+
+  const handleCreatePosition = async () => {
+    if (!newPositionTitle.trim()) {
+      toast({ title: 'Error', description: 'El nombre del puesto es obligatorio', variant: 'destructive' })
+      return
+    }
+    setCreatingPosition(true)
+    try {
+      const body: Record<string, unknown> = {
+        title: newPositionTitle.trim(),
+        sector: newPositionSector,
+        category: newPositionCategory,
+        hasKnowledgeTest: newPositionHasKnowledge,
+      }
+      if (user?.companyId) body.companyId = user.companyId
+      const res = await apiFetch('/api/positions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'Error al crear puesto')
+      }
+      toast({ title: 'Puesto creado', description: `"${newPositionTitle.trim()}" se creó con plantillas de evaluación automáticas` })
+      setShowCreatePositionDialog(false)
+      setNewPositionTitle('')
+      setNewPositionSector('RESTAURANT')
+      setNewPositionCategory('MESERO')
+      setNewPositionHasKnowledge(true)
+      // Reload positions
+      const posParams = new URLSearchParams()
+      if (user?.companyId) posParams.set('companyId', user.companyId)
+      const posRes = await apiFetch(`/api/positions?${posParams.toString()}`)
+      const posData = await posRes.json()
+      setPositions(posData.positions || [])
+    } catch (err) {
+      toast({ title: 'Error', description: err instanceof Error ? err.message : 'No se pudo crear el puesto', variant: 'destructive' })
+    } finally {
+      setCreatingPosition(false)
+    }
+  }
+
+  // ============================================
   // Loading
   // ============================================
 
@@ -676,6 +750,42 @@ export default function QuestionsManagementView() {
                   <Briefcase className="w-3.5 h-3.5" />
                   {v.title}
                   <Badge variant="outline" className="text-xs py-0 px-1">{v.questions.length}</Badge>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Positions section with create button */}
+          <div className="flex items-center justify-between">
+            <div className="text-xs font-semibold text-gray-500 flex items-center gap-1.5">
+              <ClipboardList className="w-3.5 h-3.5" />
+              Puestos ({positions.length}) — Usados para invitar candidatos
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-emerald-600 border-emerald-200 hover:bg-emerald-50 text-xs gap-1"
+              onClick={() => setShowCreatePositionDialog(true)}
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Crear Puesto
+            </Button>
+          </div>
+          {positions.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {positions.map(p => (
+                <button
+                  key={p.id}
+                  onClick={() => { setSelectedType('position'); setSelectedId(p.id) }}
+                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all border-2 ${
+                    selectedType === 'position' && selectedId === p.id
+                      ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                      : 'border-gray-200 bg-white text-gray-600 hover:border-emerald-300 hover:bg-emerald-50/50'
+                  }`}
+                >
+                  {p.sector === 'RESTAURANT' ? <Utensils className="w-3.5 h-3.5" /> : <ShoppingBag className="w-3.5 h-3.5" />}
+                  {p.title}
+                  <Badge variant="outline" className="text-xs py-0 px-1">{p.evaluationTemplates.length} plant.</Badge>
                 </button>
               ))}
             </div>
@@ -1247,6 +1357,7 @@ export default function QuestionsManagementView() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
 
       {/* ============================================ */}
       {/* Delete Position Confirmation Dialog */}

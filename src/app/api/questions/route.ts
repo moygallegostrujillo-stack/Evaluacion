@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createRLSClient, getUnscopedClient } from '@/lib/rls'
+import { createRLSClient, createSuperAdminRLSClient, getUnscopedClient } from '@/lib/rls'
 import { getAuthFromHeaders, canAccessCompany } from '@/lib/auth'
 
 // GET: List questions for a position, optionally filtered by company
@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
       ? companyIdParam
       : null
     const { client: rlsDb } = targetCompanyId
-      ? createRLSClient({ ...auth, companyId: targetCompanyId })
+      ? createSuperAdminRLSClient(targetCompanyId)
       : createRLSClient(auth)
 
     if (templateId) {
@@ -122,7 +122,7 @@ export async function POST(req: NextRequest) {
       ? bodyCompanyId
       : null
     const { client: rlsDb } = targetCompanyId
-      ? createRLSClient({ ...auth, companyId: targetCompanyId })
+      ? createSuperAdminRLSClient(targetCompanyId)
       : createRLSClient(auth)
     const companyId = targetCompanyId || auth.companyId
 
@@ -205,7 +205,7 @@ export async function PUT(req: NextRequest) {
       ? bodyCompanyId
       : null
     const { client: rlsDb } = targetCompanyId
-      ? createRLSClient({ ...auth, companyId: targetCompanyId })
+      ? createSuperAdminRLSClient(targetCompanyId)
       : createRLSClient(auth)
     const companyId = targetCompanyId || auth.companyId
 
@@ -281,7 +281,7 @@ export async function DELETE(req: NextRequest) {
       ? companyIdParam
       : null
     const { client: rlsDb } = targetCompanyId
-      ? createRLSClient({ ...auth, companyId: targetCompanyId })
+      ? createSuperAdminRLSClient(targetCompanyId)
       : createRLSClient(auth)
     const companyId = targetCompanyId || auth.companyId
 
