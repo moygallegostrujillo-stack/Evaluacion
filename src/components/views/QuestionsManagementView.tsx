@@ -524,6 +524,47 @@ export default function QuestionsManagementView() {
   }
 
   // ============================================
+  // Delete Position handler
+  // ============================================
+
+  const [deletingPositionId, setDeletingPositionId] = useState<string | null>(null)
+  const [showDeletePositionDialog, setShowDeletePositionDialog] = useState(false)
+
+  const handleDeletePosition = (positionId: string) => {
+    setDeletingPositionId(positionId)
+    setShowDeletePositionDialog(true)
+  }
+
+  const handleConfirmDeletePosition = async () => {
+    if (!deletingPositionId) return
+    setSaving(true)
+    try {
+      const companyIdParam = user?.companyId ? `&companyId=${user.companyId}` : ''
+      const res = await apiFetch(`/api/positions?id=${deletingPositionId}${companyIdParam}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Error deleting')
+      toast({ title: 'Puesto eliminado', description: 'El puesto fue desactivado exitosamente' })
+      setShowDeletePositionDialog(false)
+      setDeletingPositionId(null)
+      // If the deleted position was selected, clear selection
+      if (selectedId === deletingPositionId) {
+        setSelectedId(null)
+        setSelectedType(null)
+        setTemplates([])
+      }
+      // Reload positions
+      const posParams = new URLSearchParams()
+      if (user?.companyId) posParams.set('companyId', user.companyId)
+      apiFetch(`/api/positions?${posParams.toString()}`)
+        .then(r => r.json())
+        .then(data => setPositions(data.positions || []))
+    } catch {
+      toast({ title: 'Error', description: 'No se pudo desactivar el puesto', variant: 'destructive' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // ============================================
   // Loading
   // ============================================
 
@@ -803,6 +844,37 @@ export default function QuestionsManagementView() {
       {/* ============================================ */}
       {/* POSITION VIEW - Templates + Questions */}
       {/* ============================================ */}
+
+      {selectedType === 'position' && selectedId && (
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {(() => {
+              const pos = positions.find(p => p.id === selectedId)
+              if (!pos) return null
+              return (
+                <>
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${pos.sector === 'RESTAURANT' ? 'bg-orange-100 text-orange-600' : 'bg-purple-100 text-purple-600'}`}>
+                    {pos.sector === 'RESTAURANT' ? <Utensils className="w-4 h-4" /> : <ShoppingBag className="w-4 h-4" />}
+                  </div>
+                  <div>
+                    <h2 className="font-semibold text-sm">{pos.title}</h2>
+                    <p className="text-xs text-gray-500">Puesto · {pos.evaluationTemplates.length} plantillas</p>
+                  </div>
+                </>
+              )
+            })()}
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-red-500 border-red-200 hover:bg-red-50 hover:text-red-700 text-xs"
+            onClick={() => handleDeletePosition(selectedId)}
+          >
+            <Trash2 className="w-3.5 h-3.5 mr-1" />
+            Eliminar Puesto
+          </Button>
+        </div>
+      )}
 
       {selectedType === 'position' && templates.length > 0 && (
         <div className="space-y-4">
@@ -1171,6 +1243,32 @@ export default function QuestionsManagementView() {
               disabled={saving}
             >
               {saving ? 'Eliminando...' : 'Eliminar Pregunta'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ============================================ */}
+      {/* Delete Position Confirmation Dialog */}
+      {/* ============================================ */}
+
+      <AlertDialog open={showDeletePositionDialog} onOpenChange={setShowDeletePositionDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Desactivar este puesto?</AlertDialogTitle>
+            <AlertDialogDescription>
+              El puesto será desactivado y ya no aparecerá en la lista de puestos disponibles
+              para invitar candidatos. Las evaluaciones ya completadas con este puesto no se verán afectadas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => { setShowDeletePositionDialog(false); setDeletingPositionId(null) }}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDeletePosition}
+              className="bg-red-600 hover:bg-red-700"
+              disabled={saving}
+            >
+              {saving ? 'Desactivando...' : 'Desactivar Puesto'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

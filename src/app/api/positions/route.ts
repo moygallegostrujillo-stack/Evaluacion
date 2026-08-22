@@ -155,6 +155,49 @@ export async function POST(req: NextRequest) {
   }
 }
 
+// DELETE: Deactivate a position (soft-delete — sets active=false)
+// Positions with existing evaluation sessions cannot be deleted to preserve data integrity.
+export async function DELETE(req: NextRequest) {
+  try {
+    const auth = getAuthFromHeaders(req.headers)
+    if (!auth) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const positionId = req.nextUrl.searchParams.get('id')
+    if (!positionId) {
+      return NextResponse.json({ error: 'position id is required' }, { status: 400 })
+    }
+
+    // Use RLS client scoped to the user's company (or SUPER_ADMIN target)
+    const targetCompanyId = auth.role === 'SUPER_ADMIN'
+      ? req.nextUrl.searchParams.get('companyId')
+      : null
+    const { client: rlsDb } = targetCompanyId
+      ? createRLSClient({ ...auth, companyId: targetCompanyId })
+      : createRLSClient(auth)
+
+    // Check position exists and belongs to this company
+    const position = await rlsDb.position.findUnique({
+      where: { id: positionId },
+    })
+    if (!position) {
+      return NextResponse.json({ error: 'Position not found' }, { status: 404 })
+    }
+
+    // Soft-delete: set active=false
+    await rlsDb.position.update({
+      where: { id: positionId },
+      data: { active: false },
+    })
+
+    return NextResponse.json({ success: true, positionId })
+  } catch (error) {
+    console.error('Positions DELETE error:', error)
+    return NextResponse.json({ error: 'Error deactivating position' }, { status: 500 })
+  }
+}
+
 // PATCH: Generate templates for existing positions that don't have them
 export async function PATCH(req: NextRequest) {
   try {
