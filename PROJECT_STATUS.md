@@ -910,6 +910,36 @@ bun run lint               # ESLint
 
 ## 15. Changelog
 
+### 22 Agosto 2026 -- Unificacion Position + Vacancy en una sola entidad (Puestos)
+
+**Commit:** `deb73ce` (pushed a main)
+
+**Motivo:** El sistema tenia dos entidades paralelas y desconectadas (Position y Vacancy) para el mismo concepto: la necesidad de contratar persona para un puesto. Vacancy fue creada para el link publico eliminado. Ahora Position es la unica entidad.
+
+**Cambios en schema:**
+- Campo `status` (ACTIVE/PAUSED/CLOSED) agregado a Position
+- Modelo Vacancy permanece en schema (preservacion de datos) pero sin UI ni API
+
+**Cambios en API:**
+- `PUT /api/positions` (nuevo) -- Cambia estado del puesto con validacion de transiciones
+- `GET /api/positions` ahora filtra por `status=ACTIVE`
+- `/api/migrate` agrega columna `Position.status` en produccion
+
+**Cambios en UI:**
+- `QuestionsManagementView` renombrada de "Preguntas y Puestos" a "Puestos"
+- Badges de estado (Activa/Pausada/Cerrada) en cada puesto
+- Botones Pausar/Reactivar/Cerrar en el header del puesto
+
+**Eliminado (-2,698 lineas):**
+- `VacancyManagementView.tsx` (~1,040 lineas)
+- `/api/vacancies/` (5 archivos de rutas)
+- Entrada "Vacantes" del sidebar
+- `vacancies` del ViewType en store
+
+**Post-deploy requerido:** Ejecutar `POST /api/migrate` como SUPER_ADMIN para agregar columna `status` en produccion.
+
+---
+
 ### 22 Agosto 2026 -- Eliminacion del flujo de vacante publica (?v=slug)
 
 **Commit:** `ba08034` (pushed a main)
