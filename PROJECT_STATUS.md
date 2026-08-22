@@ -1,6 +1,6 @@
 # EvaluHR — Documento de Estado del Proyecto
 
-> **Última actualización:** 21 Agosto 2026
+> **Última actualización:** 22 Agosto 2026
 > **Propósito:** Contexto completo para futuras sesiones de desarrollo
 
 ---
@@ -901,6 +901,30 @@ bun run lint               # ESLint
 ---
 
 ## 15. Changelog
+
+### 22 Agosto 2026 -- Eliminacion del flujo de vacante publica (?v=slug)
+
+**Commit:** `ba08034` (pushed a main)
+
+**Motivo:** El link publico `?v=slug` no recolectaba nombre ni telefono del candidato antes de iniciar la evaluacion, inconsistente con el flujo de negocio donde RH siempre identifica al candidato (nombre + telefono) antes de invitar. El flujo de invitacion con token es el unico punto de entrada.
+
+**Archivos eliminados (4, -2,824 lineas):**
+- `src/components/views/PublicEvaluationView.tsx` -- Componente completo de evaluacion publica (996 lineas)
+- `src/app/api/public/apply/route.ts` -- Endpoint de aplicacion publica (scoring duplicado)
+- `src/app/api/public/vacancy/route.ts` -- Endpoint publico de info de vacante
+- `src/app/api/public/video/route.ts` -- Endpoint publico de video
+
+**Archivos modificados (3):**
+- `src/components/views/VacancyManagementView.tsx` -- Eliminada tarjeta "Link para compartir", boton "Copiar Link", funcion handleCopyLink, iconos Link2/Copy
+- `src/app/page.tsx` -- Eliminado hook useVacancyLinkCheck, routing public-evaluation, import PublicEvaluationView/CheckCircle2
+- `src/lib/store.ts` -- Eliminados ViewType public-evaluation/public-evaluation-complete, estado vacancySlug/vacancyApplicationId/vacancyAnswers
+
+**Conservado:**
+- `src/app/api/public/invitation/route.ts` -- Sigue activo para flujo de invitacion con `?token=xxx`
+
+**Resultado:** Un solo flujo de entrada: Invitacion con nombre + telefono. Sin endpoints publicos sin autenticacion (excepto invitation token).
+
+---
 
 ### 21 Agosto 2026 — Fix RLS bypass SUPER_ADMIN + Limpieza de producción
 
