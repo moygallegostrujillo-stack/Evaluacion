@@ -14,7 +14,6 @@ import InviteView from '@/components/views/InviteView'
 import InterviewsView from '@/components/views/InterviewsView'
 import QuestionsManagementView from '@/components/views/QuestionsManagementView'
 import VacancyManagementView from '@/components/views/VacancyManagementView'
-import PublicEvaluationView from '@/components/views/PublicEvaluationView'
 import CompanyManagementView from '@/components/views/CompanyManagementView'
 import InvitationWelcomeView from '@/components/views/InvitationWelcomeView'
 import { Card, CardContent } from '@/components/ui/card'
@@ -25,7 +24,7 @@ import { Separator } from '@/components/ui/separator'
 import {
   LayoutDashboard, Users, ClipboardCheck, UserPlus,
   BarChart3, Calendar, LogOut, Menu, X, ChevronRight, HelpCircle, Briefcase,
-  CheckCircle2, Building2, Shield, FileDown
+  Building2, Shield, FileDown
 } from 'lucide-react'
 
 // Restore auth from localStorage
@@ -43,16 +42,11 @@ function useAuthRestore() {
   useEffect(() => {
     if (hasRestored.current) return
     if (user) return // Already authenticated, don't override
-    // Don't restore auth if we're in a public evaluation flow
-    if (currentView === 'public-evaluation') return
-    // Also check if URL or localStorage indicates a public evaluation
-    const params = new URLSearchParams(window.location.search)
-    if (params.get('v')) return
-    if (localStorage.getItem('evaluhr_vacancy_slug')) return
     // CRITICAL FIX: If there is an invitation token in the URL, do NOT restore
     // stale auth from localStorage. The invitation flow will handle everything.
     // This prevents the race condition where useAuthRestore restores a stale
     // session before useInvitationCheck can clear it and do auto-login.
+    const params = new URLSearchParams(window.location.search)
     if (params.get('token')) return
 
     const token = localStorage.getItem('evaluhr_token')
@@ -107,47 +101,6 @@ function useInvitationCheck() {
       setCurrentView('invitation-welcome')
       // Clean URL — keep token in store only
       window.history.replaceState({}, '', '/')
-    }
-  }, [])
-}
-
-// Check for public vacancy link in URL (?v=slug) or localStorage resume
-function useVacancyLinkCheck() {
-  const setVacancySlug = useAppStore((s) => s.setVacancySlug)
-  const setVacancyApplicationId = useAppStore((s) => s.setVacancyApplicationId)
-  const setCurrentView = useAppStore((s) => s.setCurrentView)
-
-  useEffect(() => {
-    // Priority 1: Check URL for ?v=slug
-    const params = new URLSearchParams(window.location.search)
-    const vacancySlugFromUrl = params.get('v')
-
-    if (vacancySlugFromUrl) {
-      setVacancySlug(vacancySlugFromUrl)
-      setCurrentView('public-evaluation')
-      // Save slug to localStorage for reload recovery
-      localStorage.setItem('evaluhr_vacancy_slug', vacancySlugFromUrl)
-      // Check if there's a saved applicationId for this slug
-      const savedAppId = localStorage.getItem('evaluhr_vacancy_app_id')
-      if (savedAppId) {
-        setVacancyApplicationId(savedAppId)
-      }
-      // Do NOT strip the URL — keep ?v=slug so reload works
-      return
-    }
-
-    // Priority 2: Check localStorage for saved evaluation state (page reload)
-    const savedSlug = localStorage.getItem('evaluhr_vacancy_slug')
-    const savedAppId = localStorage.getItem('evaluhr_vacancy_app_id')
-
-    if (savedSlug) {
-      setVacancySlug(savedSlug)
-      if (savedAppId) {
-        setVacancyApplicationId(savedAppId)
-      }
-      setCurrentView('public-evaluation')
-      // Restore URL to include the slug
-      window.history.replaceState({}, '', `/?v=${encodeURIComponent(savedSlug)}`)
     }
   }, [])
 }
@@ -318,18 +271,6 @@ function renderView(view: ViewType) {
       return <InterviewsView />
     case 'companies':
       return <CompanyManagementView />
-    case 'public-evaluation':
-      return <PublicEvaluationView />
-    case 'public-evaluation-complete':
-      return <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 via-white to-teal-50 p-4">
-        <Card className="max-w-md w-full shadow-xl border-0">
-          <CardContent className="p-8 text-center">
-            <CheckCircle2 className="w-16 h-16 text-emerald-500 mx-auto mb-4" />
-            <h2 className="text-xl font-bold">¡Evaluación Completada!</h2>
-            <p className="text-gray-500 mt-2">Gracias por completar tu evaluación. La empresa revisará tu perfil y te contactará.</p>
-          </CardContent>
-        </Card>
-      </div>
     default:
       return <DashboardView />
   }
@@ -342,13 +283,6 @@ export default function Home() {
 
   useAuthRestore()
   useInvitationCheck()
-  useVacancyLinkCheck()
-
-  // Public evaluation - no auth required
-  if (currentView === 'public-evaluation') {
-    return <PublicEvaluationView />
-  }
-
   // Invitation welcome page - no auth required (shows company/position info)
   // After useInvitationCheck clears stale auth, user is always null here.
   // The InvitationWelcomeView handles auto-login → consent → evaluation routing.

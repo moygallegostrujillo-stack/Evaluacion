@@ -36,7 +36,7 @@ import {
 } from '@/components/ui/select'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import {
-  Briefcase, Plus, Link2, Copy, Pause, Play, XCircle,
+  Briefcase, Plus, Pause, Play, XCircle,
   Edit3, Trash2, Users, HelpCircle, CheckCircle2, Video,
   RefreshCw, ExternalLink, Sparkles, Loader2
 } from 'lucide-react'
@@ -282,10 +282,9 @@ export default function VacancyManagementView() {
         setSelectedVacancyId(data.vacancy.id)
         setShowCreateDialog(false)
         setCreateForm({ title: '', description: '', sector: 'GENERAL', companyId: '' })
-        const link = `${window.location.origin}/?v=${data.vacancy.slug}`
         toast({
           title: 'Vacante creada',
-          description: `Link para compartir: ${link}`,
+          description: 'Vacante creada exitosamente',
         })
       } else {
         toast({ title: 'Error', description: data.error || 'No se pudo crear la vacante', variant: 'destructive' })
@@ -319,19 +318,6 @@ export default function VacancyManagementView() {
       toast({ title: 'Error', description: 'No se pudo actualizar el estado', variant: 'destructive' })
     }
     setShowCloseDialog(false)
-  }
-
-  // ============================================
-  // Copy link
-  // ============================================
-
-  const handleCopyLink = (slug: string) => {
-    const link = `${window.location.origin}/?v=${slug}`
-    navigator.clipboard.writeText(link).then(() => {
-      toast({ title: 'Link copiado', description: link })
-    }).catch(() => {
-      toast({ title: 'Link', description: link })
-    })
   }
 
   // ============================================
@@ -606,14 +592,6 @@ export default function VacancyManagementView() {
 
                 {/* Actions */}
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleCopyLink(selectedVacancy.slug)}
-                  >
-                    <Copy className="w-4 h-4 mr-1" />
-                    Copiar Link
-                  </Button>
                   {selectedVacancy.status === 'ACTIVE' && (
                     <Button
                       variant="outline"
@@ -648,31 +626,6 @@ export default function VacancyManagementView() {
                   )}
                 </div>
               </div>
-
-              {/* Shareable Link Section */}
-              <Card className="bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-200">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Link2 className="w-4 h-4 text-emerald-600" />
-                    <span className="text-sm font-medium text-emerald-700">Link para compartir</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 bg-white rounded-md border border-emerald-200 px-3 py-2 text-sm text-gray-700 font-mono truncate">
-                      {window.location.origin}/?v={selectedVacancy.slug}
-                    </div>
-                    <Button
-                      size="sm"
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white flex-shrink-0"
-                      onClick={() => handleCopyLink(selectedVacancy.slug)}
-                    >
-                      <Copy className="w-4 h-4" />
-                    </Button>
-                  </div>
-                  <p className="text-xs text-emerald-600 mt-2">
-                    Comparte este link con los candidatos para que apliquen a la vacante
-                  </p>
-                </CardContent>
-              </Card>
 
               {/* Info Cards */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">

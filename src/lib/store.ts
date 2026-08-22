@@ -18,8 +18,6 @@ export type ViewType =
   | 'questions'
   | 'vacancies'
   | 'companies'
-  | 'public-evaluation'
-  | 'public-evaluation-complete'
   | 'settings'
   | 'invitation-welcome'
 
@@ -149,17 +147,6 @@ interface AppState {
   // Invitation details (from public API)
   invitationData: InvitationData | null
   setInvitationData: (data: InvitationData | null) => void
-
-  // Public vacancy application state
-  vacancySlug: string | null
-  setVacancySlug: (slug: string | null) => void
-  vacancyApplicationId: string | null
-  setVacancyApplicationId: (id: string | null) => void
-  vacancyCurrentStep: number
-  setVacancyCurrentStep: (step: number) => void
-  vacancyAnswers: Record<string, number | string>
-  setVacancyAnswer: (questionId: string, value: number | string) => void
-  resetVacancyApplication: () => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -220,17 +207,4 @@ export const useAppStore = create<AppState>((set) => ({
   setInvitationToken: (invitationToken) => set({ invitationToken }),
   invitationData: null,
   setInvitationData: (invitationData) => set({ invitationData }),
-
-  // Public vacancy application
-  vacancySlug: null,
-  setVacancySlug: (vacancySlug) => set({ vacancySlug }),
-  vacancyApplicationId: null,
-  setVacancyApplicationId: (vacancyApplicationId) => set({ vacancyApplicationId }),
-  vacancyCurrentStep: 0,
-  setVacancyCurrentStep: (vacancyCurrentStep) => set({ vacancyCurrentStep }),
-  vacancyAnswers: {},
-  setVacancyAnswer: (questionId, value) =>
-    set((state) => ({ vacancyAnswers: { ...state.vacancyAnswers, [questionId]: value } })),
-  resetVacancyApplication: () =>
-    set({ vacancySlug: null, vacancyApplicationId: null, vacancyCurrentStep: 0, vacancyAnswers: {} }),
 }))
