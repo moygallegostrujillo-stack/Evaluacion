@@ -625,9 +625,10 @@ Todos los archivos `.tsx` con sufijo `View`. Los más complejos:
 - Ejecuta `DELETE /api/positions?id=xxx` que hace soft-delete (`active=false`).
 
 ### Limpieza de producción (21 Ago 2026)
-- Endpoint `/api/cleanup` creado (SUPER_ADMIN only, con `dryRun` support).
+- Endpoint `/api/cleanup` creado (SUPER_ADMIN only, con `dryRun` support). **TEMPORAL — eliminar después de uso.**
 - Ejecutado en producción: eliminados 4 resultados, 4 sesiones, 4 invitaciones, 70 preguntas, 7 plantillas, 2 puestos, 3 candidatos de Café DeChiapas.
 - DB de producción limpia, lista para empezar desde cero.
+- Corregido orden FK: EvaluationResult > EvaluationResponse > EvaluationSession (antes fallaba por violacion de constraint).
 
 ### Sesiones anteriores (resumen)
 
@@ -674,6 +675,7 @@ ZAI_TOKEN        — Token de sesión Z.ai
 | Middleware deprecated warning | Next.js 16 muestra warning sobre `middleware.ts` config matcher. No rompe funcionalidad pero debe ajustarse en futura versión. | Media |
 | DB-level RLS no activado | `prisma/rls-policies.sql` existe pero no se ha ejecutado en producción. Solo App-level RLS (Prisma Extension) está activo. **Recomendación:** ejecutar SQL contra Supabase y activar `db-rls-session.ts`. | Alta |
 | Seguridad de endpoints públicos | `/api/public/apply` y `/api/public/video` usan verificación por slug token (ligera). Considerar rate limiting y CAPTCHA. | Alta |
+| Endpoint /api/cleanup expuesto | Endpoint temporal de limpieza aún existe en código. Debe eliminarse o deshabilitarse. | Media |
 
 ### Auditoría legal (31 secciones)
 
@@ -902,7 +904,7 @@ bun run lint               # ESLint
 
 ### 21 Agosto 2026 — Fix RLS bypass SUPER_ADMIN + Limpieza de producción
 
-**Commits:** `a8be259` → `fa3d4ad` → `0e89348` (pushed to main)
+**Commits:** `a8be259` → `fa3d4ad` → `0e89348` → `40d761d` → `775070c` (todos pushed a main)
 
 **Archivos modificados (10):**
 - `src/app/api/positions/route.ts` — createSuperAdminRLSClient + DELETE endpoint + import fix
@@ -913,7 +915,7 @@ bun run lint               # ESLint
 - `src/app/api/invite/route.ts` — createSuperAdminRLSClient
 - `src/app/api/interviews/route.ts` — createSuperAdminRLSClient (2 handlers)
 - `src/app/api/dashboard/route.ts` — createSuperAdminRLSClient
-- `src/app/api/cleanup/route.ts` (NUEVO) — SUPER_ADMIN cleanup endpoint
+- `src/app/api/cleanup/route.ts` (NUEVO, TEMPORAL) — SUPER_ADMIN cleanup endpoint (deshabilitar/eliminar después de uso)
 - `src/components/views/QuestionsManagementView.tsx` — Botón eliminar puesto
 - `src/app/api/auth/route.ts` — Eliminada acción register (código muerto)
 - `src/app/api/invite/route.ts` — Email eliminado del flujo de invitación
@@ -1034,7 +1036,7 @@ bun run lint               # ESLint
 
 **Fix:** Verificar `res.ok` en `handleComplete()` antes de navegar. Mostrar error al usuario si falla.
 
-**Estado:** Commited localmente. Pendiente push a GitHub (requiere token GitHub válido).
+**Estado:** Commited y pushed a GitHub.
 
 ---
 
