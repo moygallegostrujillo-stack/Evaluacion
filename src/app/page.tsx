@@ -13,18 +13,14 @@ import CompareView from '@/components/views/CompareView'
 import InviteView from '@/components/views/InviteView'
 import InterviewsView from '@/components/views/InterviewsView'
 import QuestionsManagementView from '@/components/views/QuestionsManagementView'
-import VacancyManagementView from '@/components/views/VacancyManagementView'
 import CompanyManagementView from '@/components/views/CompanyManagementView'
 import InvitationWelcomeView from '@/components/views/InvitationWelcomeView'
-import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import {
-  LayoutDashboard, Users, ClipboardCheck, UserPlus,
-  BarChart3, Calendar, LogOut, Menu, X, ChevronRight, HelpCircle, Briefcase,
-  Building2, Shield, FileDown
+  LayoutDashboard, Users, UserPlus,
+  BarChart3, Calendar, LogOut, Menu, X, HelpCircle,
+  Building2, FileDown
 } from 'lucide-react'
 
 // Restore auth from localStorage
@@ -122,7 +118,6 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
     { view: 'companies', label: 'Empresas', icon: <Building2 className="w-5 h-5" />, show: isSuperAdmin },
     { view: 'dashboard', label: 'Panel', icon: <LayoutDashboard className="w-5 h-5" />, show: true },
     { view: 'candidates', label: 'Candidatos', icon: <Users className="w-5 h-5" />, show: isRH || isGerente },
-    { view: 'vacancies', label: 'Vacantes', icon: <Briefcase className="w-5 h-5" />, show: isRH || isGerente },
     { view: 'questions', label: 'Preguntas', icon: <HelpCircle className="w-5 h-5" />, show: isRH || isGerente },
     { view: 'invite', label: 'Invitar', icon: <UserPlus className="w-5 h-5" />, show: isRH },
     { view: 'compare', label: 'Comparar', icon: <BarChart3 className="w-5 h-5" />, show: isRH || isGerente },
@@ -263,8 +258,6 @@ function renderView(view: ViewType) {
       return <CompareView />
     case 'invite':
       return <InviteView />
-    case 'vacancies':
-      return <VacancyManagementView />
     case 'questions':
       return <QuestionsManagementView />
     case 'interviews':

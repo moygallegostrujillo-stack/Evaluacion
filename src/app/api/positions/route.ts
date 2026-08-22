@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
       // Only SUPER_ADMIN can see positions from all companies — use unscoped client
       if (auth.role === 'SUPER_ADMIN') {
         const positions = await getUnscopedClient().position.findMany({
-          where: { active: true, ...(sector ? { sector } : {}) },
+          where: { active: true, status: 'ACTIVE', ...(sector ? { sector } : {}) },
           orderBy: [{ sector: 'asc' }, { title: 'asc' }],
           include: {
             company: {
@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
       // Non-admin: use RLS client (auto-scoped to their company)
       const { client: rlsDb } = createRLSClient(auth)
       const positions = await rlsDb.position.findMany({
-        where: { active: true, ...(sector ? { sector } : {}) },
+        where: { active: true, status: 'ACTIVE', ...(sector ? { sector } : {}) },
         orderBy: [{ sector: 'asc' }, { title: 'asc' }],
         include: {
           company: {
@@ -79,7 +79,7 @@ export async function GET(req: NextRequest) {
       : createRLSClient(auth)
 
     const positions = await rlsDb.position.findMany({
-      where: { active: true },
+      where: { active: true, status: 'ACTIVE' },
       orderBy: { createdAt: 'desc' },
       include: {
         evaluationTemplates: {
@@ -199,6 +199,11 @@ export async function DELETE(req: NextRequest) {
 }
 
 // PATCH: Generate templates for existing positions that don't have them
+// NOTE: The vacancy system previously had AI-generated knowledge questions via
+// POST /api/vacancies/[id]/generate-questions. The position system already
+// auto-generates templates via generateTemplatesForPosition on creation.
+// If AI knowledge question generation is needed in the future, it can be
+// added here as a separate endpoint (e.g., PATCH with action=generate-ai-questions).
 export async function PATCH(req: NextRequest) {
   try {
     const auth = getAuthFromHeaders(req.headers)
@@ -238,5 +243,66 @@ export async function PATCH(req: NextRequest) {
   } catch (error) {
     console.error('Positions PATCH error:', error)
     return NextResponse.json({ error: 'Error generating templates' }, { status: 500 })
+  }
+}
+
+// PUT: Change position status (ACTIVE ↔ PAUSED → CLOSED → ACTIVE)
+// Valid transitions: ACTIVE→PAUSED, PAUSED→ACTIVE, any→CLOSED, CLOSED→ACTIVE
+export async function PUT(req: NextRequest) {
+  try {
+    const auth = getAuthFromHeaders(req.headers)
+    if (!auth) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const body = await req.json()
+    const { id, status } = body
+
+    if (!id || !status) {
+      return NextResponse.json({ error: 'id and status are required' }, { status: 400 })
+    }
+
+    const validStatuses = ['ACTIVE', 'PAUSED', 'CLOSED']
+    if (!validStatuses.includes(status)) {
+      return NextResponse.json({ error: 'Invalid status. Must be ACTIVE, PAUSED, or CLOSED' }, { status: 400 })
+    }
+
+    // Use RLS client scoped to the user's company (or SUPER_ADMIN target)
+    const targetCompanyId = auth.role === 'SUPER_ADMIN'
+      ? body.companyId
+      : null
+    const { client: rlsDb } = targetCompanyId
+      ? createSuperAdminRLSClient(targetCompanyId)
+      : createRLSClient(auth)
+
+    const position = await rlsDb.position.findUnique({
+      where: { id },
+    })
+    if (!position) {
+      return NextResponse.json({ error: 'Position not found' }, { status: 404 })
+    }
+
+    // Validate status transitions
+    const currentStatus = (position as { status?: string }).status || 'ACTIVE'
+    const allowedTransitions: Record<string, string[]> = {
+      ACTIVE: ['PAUSED', 'CLOSED'],
+      PAUSED: ['ACTIVE', 'CLOSED'],
+      CLOSED: ['ACTIVE'],
+    }
+    if (!allowedTransitions[currentStatus]?.includes(status)) {
+      return NextResponse.json({
+        error: `Cannot transition from ${currentStatus} to ${status}. Allowed: ${allowedTransitions[currentStatus]?.join(', ')}`,
+      }, { status: 400 })
+    }
+
+    const updated = await rlsDb.position.update({
+      where: { id },
+      data: { status },
+    })
+
+    return NextResponse.json({ position: updated })
+  } catch (error) {
+    console.error('Positions PUT error:', error)
+    return NextResponse.json({ error: 'Error updating position status' }, { status: 500 })
   }
 }

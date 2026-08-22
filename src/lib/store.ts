@@ -16,7 +16,6 @@ export type ViewType =
   | 'evaluation-complete'
   | 'interviews'
   | 'questions'
-  | 'vacancies'
   | 'companies'
   | 'settings'
   | 'invitation-welcome'

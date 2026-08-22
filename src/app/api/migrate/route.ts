@@ -243,6 +243,23 @@ export async function POST(req: NextRequest) {
       results.push(`✗ Failed to create CompanyPrivacyNotice: ${tblErr}`)
     }
 
+    // ============================================
+    // 6. Add status column to Position (Aug 2026 - Position/Vacancy unification)
+    // ============================================
+    try {
+      await db.$executeRawUnsafe(`SELECT "status" FROM "Position" LIMIT 0;`)
+      results.push('✓ Column "Position.status" already exists')
+    } catch {
+      try {
+        await db.$executeRawUnsafe(
+          `ALTER TABLE "Position" ADD COLUMN IF NOT EXISTS "status" TEXT NOT NULL DEFAULT 'ACTIVE';`
+        )
+        results.push('✓ Added column "Position.status" (TEXT, default ACTIVE)')
+      } catch (addErr) {
+        results.push(`✗ Failed to add column "Position.status": ${addErr}`)
+      }
+    }
+
     // Verify by checking the columns
     let verification
     try {
