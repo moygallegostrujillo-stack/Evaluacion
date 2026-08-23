@@ -102,7 +102,14 @@ export default function CompanyManagementView() {
   const [companies, setCompanies] = useState<CompanyData[]>([])
   const [users, setUsers] = useState<UserData[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null)
+  const [selectedCompanyId, setSelectedCompanyIdLocal] = useState<string | null>(null)
+  const setGlobalSelectedCompanyId = useAppStore((s) => s.setSelectedCompanyId)
+
+  // Sync local selectedCompanyId with global store
+  const setSelectedCompanyId = (id: string | null) => {
+    setSelectedCompanyIdLocal(id)
+    setGlobalSelectedCompanyId(id)
+  }
 
   // Create company form
   const [showCreateCompany, setShowCreateCompany] = useState(false)

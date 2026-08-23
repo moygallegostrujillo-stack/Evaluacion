@@ -146,6 +146,10 @@ interface AppState {
   // Invitation details (from public API)
   invitationData: InvitationData | null
   setInvitationData: (data: InvitationData | null) => void
+
+  // SUPER_ADMIN selected company context
+  selectedCompanyId: string | null
+  setSelectedCompanyId: (id: string | null) => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -206,4 +210,8 @@ export const useAppStore = create<AppState>((set) => ({
   setInvitationToken: (invitationToken) => set({ invitationToken }),
   invitationData: null,
   setInvitationData: (invitationData) => set({ invitationData }),
+
+  // SUPER_ADMIN selected company context
+  selectedCompanyId: null,
+  setSelectedCompanyId: (selectedCompanyId) => set({ selectedCompanyId }),
 }))

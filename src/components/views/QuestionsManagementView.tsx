@@ -126,7 +126,11 @@ function StatusBadge({ status }: { status: string }) {
 
 export default function QuestionsManagementView() {
   const user = useAppStore((s) => s.user)
+  const selectedCompanyId = useAppStore((s) => s.selectedCompanyId)
   const { toast } = useToast()
+
+  // For SUPER_ADMIN, use the globally selected company; for regular users, use their own
+  const effectiveCompanyId = user?.companyId || selectedCompanyId
 
   // Data
   const [positions, setPositions] = useState<PositionData[]>([])
@@ -168,7 +172,7 @@ export default function QuestionsManagementView() {
     setLoading(true)
     try {
       const posParams = new URLSearchParams()
-      if (user?.companyId) posParams.set('companyId', user.companyId)
+      if (effectiveCompanyId) posParams.set('companyId', effectiveCompanyId)
       const res = await apiFetch(`/api/positions?${posParams.toString()}`)
       const data = await res.json()
       setPositions(data.positions || [])
@@ -177,7 +181,7 @@ export default function QuestionsManagementView() {
     } finally {
       setLoading(false)
     }
-  }, [user?.companyId])
+  }, [effectiveCompanyId])
 
   useEffect(() => {
     reloadPositions()
@@ -258,7 +262,7 @@ export default function QuestionsManagementView() {
   }
 
   const handleSaveNew = async () => {
-    if (!selectedTemplateId || !user?.companyId || !formText.trim()) return
+    if (!selectedTemplateId || !effectiveCompanyId || !formText.trim()) return
     if (formOptions.some(o => !o.trim())) {
       toast({ title: 'Error', description: 'Todas las opciones deben tener texto', variant: 'destructive' })
       return
@@ -275,7 +279,7 @@ export default function QuestionsManagementView() {
           options: formOptions,
           correctAnswer: formCorrectAnswer,
           isCustom: true,
-          companyId: user.companyId,
+          companyId: effectiveCompanyId,
         }),
       })
       if (!res.ok) throw new Error('Error saving')
@@ -369,7 +373,7 @@ export default function QuestionsManagementView() {
     if (!deletingPositionId) return
     setSaving(true)
     try {
-      const companyIdParam = user?.companyId ? `&companyId=${user.companyId}` : ''
+      const companyIdParam = effectiveCompanyId ? `&companyId=${effectiveCompanyId}` : ''
       const res = await apiFetch(`/api/positions?id=${deletingPositionId}${companyIdParam}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Error deleting')
       toast({ title: 'Puesto eliminado', description: 'El puesto fue desactivado exitosamente' })
@@ -397,7 +401,7 @@ export default function QuestionsManagementView() {
     setSaving(true)
     try {
       const body: Record<string, unknown> = { id: positionId, status: newStatus }
-      if (user?.companyId) body.companyId = user.companyId
+      if (effectiveCompanyId) body.companyId = effectiveCompanyId
       const res = await apiFetch('/api/positions', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -435,7 +439,7 @@ export default function QuestionsManagementView() {
         category: newPositionCategory,
         hasKnowledgeTest: newPositionHasKnowledge,
       }
-      if (user?.companyId) body.companyId = user.companyId
+      if (effectiveCompanyId) body.companyId = effectiveCompanyId
       const res = await apiFetch('/api/positions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
