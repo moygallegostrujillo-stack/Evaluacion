@@ -1074,7 +1074,7 @@ export default function QuestionsManagementView() {
               Crear Nuevo Puesto
             </DialogTitle>
             <DialogDescription>
-              Se crearán automáticamente las plantillas de evaluación (psicométrica, psicológica y conocimientos).
+              Se crearán automáticamente las plantillas de evaluación (psicométrica, psicológica, conocimientos e integridad).
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
