@@ -153,7 +153,7 @@ export default function ConsentView() {
             <div className="bg-amber-50 p-4 rounded-lg border border-amber-200 space-y-3">
               <p className="text-sm text-amber-900 font-medium">
                 Está a punto de realizar evaluaciones psicométricas,
-                psicológicas y de conocimientos.
+                psicológicas, de conocimientos y de integridad.
               </p>
               <p className="text-sm text-amber-800">
                 Los resultados serán utilizados exclusivamente para el proceso
@@ -162,8 +162,9 @@ export default function ConsentView() {
               <div className="flex items-start gap-2 bg-amber-100/60 p-2.5 rounded-md">
                 <Info className="w-4 h-4 text-amber-700 flex-shrink-0 mt-0.5" />
                 <p className="text-xs text-amber-800 leading-relaxed">
-                  Sus respuestas a las pruebas psicométricas y psicológicas son
-                  consideradas <strong>Datos Personales Sensibles</strong>{' '}
+                  Sus respuestas a las pruebas psicométricas, psicológicas
+                  y de integridad son consideradas{' '}
+                  <strong>Datos Personales Sensibles</strong>{' '}
                   conforme a la{' '}
                   <strong>
                     Ley Federal de Protección de Datos Personales en Posesión
@@ -223,8 +224,8 @@ export default function ConsentView() {
                 </li>
                 <li className="flex items-start gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
-                  Respuestas a evaluaciones psicométricas (Big Five) y
-                  psicológicas
+                  Respuestas a evaluaciones psicométricas (Big Five),
+                  psicológicas y de integridad
                 </li>
                 <li className="flex items-start gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
@@ -282,8 +283,9 @@ export default function ConsentView() {
                   <p className="text-sm text-gray-600 leading-relaxed">
                     Incluye evaluación <strong>psicométrica</strong> (Big Five),{' '}
                     <strong>psicológica</strong> (estrés, empatía,
-                    adaptabilidad, liderazgo, trabajo en equipo) y de{' '}
-                    <strong>conocimientos técnicos</strong>.
+                    adaptabilidad, liderazgo, trabajo en equipo), de{' '}
+                    <strong>conocimientos técnicos</strong> y de{' '}
+                    <strong>integridad</strong> (orientativo).
                   </p>
                   <p className="text-xs text-gray-500 mt-1.5">
                     Recomendada para una valoración integral del candidato.
@@ -459,8 +461,8 @@ export default function ConsentView() {
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0 mt-1.5" />
                 <span>
                   <strong>Datos sensibles</strong> (respuestas psicométricas /
-                  psicológicas): se eliminarán al concluir el proceso o al
-                  retirar el consentimiento.
+                  psicológicas / de integridad): se eliminarán al concluir el
+                  proceso o al retirar el consentimiento.
                 </span>
               </li>
               <li className="flex items-start gap-2">

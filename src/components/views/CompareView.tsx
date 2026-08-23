@@ -93,7 +93,7 @@ export default function CompareView() {
   }
 
   // Prepare comparison data
-  const dimensions = ['openness', 'conscientiousness', 'extraversion', 'agreeableness', 'neuroticism', 'stressLevel', 'empathy', 'adaptability', 'leadership', 'teamwork']
+  const dimensions = ['openness', 'conscientiousness', 'extraversion', 'agreeableness', 'neuroticism', 'stressLevel', 'empathy', 'adaptability', 'leadership', 'teamwork', 'knowledgeScore', 'integrityScore']
   const dimensionLabels: Record<string, string> = {
     openness: 'Apertura',
     conscientiousness: 'Responsabilidad',
@@ -102,9 +102,11 @@ export default function CompareView() {
     neuroticism: 'Neuroticismo',
     stressLevel: 'Estrés',
     empathy: 'Empatía',
-    adaptability: 'Adaptabilidad',
+    adaptabilidad: 'Adaptabilidad',
     leadership: 'Liderazgo',
     teamwork: 'Trabajo Equipo',
+    knowledgeScore: 'Conocimientos',
+    integrityScore: 'Integridad',
   }
 
   const radarData = dimensions.slice(0, 5).map(dim => {
@@ -115,10 +117,18 @@ export default function CompareView() {
     return point
   })
 
-  const barData = dimensions.slice(5).map(dim => {
+  const barData = dimensions.slice(5, 10).map(dim => {
     const point: any = { dimension: dimensionLabels[dim] }
     results.forEach((r, i) => {
       point[`candidato${i}`] = Math.round((r as any)[dim])
+    })
+    return point
+  })
+
+  const kiData = dimensions.slice(10).map(dim => {
+    const point: any = { dimension: dimensionLabels[dim] }
+    results.forEach((r, i) => {
+      point[`candidato${i}`] = Math.round((r as any)[dim] || 0)
     })
     return point
   })
@@ -235,6 +245,33 @@ export default function CompareView() {
         <CardContent>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={barData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="dimension" tick={{ fontSize: 11 }} />
+              <YAxis domain={[0, 100]} />
+              <Tooltip />
+              <Legend />
+              {results.map((_, i) => (
+                <Bar
+                  key={i}
+                  dataKey={`candidato${i}`}
+                  name={results[i].candidateName?.split(' ')[0] || `Cand. ${i + 1}`}
+                  fill={COLORS[i % COLORS.length]}
+                  radius={[2, 2, 0, 0]}
+                />
+              ))}
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      {/* Knowledge & Integrity Bar Comparison */}
+      <Card className="shadow-sm">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg">Conocimientos e Integridad - Comparativo</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={250}>
+            <BarChart data={kiData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="dimension" tick={{ fontSize: 11 }} />
               <YAxis domain={[0, 100]} />

@@ -200,6 +200,8 @@ export async function GET(req: NextRequest) {
           adaptability: allCandidates.reduce((s, r) => s + r.scores.adaptability, 0) / (allCandidates.length || 1),
           leadership: allCandidates.reduce((s, r) => s + r.scores.leadership, 0) / (allCandidates.length || 1),
           teamwork: allCandidates.reduce((s, r) => s + r.scores.teamwork, 0) / (allCandidates.length || 1),
+          knowledgeScore: allCandidates.reduce((s, r) => s + (r.scores.knowledgeScore || 0), 0) / (allCandidates.length || 1),
+          integrityScore: allCandidates.reduce((s, r) => s + r.scores.integrityScore, 0) / (allCandidates.length || 1),
         },
       }
 

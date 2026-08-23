@@ -46,7 +46,7 @@ export default function EvaluationCompleteView() {
   }
 
   const consentOptionLabel = user?.consentOption === 'FULL'
-    ? 'Evaluación Completa (Psicométrica + Psicológica + Conocimientos)'
+    ? 'Evaluación Completa (Psicométrica + Psicológica + Conocimientos + Integridad)'
     : user?.consentOption === 'KNOWLEDGE_ONLY'
     ? 'Solo Conocimientos Técnicos'
     : 'No registrado'
