@@ -39,7 +39,7 @@ import {
   Plus, Trash2, Edit3, BookOpen, Brain, ClipboardList,
   Utensils, ShoppingBag, CheckCircle2, XCircle,
   HelpCircle, ChevronDown, ChevronRight, Loader2,
-  Pause, Play
+  Pause, Play, ShieldCheck
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
@@ -218,7 +218,8 @@ export default function QuestionsManagementView() {
       case 'PSICOMETRICA': return <Brain className="w-4 h-4" />
       case 'PSICOLOGICA': return <ClipboardList className="w-4 h-4" />
       case 'CONOCIMIENTOS': return <BookOpen className="w-4 h-4" />
-      default: return null
+      case 'INTEGRIDAD': return <ShieldCheck className="w-4 h-4" />
+      default: return <HelpCircle className="w-4 h-4" />
     }
   }
 
@@ -227,6 +228,7 @@ export default function QuestionsManagementView() {
       case 'PSICOMETRICA': return 'Psicométrica'
       case 'PSICOLOGICA': return 'Psicológica'
       case 'CONOCIMIENTOS': return 'Conocimientos'
+      case 'INTEGRIDAD': return 'Integridad'
       default: return type
     }
   }
@@ -236,6 +238,7 @@ export default function QuestionsManagementView() {
       case 'PSICOMETRICA': return 'bg-violet-100 text-violet-700 border-violet-200'
       case 'PSICOLOGICA': return 'bg-sky-100 text-sky-700 border-sky-200'
       case 'CONOCIMIENTOS': return 'bg-amber-100 text-amber-700 border-amber-200'
+      case 'INTEGRIDAD': return 'bg-rose-100 text-rose-700 border-rose-200'
       default: return 'bg-gray-100 text-gray-700 border-gray-200'
     }
   }
