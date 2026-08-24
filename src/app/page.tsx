@@ -273,13 +273,42 @@ export default function Home() {
   const user = useAppStore((s) => s.user)
   const currentView = useAppStore((s) => s.currentView)
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false)
+  // Track client mount to avoid flashing LoginView during SSR/hydration.
+  // Before mount, we render a neutral loading state (matches SSR output,
+  // so no hydration mismatch). After mount, the URL check + store state
+  // correctly determine which view to show. This prevents invitation users
+  // from seeing LoginView for 1-2 seconds before useInvitationCheck's
+  // effect can run and switch to invitation-welcome.
+  const [mounted, setMounted] = React.useState(false)
 
   useAuthRestore()
   useInvitationCheck()
+
+  React.useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Before client mount: render a neutral loading spinner. This matches
+  // the SSR output (server also renders this), preventing hydration
+  // mismatch. Once mounted, useEffect runs and useInvitationCheck sets
+  // the correct view, triggering a re-render with the right content.
+  if (!mounted) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 via-white to-teal-50">
+        <div className="animate-spin w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full" />
+      </div>
+    )
+  }
+
+  // After mount: check for invitation token in URL synchronously.
+  // This catches the case where useInvitationCheck hasn't run yet but
+  // the URL has a token (e.g., user just landed on the invitation link).
+  const hasInvitationToken =
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).has('token')
+
   // Invitation welcome page - no auth required (shows company/position info)
-  // After useInvitationCheck clears stale auth, user is always null here.
-  // The InvitationWelcomeView handles auto-login → consent → evaluation routing.
-  if (currentView === 'invitation-welcome') {
+  if (hasInvitationToken || currentView === 'invitation-welcome') {
     return <InvitationWelcomeView />
   }
 
