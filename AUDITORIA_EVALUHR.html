@@ -1,0 +1,2819 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Auditoría Técnica y Funcional de EvaluHR</title>
+<style>
+  @page {
+    size: A4;
+    margin: 18mm 16mm 20mm 16mm;
+    @bottom-center {
+      content: counter(page) " / " counter(pages);
+      font-size: 9pt;
+      color: #6b7280;
+    }
+    @top-center {
+      content: "Auditoría EvaluHR — Confidencial";
+      font-size: 8pt;
+      color: #9ca3af;
+    }
+  }
+  @page :first {
+    @top-center { content: ""; }
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Helvetica Neue', 'Arial', 'Noto Sans', sans-serif;
+    font-size: 10pt;
+    line-height: 1.5;
+    color: #1f2937;
+    background: #ffffff;
+  }
+  h1 {
+    font-size: 22pt;
+    color: #0f766e;
+    border-bottom: 3px solid #0f766e;
+    padding-bottom: 8px;
+    margin-top: 0;
+    margin-bottom: 16px;
+    line-height: 1.2;
+  }
+  h2 {
+    font-size: 15pt;
+    color: #ffffff;
+    background: #0f766e;
+    padding: 6px 12px;
+    margin-top: 28px;
+    margin-bottom: 12px;
+    border-radius: 4px;
+    page-break-after: avoid;
+    page-break-before: auto;
+  }
+  h3 {
+    font-size: 12pt;
+    color: #115e59;
+    border-left: 4px solid #14b8a6;
+    padding-left: 10px;
+    margin-top: 20px;
+    margin-bottom: 8px;
+    page-break-after: avoid;
+  }
+  h4 {
+    font-size: 11pt;
+    color: #0f766e;
+    margin-top: 14px;
+    margin-bottom: 6px;
+    page-break-after: avoid;
+  }
+  p { margin: 6px 0; }
+  ul, ol { margin: 6px 0 6px 22px; padding: 0; }
+  li { margin: 3px 0; }
+  code {
+    font-family: 'Menlo', 'Consolas', 'Courier New', monospace;
+    background: #f1f5f9;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 9pt;
+    color: #be123c;
+  }
+  pre {
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 12px 14px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 8.5pt;
+    line-height: 1.4;
+    page-break-inside: avoid;
+  }
+  pre code {
+    background: transparent;
+    color: inherit;
+    padding: 0;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 10px 0;
+    font-size: 8.5pt;
+    page-break-inside: avoid;
+  }
+  th {
+    background: #0f766e;
+    color: white;
+    padding: 6px 8px;
+    text-align: left;
+    border: 1px solid #0f766e;
+    font-weight: 600;
+  }
+  td {
+    padding: 5px 8px;
+    border: 1px solid #d1d5db;
+    vertical-align: top;
+  }
+  tr:nth-child(even) td { background: #f9fafb; }
+  tr:nth-child(odd) td { background: #ffffff; }
+  blockquote {
+    border-left: 4px solid #f59e0b;
+    background: #fffbeb;
+    padding: 8px 14px;
+    margin: 10px 0;
+    color: #78350f;
+    font-style: italic;
+  }
+  hr {
+    border: none;
+    border-top: 1px solid #d1d5db;
+    margin: 18px 0;
+  }
+  strong { color: #111827; }
+  a { color: #0f766e; text-decoration: none; }
+  /* Cover page */
+  .cover {
+    page-break-after: always;
+    text-align: center;
+    padding-top: 60mm;
+  }
+  .cover h1 {
+    font-size: 32pt;
+    border: none;
+    color: #0f766e;
+    margin-bottom: 8px;
+  }
+  .cover .subtitle {
+    font-size: 14pt;
+    color: #4b5563;
+    margin-bottom: 30mm;
+  }
+  .cover .meta {
+    font-size: 10pt;
+    color: #6b7280;
+    line-height: 2;
+  }
+</style>
+</head>
+<body>
+  <div class="cover">
+    <h1>AUDITORÍA TÉCNICA Y FUNCIONAL DE EVALUHR</h1>
+    <div class="subtitle">Revisión para análisis jurídico y de cumplimiento bajo legislación mexicana<br/>(LFPDPPP, NOM-035-STPS-2018, Art. 37 Bis)</div>
+    <div class="meta">
+      <strong>Base de evidencia:</strong> Código fuente en /home/z/my-project<br/>
+      <strong>Alcance:</strong> 22 rutas API · 16 modelos Prisma · 4 plantillas de evaluación<br/>
+      <strong>Verificabilidad:</strong> Cada afirmación incluye archivo y línea citable<br/>
+      <strong>Fecha:</strong> 2025-07-25<br/>
+      <strong>Commit base:</strong> 1249353<br/>
+      <strong>Documento:</strong> Confidencial — para revisión jurídica
+    </div>
+  </div>
+  <h1 id="auditoría-técnica-y-funcional-de-evaluhr">AUDITORÍA TÉCNICA Y
+FUNCIONAL DE EVALUHR</h1>
+<p><strong>Base de evidencia:</strong> Código fuente en
+<code>/home/z/my-project</code> (revisión directa, no especulativa)
+<strong>Alcance:</strong> 22 rutas API, 16 modelos Prisma, 4 plantillas
+de evaluación, middleware, auth, RLS, consentimiento, privacidad
+<strong>Verificabilidad:</strong> Cada afirmación incluye archivo y
+línea citable <strong>Fecha:</strong> 2025-07-25
+<strong>Destino:</strong> Revisión jurídica y de cumplimiento bajo
+legislación mexicana (LFPDPPP, NOM-035-STPS-2018, Art. 37 Bis)</p>
+<hr />
+<h2 id="resumen-ejecutivo">RESUMEN EJECUTIVO</h2>
+<ol type="1">
+<li><p><strong>EvaluHR es una plataforma web</strong> (Next.js 16 +
+Prisma + Supabase Postgres) que aplica 4 pruebas
+psicométricas/psicológicas/de conocimientos/de integridad a candidatos
+invitados por empresas. <strong>IMPLEMENTADO Y
+COMPROBADO</strong></p></li>
+<li><p><strong>No utiliza IA en producción.</strong> La dependencia
+<code>z-ai-web-dev-sdk</code> está declarada en
+<code>package.json:84</code> pero <strong>no se importa ni se invoca en
+ningún archivo de <code>src/</code></strong>. La documentación
+<code>PROJECT_STATUS.md</code> menciona una ruta
+<code>/api/vacancies/[id]/generate-questions</code> que <strong>no
+existe en el código actual</strong>. <strong>IMPLEMENTADO Y COMPROBADO
+(ausencia verificada)</strong></p></li>
+<li><p><strong>Las 4 pruebas usan preguntas redactadas por el
+desarrollador</strong>, NO adaptadas de instrumentos validados. El “Big
+Five” se menciona como nombre descriptivo del modelo, sin citar IPIP,
+NEO-PI-R, BFI, Maslach, IRI, Reid, Hogan ni ningún instrumento normado.
+<strong>NO IMPLEMENTADO (referencias a validación)</strong></p></li>
+<li><p><strong>Las fórmulas de scoring fueron creadas por el
+desarrollador</strong> (<code>/api/evaluations/route.ts:10-217</code>).
+Normalización lineal <code>((avg-1)/4)*100</code> para Likert 1-5. Pesos
+adaptativos del overall score (8 combinaciones) sin justificación
+psicométrica documentada. <strong>IMPLEMENTADO Y COMPROBADO (fórmulas
+propias)</strong></p></li>
+<li><p><strong>El concepto “APTO/NO_APTO” fue eliminado</strong> del
+código en producción (<code>src/</code>). Persiste solo en
+<code>prisma/seed.ts:907,978</code> y
+<code>scripts/seed-supabase.ts:340,418,444</code> como datos semilla
+obsoletos. El campo <code>recommendation</code> ahora produce
+<code>PENDIENTE | PERFIL_COMPLETO | PERFIL_PARCIAL</code> (orientación
+de completitud, no decisión de contratación). <strong>IMPLEMENTADO Y
+COMPROBADO (eliminación)</strong></p></li>
+<li><p><strong>No existe auto-exclusión algorítmica.</strong> Ningún
+<code>WHERE</code> por score o recommendation en
+<code>/api/candidates</code> o <code>/api/results</code>. Comentarios
+explícitos: “orientative, never auto-filter”
+(<code>route.ts:112</code>), “never as disqualification (LFPDPPP Art. 37
+Bis)” (<code>route.ts:271</code>). <strong>IMPLEMENTADO Y
+COMPROBADO</strong></p></li>
+<li><p><strong>No existe override manual</strong> del
+<code>recommendation</code> o <code>overallScore</code> por RRHH.
+<code>/api/results</code> solo soporta GET. RRHH no puede modificar
+resultados algorítmicos. <strong>IMPLEMENTADO Y
+COMPROBADO</strong></p></li>
+<li><p><strong>No existe decisión final registrada en el
+sistema.</strong> No hay campo “contratado/no contratado”, no hay
+<code>decisionById</code>, <code>decisionAt</code>,
+<code>decisionReason</code> en ningún modelo. La decisión final es 100%
+externa al sistema. <strong>NO IMPLEMENTADO</strong></p></li>
+<li><p><strong>Option B (KNOWLEDGE_ONLY) NO se cumple
+técnicamente.</strong> El filtrado solo existe client-side
+(<code>EvaluationView.tsx:58-66</code>). El servidor
+<code>/api/evaluations</code> POST <strong>nunca verifica
+<code>consentOption</code></strong> antes de aceptar respuestas a
+preguntas sensibles. Un candidato con consent B puede vía API directa
+responder items PSICOMETRICA y se almacenarán. <strong>CRÍTICO — NO
+IMPLEMENTADO server-side</strong></p></li>
+<li><p><strong>Option C (estadísticas anónimas) NO está
+implementada.</strong> Solo se guarda un booleano
+<code>anonymousStats</code> en <code>User</code>. No existe pipeline de
+anonimización ni endpoint de estadísticas agregadas. La cadena
+<code>EvaluationResponse → Session.candidateId → User.id</code> permite
+reidentificación trivial. <strong>NO IMPLEMENTADO</strong></p></li>
+<li><p><strong>Derechos ARCO NO están implementados como
+workflow.</strong> Solo son menciones textuales en la UI y el aviso de
+privacidad. No hay endpoints de auto-servicio para candidatos. El
+contacto es por email manual a
+<code>recursos.humanos@cafedechiapas.mx</code> con SLA de 20 días
+hábiles (solo textual). <strong>NO IMPLEMENTADO</strong></p></li>
+<li><p><strong>El flujo de revocación miente.</strong> La UI dice “Sus
+respuestas serán marcadas para eliminación”
+(<code>EvaluationView.tsx:912-938</code>), pero
+<code>/api/consent</code> PATCH solo cambia <code>consentOption</code> a
+KNOWLEDGE_ONLY y marca <code>consentWithdrawnAt</code>. <strong>No
+elimina ninguna respuesta sensible.</strong> No hay job programado de
+eliminación. <strong>CRÍTICO — IMPLEMENTADO PARCIALMENTE
+(misrepresentación)</strong></p></li>
+<li><p><strong>Existe un endpoint de fabricación retroactiva de
+consentimiento</strong> (<code>/api/consent/fix</code>, accesible por
+RH/GERENTE/SUPER_ADMIN) que crea registros
+<code>consentGiven=true</code> después de completada la evaluación, con
+<code>consentVersion: 'retroactive-fix'</code>. <strong>VIOLACIÓN
+LFPDPPP Art. 8 (consentimiento debe ser previo, expreso e
+informado).</strong> <strong>CRÍTICO — IMPLEMENTADO PERO
+ILEGAL</strong></p></li>
+<li><p><strong>Credenciales hardcodeadas en git:</strong>
+<code>service_role</code> JWT de Supabase (expira 2036) en
+<code>scripts/seed-supabase-clean.mjs:9</code>; contraseña DB
+<code>9042mgt0993</code> en
+<code>scripts/apply-supabase-schema.mjs:12</code>; fallback
+<code>JWT_SECRET='fallback-dev-secret-change-in-production'</code> en
+<code>src/lib/auth.ts:3-5</code> y <code>src/middleware.ts:4-6</code>.
+<strong>CRÍTICO — EXPOSICIÓN</strong></p></li>
+<li><p><strong>RLS a nivel DB está definido pero NO aplicado.</strong>
+Solo RLS a nivel app (Prisma extension) funciona.
+<code>getUnscopedClient()</code> se usa en <strong>41 ubicaciones de 14
+archivos</strong>, bypaseando todo RLS. <code>/api/health</code> es
+público y expone email del SUPER_ADMIN, prefijo de
+<code>JWT_SECRET</code> y conteos. <strong>CRÍTICO — IMPLEMENTADO
+PARCIALMENTE</strong></p></li>
+</ol>
+<hr />
+<h2 id="arquitectura-del-sistema">ARQUITECTURA DEL SISTEMA</h2>
+<pre><code>┌─────────────────┐    crea puesto    ┌─────────────────┐
+│  RH / SA        │ ───────────────► │  Position +     │
+│ (admin web UI)  │                  │  4 Templates +  │
+└─────────────────┘                  │  Questions      │
+                                      │  (estáticas)    │
+                                      └────────┬────────┘
+                                               │ genera
+                                               ▼
+┌─────────────────┐   invitación     ┌─────────────────┐
+│  RH invita      │ ───────────────► │ CandidateInvit. │
+│  (token email/  │                  │ (token único    │
+│   whatsapp)     │                  │  64 hex chars)  │
+└─────────────────┘                  └────────┬────────┘
+                                              │ candidato
+                                              ▼  hace clic
+┌─────────────────┐   auto-login      ┌─────────────────┐
+│  Candidato      │ ◄─────────────── │  /?token=xxx    │
+│  (sin registro) │  crea User       │  InvitationView │
+└────────┬────────┘                  └─────────────────┘
+         │
+         ▼
+┌─────────────────┐   Option A/B/C   ┌─────────────────┐
+│  ConsentView    │ ───────────────► │  ConsentLog     │
+│  (3 opciones)   │                  │  (IP, versión)  │
+└────────┬────────┘                  └─────────────────┘
+         │
+         ▼
+┌─────────────────────────────────────────────────┐
+│  EvaluationView (4 plantillas, filtrado CLIENT) │
+│  PSICOMETRICA → Big Five (10 items Likert 1-5)  │
+│  PSICOLOGICA  → 5 dim (10 items Likert 1-5)     │
+│  CONOCIMIENTOS → 10 MCQ por categoría            │
+│  INTEGRIDAD   → 10 items (4 sub-dim)             │
+└────────┬────────────────────────────────────────┘
+         │ POST /api/evaluations (action: complete)
+         ▼
+┌─────────────────┐                  ┌─────────────────┐
+│ calculateScores │ ──resultados──►  │ EvaluationResult│
+│ (algoritmo      │                  │ - 15 scores     │
+│  determinista) │                  │ - recommendation │
+│  SIN IA         │                  │   PENDIENTE/    │
+└─────────────────┘                  │   PERFIL_COMPL/ │
+                                     │   PERFIL_PARC   │
+                                     │ - summary texto │
+                                     └────────┬────────┘
+                                              │ RH visualiza
+                                              ▼
+                              ┌─────────────────────────┐
+                              │ RH ve resultados         │
+                              │ (read-only, sin override)│
+                              │ → DECISIÓN EXTERNA       │
+                              │   (no registrada en DB)  │
+                              └─────────────────────────┘</code></pre>
+<p><strong>Flujo verificado en código:</strong> Empresa → crea puesto (4
+plantillas estáticas) → invita candidato → candidato auto-login →
+consentimiento → evaluación → scoring algorítmico →
+<code>EvaluationResult</code> con orientación (NO decisión) → RH
+visualiza → <strong>decisión laboral ocurre fuera del
+sistema</strong>.</p>
+<hr />
+<h2 id="pruebas">PRUEBAS</h2>
+<table>
+<colgroup>
+<col style="width: 12%" />
+<col style="width: 20%" />
+<col style="width: 16%" />
+<col style="width: 13%" />
+<col style="width: 6%" />
+<col style="width: 18%" />
+<col style="width: 12%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Prueba</th>
+<th>Instrumento</th>
+<th>Preguntas</th>
+<th>Fórmula</th>
+<th>IA</th>
+<th>Validación</th>
+<th>Riesgo</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>PSICOMETRICA</strong> (Big Five)</td>
+<td>“Big Five” (nombre descriptivo, <strong>sin citar
+IPIP/NEO/BFI</strong>)</td>
+<td>10 (2 por dimensión: O,C,E,A,N)</td>
+<td><code>((avgLikert-1)/4)*100</code>; NEUROTICISM con reverse-scoring
+en items</td>
+<td>NO</td>
+<td><strong>NO IMPLEMENTADO</strong> — items originales, sin baremos, 2
+items/dim insuficiente para α≥.70</td>
+<td>ALTO</td>
+</tr>
+<tr class="even">
+<td><strong>PSICOLOGICA</strong></td>
+<td>Ninguno citado</td>
+<td>10 (2 por dimensión: stress, empathy, adaptability, leadership,
+teamwork)</td>
+<td><code>((avg-1)/4)*100</code>; STRESS con <code>100-normalized</code>
+post-normalización (además de reverse en items → <strong>doble
+inversión</strong>)</td>
+<td>NO</td>
+<td><strong>NO IMPLEMENTADO</strong> — items originales, no
+Maslach/IRI/LPI</td>
+<td>ALTO</td>
+</tr>
+<tr class="odd">
+<td><strong>CONOCIMIENTOS</strong></td>
+<td>Original (90 preguntas: 9 categorías × 10)</td>
+<td>10 por categoría</td>
+<td><code>(correctas/total)*100</code>, <strong>sin umbral
+aprobatorio</strong></td>
+<td>NO</td>
+<td>N/A (conocimiento técnico, no psicométrico)</td>
+<td>BAJO</td>
+</tr>
+<tr class="even">
+<td><strong>INTEGRIDAD</strong></td>
+<td>“Overt integrity test” original (estructura
+HONESTY/RULES/THEFT/RESPONSIBILITY)</td>
+<td>10 (5 reverse-scored)</td>
+<td><code>((avg-1)/4)*100</code>, marcado “orientativo, never
+auto-filter”</td>
+<td>NO</td>
+<td><strong>NO IMPLEMENTADO</strong> — no Reid/HD-29/Hogan;
+<strong>items 7-8 elicitan auto-incriminación de robo</strong></td>
+<td>ALTO</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Clasificación A/B/C/D (pregunta 2):</strong></p>
+<ul>
+<li><strong>A) Instrumentos validados respetando reglas:</strong> NO
+APLICA</li>
+<li><strong>B) Adaptaciones de instrumentos existentes:</strong> NO
+APLICA</li>
+<li><strong>C) Preguntas nuevas inspiradas en instrumentos:</strong>
+<strong>PARCIAL</strong> — los items de Big Five y STRESS son paráfrasis
+vagas de items IPIP/PSS pero no verificables como adaptaciones
+formales</li>
+<li><strong>D) Metodología propia combinada:</strong>
+<strong>APLICA</strong> a las 4 pruebas — fórmulas y items son
+originales del desarrollador</li>
+</ul>
+<p><strong>Estado:</strong> IMPLEMENTADO PARCIALMENTE — Las pruebas
+existen y funcionan técnicamente, pero <strong>no constituyen
+instrumentos psicométricos validados</strong>.</p>
+<hr />
+<h2 id="ia">IA</h2>
+<blockquote>
+<p><strong>NO SE ENCONTRÓ USO DE IA EN EL CÓDIGO DE
+PRODUCCIÓN.</strong></p>
+</blockquote>
+<p><strong>Evidencia verificada:</strong></p>
+<table>
+<colgroup>
+<col style="width: 32%" />
+<col style="width: 35%" />
+<col style="width: 32%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Pregunta</th>
+<th>Respuesta</th>
+<th>Evidencia</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>¿Qué modelos de IA se utilizan?</td>
+<td><strong>NINGUNO</strong></td>
+<td>Grep <code>z-ai-web-dev-sdk</code> en <code>src/</code> = 0 matches
+de import</td>
+</tr>
+<tr class="even">
+<td>¿La IA genera preguntas?</td>
+<td><strong>NO</strong></td>
+<td><code>generate-templates.ts</code> define constantes literales
+JS</td>
+</tr>
+<tr class="odd">
+<td>¿La IA modifica preguntas?</td>
+<td><strong>NO</strong></td>
+<td>CRUD manual en <code>/api/questions</code></td>
+</tr>
+<tr class="even">
+<td>¿La IA interpreta respuestas?</td>
+<td><strong>NO</strong></td>
+<td><code>calculateScores</code> (<code>route.ts:10-217</code>) es
+algorítmico puro</td>
+</tr>
+<tr class="odd">
+<td>¿La IA genera recomendaciones?</td>
+<td><strong>NO</strong></td>
+<td><code>guidance</code> se asigna por if/else determinista</td>
+</tr>
+<tr class="even">
+<td>¿La IA determina APTO?</td>
+<td><strong>NO</strong></td>
+<td>“APTO” no existe en <code>src/</code></td>
+</tr>
+<tr class="odd">
+<td>¿Decisions automatizadas?</td>
+<td><strong>NO</strong></td>
+<td>Summary generado por concatenación de strings hardcoded</td>
+</tr>
+<tr class="even">
+<td>¿Respuestas enviadas a proveedor externo?</td>
+<td><strong>NO</strong></td>
+<td>0 llamadas <code>fetch</code> salientes en <code>/api/**</code></td>
+</tr>
+<tr class="odd">
+<td>¿Consentimiento específico para IA?</td>
+<td><strong>N/A</strong></td>
+<td>No hay IA; aviso de privacidad no menciona IA</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Dependencia huérfana:</strong>
+<code>z-ai-web-dev-sdk@^0.0.18</code> en <code>package.json:84</code>
+instalada pero <strong>nunca importada</strong>. Riesgo latente: existe
+la capacidad técnica de activarla.</p>
+<p><strong>Documentación inconsistente:</strong>
+<code>PROJECT_STATUS.md:645</code> describe una ruta
+<code>/api/vacancies/[id]/generate-questions</code> con IA que
+<strong>no existe</strong> en <code>src/app/api/</code>. Comentario en
+<code>src/app/api/positions/route.ts:202-206</code> confirma que fue
+removida.</p>
+<p><strong>Estado:</strong> IMPLEMENTADO Y COMPROBADO (ausencia total de
+IA verificada).</p>
+<hr />
+<h2 id="motor-de-puntuación">MOTOR DE PUNTUACIÓN</h2>
+<p><strong>Archivo único:</strong>
+<code>/home/z/my-project/src/app/api/evaluations/route.ts:10-217</code></p>
+<h3 id="helpers-base-líneas-10-21">Helpers base (líneas 10-21)</h3>
+<pre class="typescript"><code>calculateLikertScore(value, reverseScored):
+  v = clamp(1, 5, value)
+  return reverseScored ? 6 - v : v
+
+normalizeBigFive(avgScore)      = ((avg - 1) / 4) * 100
+normalizePsychological(avgScore) = ((avg - 1) / 4) * 100   // idéntica a Big Five</code></pre>
+<h3 id="big-five-líneas-54-71">Big Five (líneas 54-71)</h3>
+<ul>
+<li>Promedio aritmético de items por dimensión → normalización lineal →
+clamp 0-100</li>
+<li>NEUROTICISM: reverse-scoring aplicado <strong>solo a nivel
+item</strong> (2 items marcados <code>reverseScored: true</code>)</li>
+<li>La UI vuelve a invertir neuroticism
+(<code>CandidateDetailView.tsx:96</code>:
+<code>100 - result.neuroticism</code>) — doble inversión vs servidor,
+posible bug</li>
+</ul>
+<h3 id="psicológica-líneas-73-96">Psicológica (líneas 73-96)</h3>
+<ul>
+<li>STRESS: reverse-scoring en items (2 items) <strong>+ inversión
+post-normalización</strong> <code>100 - normalized</code> →
+<strong>doble inversión</strong> (divergente con NEUROTICISM que solo se
+invierte una vez)</li>
+</ul>
+<h3 id="knowledge-líneas-98-110">Knowledge (líneas 98-110)</h3>
+<ul>
+<li><code>(correctas / total) * 100</code>, sin umbral aprobatorio</li>
+</ul>
+<h3 id="integridad-líneas-117-131">Integridad (líneas 117-131)</h3>
+<ul>
+<li><code>((avg-1)/4)*100</code> sin inversión post-normalización</li>
+</ul>
+<h3 id="overall-score-pesos-adaptativos-líneas-133-182">Overall score —
+Pesos adaptativos (líneas 133-182)</h3>
+<table>
+<thead>
+<tr class="header">
+<th>BigFive</th>
+<th>Psico</th>
+<th>Integridad</th>
+<th>Knowledge</th>
+<th>Pesos</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>SI</td>
+<td>SI</td>
+<td>SI</td>
+<td>SI</td>
+<td>0.25 / 0.25 / 0.15 / <strong>0.35</strong> (knowledge)</td>
+</tr>
+<tr class="even">
+<td>SI</td>
+<td>SI</td>
+<td>SI</td>
+<td>NO</td>
+<td>0.30 / 0.30 / 0.40 / —</td>
+</tr>
+<tr class="odd">
+<td>SI</td>
+<td>SI</td>
+<td>NO</td>
+<td>SI</td>
+<td>0.30 / 0.30 / — / 0.40</td>
+</tr>
+<tr class="even">
+<td>subset</td>
+<td></td>
+<td></td>
+<td>SI</td>
+<td>0.50 × behavioral + 0.50 × knowledge</td>
+</tr>
+<tr class="odd">
+<td>subset sin knowledge</td>
+<td></td>
+<td></td>
+<td>NO</td>
+<td>promedio simple</td>
+</tr>
+<tr class="even">
+<td>1 sola sección</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>score directo</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Origen de pesos:</strong> Definidos por el desarrollador.
+<strong>No hay referencia a literatura psicométrica</strong> que
+justifique 0.35 para knowledge o 0.15 para integridad.</p>
+<p><strong>Estado de fórmulas:</strong> <strong>IMPLEMENTADO Y
+COMPROBADO — fórmulas propias del desarrollador</strong>, NO son las
+oficiales de ningún instrumento (porque ningún instrumento validado está
+referenciado).</p>
+<hr />
+<h2 id="apto-no-apto">APTO / NO APTO</h2>
+<blockquote>
+<p><strong>NO EXISTE EN EL CÓDIGO DE PRODUCCIÓN.</strong></p>
+</blockquote>
+<p><strong>Búsqueda exhaustiva en <code>src/</code>:</strong> 0
+coincidencias funcionales de <code>APTO</code>, <code>NO_APTO</code>,
+<code>APROBADO</code>, <code>REPROBADO</code>.</p>
+<p><strong>Persistencia residual (datos semilla obsoletos):</strong> -
+<code>prisma/seed.ts:907</code> → <code>recommendation: 'APTO'</code> -
+<code>prisma/seed.ts:943</code> →
+<code>recommendation: 'ENTREVISTA_ADICIONAL'</code> -
+<code>prisma/seed.ts:978</code> →
+<code>recommendation: 'NO_RECOMENDADO'</code> -
+<code>scripts/seed-supabase.ts:340, 418, 444</code> → mismos valores
+obsoletos</p>
+<p><strong>Comportamiento actual</strong>
+(<code>route.ts:188-195</code>):</p>
+<pre class="typescript"><code>if (sectionsWithData.length === 0) guidance = &#39;PENDIENTE&#39;
+else if (hasBigFive &amp;&amp; hasPsych &amp;&amp; hasIntegrity &amp;&amp; knowledge !== null)
+  guidance = &#39;PERFIL_COMPLETO&#39;
+else guidance = &#39;PERFIL_PARCIAL&#39;</code></pre>
+<table>
+<colgroup>
+<col style="width: 47%" />
+<col style="width: 52%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Pregunta</th>
+<th>Respuesta</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>¿Condiciones para APTO?</td>
+<td><strong>N/A</strong> — concepto eliminado</td>
+</tr>
+<tr class="even">
+<td>¿Condiciones para NO APTO?</td>
+<td><strong>N/A</strong> — concepto eliminado</td>
+</tr>
+<tr class="odd">
+<td>¿Quién definió las condiciones?</td>
+<td>Desarrollador (commit <code>7b21c4d</code> y anteriores)</td>
+</tr>
+<tr class="even">
+<td>¿Configurables?</td>
+<td><strong>NO</strong> — hardcoded en <code>route.ts</code></td>
+</tr>
+<tr class="odd">
+<td>¿Diferentes por puesto?</td>
+<td><strong>NO</strong> — misma lógica para todos</td>
+</tr>
+<tr class="even">
+<td>¿Genera exclusión automática?</td>
+<td><strong>NO</strong> — <code>/api/candidates</code> no filtra por
+recommendation</td>
+</tr>
+<tr class="odd">
+<td>¿Puede pasar a entrevista con PERFIL_PARCIAL?</td>
+<td><strong>SÍ</strong> — el sistema no impide nada</td>
+</tr>
+<tr class="even">
+<td>¿Empresa puede sobrescribir?</td>
+<td><strong>NO</strong> — <code>/api/results</code> solo GET</td>
+</tr>
+<tr class="odd">
+<td>¿Queda registro de decisión?</td>
+<td><strong>NO</strong> — no hay <code>decisionById</code> /
+<code>decisionAt</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Estado:</strong> IMPLEMENTADO Y COMPROBADO (eliminación
+completa en <code>src/</code>). Persiste en datos semilla obsoletos —
+IMPLEMENTADO PARCIALMENTE.</p>
+<hr />
+<h2 id="recomendación-para-entrevista">RECOMENDACIÓN PARA
+ENTREVISTA</h2>
+<blockquote>
+<p><strong>NO EXISTE LÓGICA DE “RECOMENDADO PARA ENTREVISTA” EN
+PRODUCCIÓN.</strong></p>
+</blockquote>
+<p>El campo <code>recommendation</code> existe por compatibilidad DB
+pero <strong>ya no es una recomendación de contratación</strong>. Es una
+etiqueta de completitud
+(<code>PERFIL_COMPLETO</code>/<code>PERFIL_PARCIAL</code>/<code>PENDIENTE</code>).</p>
+<p>Comentario explícito (<code>route.ts:211</code>): &gt;
+<code>recommendation: guidance, // Keep field name for DB compatibility, but value is now guidance</code></p>
+<p><strong>Cierre obligatorio en summary</strong>
+(<code>route.ts:321</code>): &gt; <em>“Esta evaluación proporciona
+orientación informativa. La decisión final corresponde al área de
+Recursos Humanos.”</em></p>
+<table>
+<colgroup>
+<col style="width: 47%" />
+<col style="width: 52%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Pregunta</th>
+<th>Respuesta</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>¿Variables que intervienen?</td>
+<td>Solo completitud de secciones, NO scores</td>
+</tr>
+<tr class="even">
+<td>¿Umbrales?</td>
+<td><strong>NINGUNO</strong> — sin cutoff</td>
+</tr>
+<tr class="odd">
+<td>¿Automático?</td>
+<td>Sí, pero produce orientación no decisión</td>
+</tr>
+<tr class="even">
+<td>¿Obligatorio?</td>
+<td>No — RH puede ignorar</td>
+</tr>
+<tr class="odd">
+<td>¿RRHH puede ignorar?</td>
+<td><strong>SÍ</strong> (no hay enforcement)</td>
+</tr>
+<tr class="even">
+<td>¿Puede excluir a alguien?</td>
+<td><strong>NO</strong> — sin WHERE por recommendation</td>
+</tr>
+<tr class="odd">
+<td>¿Genera ranking?</td>
+<td><strong>NO</strong> — sin ORDER BY por score en
+<code>/api/candidates</code></td>
+</tr>
+<tr class="even">
+<td>¿Intervención humana?</td>
+<td><strong>Obligatoria pero no registrada</strong> — no hay
+<code>decisionById</code></td>
+</tr>
+<tr class="odd">
+<td>¿Candidato → algoritmo → no recomendado → excluido sin humano?</td>
+<td><strong>NO POSIBLE</strong> — no existe “no recomendado”</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Estado:</strong> IMPLEMENTADO Y COMPROBADO — el sistema
+<strong>no puede producir</strong> el flujo
+<code>candidato → algoritmo → excluido</code> porque no hay categoría de
+exclusión.</p>
+<hr />
+<h2 id="decisión-humana">DECISIÓN HUMANA</h2>
+<table>
+<colgroup>
+<col style="width: 34%" />
+<col style="width: 37%" />
+<col style="width: 27%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Pregunta</th>
+<th>Respuesta</th>
+<th>Estado</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>¿RRHH debe revisar el resultado?</td>
+<td>No es obligatorio técnicamente</td>
+<td>PARCIAL</td>
+</tr>
+<tr class="even">
+<td>¿RRHH puede decidir distinto a la “recomendación”?</td>
+<td>Sí (no hay recommendation real)</td>
+<td>COMPROBADO</td>
+</tr>
+<tr class="odd">
+<td>¿Existe botón “contratar/no continuar”?</td>
+<td><strong>NO</strong></td>
+<td>NO IMPLEMENTADO</td>
+</tr>
+<tr class="even">
+<td>¿Existe justificación de la decisión?</td>
+<td><strong>NO</strong></td>
+<td>NO IMPLEMENTADO</td>
+</tr>
+<tr class="odd">
+<td>¿Se registra quién tomó la decisión?</td>
+<td><strong>NO</strong> — no hay <code>decisionById</code></td>
+<td>NO IMPLEMENTADO</td>
+</tr>
+<tr class="even">
+<td>¿Se registra cuándo?</td>
+<td><strong>NO</strong></td>
+<td>NO IMPLEMENTADO</td>
+</tr>
+<tr class="odd">
+<td>¿Se registra el motivo?</td>
+<td><strong>NO</strong></td>
+<td>NO IMPLEMENTADO</td>
+</tr>
+<tr class="even">
+<td>¿Sistema distingue recomendación algorítmica vs decisión
+humana?</td>
+<td><strong>NO</strong></td>
+<td>NO IMPLEMENTADO</td>
+</tr>
+<tr class="odd">
+<td>¿Sistema puede excluir automáticamente?</td>
+<td><strong>NO</strong></td>
+<td>COMPROBADO</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Flujo real:</strong> 1. Candidato completa evaluación → se
+almacena <code>EvaluationResult</code> (solo scores + orientación) 2. RH
+ve resultados en <code>CandidateDetailView</code> (read-only) 3. RH toma
+decisión <strong>fuera del sistema</strong> (email, llamada, hoja de
+cálculo) 4. <strong>No queda rastro en DB de la decisión
+laboral</strong></p>
+<p><strong>Estado:</strong> IMPLEMENTADO PARCIALMENTE — la decisión
+humana ocurre pero es <strong>invisible al sistema</strong>. No hay
+trazabilidad de la decisión final.</p>
+<hr />
+<h2 id="datos-personales">DATOS PERSONALES</h2>
+<table>
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 26%" />
+<col style="width: 15%" />
+<col style="width: 14%" />
+<col style="width: 17%" />
+<col style="width: 15%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Dato</th>
+<th>Almacenamiento</th>
+<th>Período</th>
+<th>Acceso</th>
+<th>Modifica</th>
+<th>Elimina</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Nombre completo</strong></td>
+<td><code>User.name</code>,
+<code>CandidateInvitation.candidateName</code>,
+<code>EvaluationResult.candidateName</code>,
+<code>VacancyApplication.candidateName</code></td>
+<td>Indefinido (2 años declarados, no enforced)</td>
+<td>SA, RH (own co.), GERENTE (own co.)</td>
+<td>RH/SA vía <code>/api/users</code></td>
+<td>SA vía <code>/api/candidates</code> DELETE (también borra
+ConsentLog)</td>
+</tr>
+<tr class="even">
+<td><strong>Email</strong></td>
+<td><code>User.email</code> (unique),
+<code>CandidateInvitation.email</code>,
+<code>VacancyApplication.candidateEmail</code></td>
+<td>Indefinido</td>
+<td>SA, RH, GERENTE</td>
+<td>RH/SA</td>
+<td>SA DELETE</td>
+</tr>
+<tr class="odd">
+<td><strong>Teléfono</strong></td>
+<td><code>User.phone?</code>, <code>CandidateInvitation.phone?</code>,
+<code>VacancyApplication.candidatePhone?</code></td>
+<td>Indefinido</td>
+<td>SA, RH, GERENTE</td>
+<td>RH/SA</td>
+<td>SA DELETE</td>
+</tr>
+<tr class="even">
+<td><strong>Edad</strong></td>
+<td><code>VacancyApplication.candidateAge Int?</code></td>
+<td>Indefinido</td>
+<td>SA, RH, GERENTE</td>
+<td>N/A</td>
+<td>SA DELETE</td>
+</tr>
+<tr class="odd">
+<td><strong>Password (hash bcrypt 12 rounds)</strong></td>
+<td><code>User.password</code></td>
+<td>Indefinido</td>
+<td>Solo verificación</td>
+<td><code>/api/users</code> PATCH</td>
+<td>SA DELETE</td>
+</tr>
+<tr class="even">
+<td><strong>Empresa</strong></td>
+<td><code>User.companyId</code>, <code>User.companyName</code></td>
+<td>Indefinido</td>
+<td>SA, RH</td>
+<td>SA</td>
+<td>SA DELETE</td>
+</tr>
+<tr class="odd">
+<td><strong>Rol</strong></td>
+<td><code>User.role</code></td>
+<td>Indefinido</td>
+<td>SA, RH</td>
+<td>SA vía <code>/api/users</code></td>
+<td>SA DELETE</td>
+</tr>
+<tr class="even">
+<td><strong>Estado de consentimiento</strong></td>
+<td><code>User.consentGiven</code>, <code>consentDate</code>,
+<code>consentOption</code>, <code>anonymousStats</code>,
+<code>consentConfirmed</code>, <code>consentWithdrawnAt</code>,
+<code>consentVersion</code></td>
+<td>Indefinido</td>
+<td>SA, RH</td>
+<td>RH/SA <code>/api/consent</code> PATCH</td>
+<td>SA DELETE</td>
+</tr>
+<tr class="odd">
+<td><strong>IP de consentimiento</strong></td>
+<td><code>ConsentLog.ipAddress</code></td>
+<td>Indefinido (aviso declara 90 días — <strong>no
+enforced</strong>)</td>
+<td>SA</td>
+<td>NO</td>
+<td>SA DELETE (borra evidencia)</td>
+</tr>
+<tr class="even">
+<td><strong>Respuestas a tests (crudo)</strong></td>
+<td><code>EvaluationResponse.value</code>,
+<code>EvaluationResponse.numericValue</code></td>
+<td>Indefinido (aviso dice “eliminados al concluir” —
+<strong>MENTIRA</strong>)</td>
+<td>SA, RH, GERENTE (own co.)</td>
+<td>NO editable</td>
+<td>SA DELETE</td>
+</tr>
+<tr class="odd">
+<td><strong>Scores (15 floats)</strong></td>
+<td><code>EvaluationResult.openness</code>,
+<code>conscientiousness</code>, …, <code>integrityScore</code>,
+<code>overallScore</code></td>
+<td>Indefinido</td>
+<td>SA, RH, GERENTE</td>
+<td>NO editable</td>
+<td>SA DELETE</td>
+</tr>
+<tr class="even">
+<td><strong>Recommendation</strong></td>
+<td><code>EvaluationResult.recommendation</code></td>
+<td>Indefinido</td>
+<td>SA, RH, GERENTE</td>
+<td>NO editable</td>
+<td>SA DELETE</td>
+</tr>
+<tr class="odd">
+<td><strong>Summary textual</strong></td>
+<td><code>EvaluationResult.summary</code></td>
+<td>Indefinido</td>
+<td>SA, RH, GERENTE</td>
+<td>NO</td>
+<td>SA DELETE</td>
+</tr>
+<tr class="even">
+<td><strong>Sesión de evaluación</strong></td>
+<td><code>EvaluationSession.status</code>, <code>startedAt</code>,
+<code>completedAt</code></td>
+<td>Indefinido</td>
+<td>SA, RH</td>
+<td>NO</td>
+<td>SA DELETE</td>
+</tr>
+<tr class="odd">
+<td><strong>Invitación</strong></td>
+<td><code>CandidateInvitation.token</code>, <code>status</code>,
+<code>channel</code>, <code>expiresAt</code></td>
+<td>Indefinido</td>
+<td>SA, RH</td>
+<td>NO</td>
+<td>SA DELETE</td>
+</tr>
+<tr class="even">
+<td><strong>Entrevistas</strong></td>
+<td><code>InterviewSchedule.scheduledAt</code>, <code>location</code>,
+<code>notes</code>, <code>status</code></td>
+<td>Indefinido</td>
+<td>SA, RH, GERENTE</td>
+<td>RH/SA <code>/api/interviews</code></td>
+<td>SA DELETE</td>
+</tr>
+<tr class="odd">
+<td><strong>CV / documentos</strong></td>
+<td><strong>NO ALMACENADOS</strong></td>
+<td>N/A</td>
+<td>N/A</td>
+<td>N/A</td>
+<td>N/A</td>
+</tr>
+<tr class="even">
+<td><strong>Video</strong></td>
+<td><code>VacancyApplication.videoUrl</code> declarado pero
+<strong>NUNCA escrito/leído</strong> en <code>src/</code></td>
+<td>N/A</td>
+<td>N/A</td>
+<td>N/A</td>
+<td>N/A</td>
+</tr>
+<tr class="odd">
+<td><strong>IP de login</strong></td>
+<td><strong>NO ALMACENADA</strong></td>
+<td>N/A</td>
+<td>N/A</td>
+<td>N/A</td>
+<td>N/A</td>
+</tr>
+<tr class="even">
+<td><strong>User-Agent</strong></td>
+<td><strong>NO ALMACENADO</strong> (excepto consentimiento que
+tampoco)</td>
+<td>N/A</td>
+<td>N/A</td>
+<td>N/A</td>
+<td>N/A</td>
+</tr>
+<tr class="odd">
+<td><strong>Dispositivo / fingerprint</strong></td>
+<td><strong>NO ALMACENADO</strong></td>
+<td>N/A</td>
+<td>N/A</td>
+<td>N/A</td>
+<td>N/A</td>
+</tr>
+<tr class="even">
+<td><strong>Logs de auditoría</strong></td>
+<td>Solo <code>console.log</code> en stdout (no persistente)</td>
+<td>Efímero</td>
+<td>N/A</td>
+<td>N/A</td>
+<td>N/A</td>
+</tr>
+<tr class="odd">
+<td><strong>Fotografías</strong></td>
+<td><strong>NO ALMACENADAS</strong></td>
+<td>N/A</td>
+<td>N/A</td>
+<td>N/A</td>
+<td>N/A</td>
+</tr>
+<tr class="even">
+<td><strong>Aviso de privacidad (texto)</strong></td>
+<td><code>CompanyPrivacyNotice.contentHtml</code></td>
+<td>Indefinido</td>
+<td>SA, RH</td>
+<td>RH/SA <code>/api/privacy-notice</code> PUT</td>
+<td>Overwrite (no historial)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="datos-sensibles">DATOS SENSIBLES</h2>
+<p>Conforme LFPDPPP Art. 9 (datos personales sensibles):</p>
+<table>
+<colgroup>
+<col style="width: 39%" />
+<col style="width: 41%" />
+<col style="width: 19%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Categoría sensible</th>
+<th>¿EvaluHR la revela?</th>
+<th>Evidencia</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Origen étnico</strong></td>
+<td>NO</td>
+<td>Ningún item pregunta</td>
+</tr>
+<tr class="even">
+<td><strong>Religión</strong></td>
+<td>NO</td>
+<td>Ningún item pregunta</td>
+</tr>
+<tr class="odd">
+<td><strong>Opiniones políticas</strong></td>
+<td>NO</td>
+<td>Ningún item pregunta</td>
+</tr>
+<tr class="even">
+<td><strong>Afiliación sindical</strong></td>
+<td>NO</td>
+<td>Ningún item pregunta</td>
+</tr>
+<tr class="odd">
+<td><strong>Orientación/preferencia sexual</strong></td>
+<td>NO</td>
+<td>Ningún item pregunta</td>
+</tr>
+<tr class="even">
+<td><strong>Salud física</strong></td>
+<td>NO directo</td>
+<td>Ningún item clínico</td>
+</tr>
+<tr class="odd">
+<td><strong>Salud mental / estado psicológico</strong></td>
+<td><strong>PARCIAL</strong></td>
+<td>Big Five NEUROTICISM items 9-10 (“Me estreso fácilmente”, “Me cuesta
+controlar mis emociones”) y PSICOLOGICA STRESS items 1-2 (“abrumado con
+múltiples tareas”, “cuesta desconectar del trabajo”) elicitan estado
+emocional. <strong>No son instrumentos clínicos</strong> pero producen
+datos de estado psicológico.</td>
+</tr>
+<tr class="even">
+<td><strong>Información genética</strong></td>
+<td>NO</td>
+<td>Ningún item</td>
+</tr>
+<tr class="odd">
+<td><strong>Biometría</strong></td>
+<td>NO</td>
+<td>Ningún item</td>
+</tr>
+<tr class="even">
+<td><strong>Discapacidad</strong></td>
+<td>NO</td>
+<td>Ningún item</td>
+</tr>
+<tr class="odd">
+<td><strong>Datos de personalidad (OCEAN)</strong></td>
+<td><strong>SI</strong></td>
+<td><code>EvaluationResult.openness</code>,
+<code>conscientiousness</code>, <code>extraversion</code>,
+<code>agreeableness</code>, <code>neuroticism</code> — explícitamente
+LFPDPPP Art. 7-I</td>
+</tr>
+<tr class="even">
+<td><strong>Datos psicológicos (competencias)</strong></td>
+<td><strong>SI</strong></td>
+<td><code>stressLevel</code>, <code>empathy</code>,
+<code>adaptability</code>, <code>leadership</code>,
+<code>teamwork</code> — LFPDPPP Art. 7-II</td>
+</tr>
+<tr class="odd">
+<td><strong>Datos de integridad (conducta)</strong></td>
+<td><strong>SI</strong></td>
+<td><code>integrityScore</code> + 10 items que <strong>indagan
+comportamientos de honestidad/robo</strong> — Art. 7-V</td>
+</tr>
+<tr class="even">
+<td><strong>Auto-incriminación de robo</strong></td>
+<td><strong>CRÍTICO</strong></td>
+<td>Items 7 y 8 de INTEGRIDAD: <em>“Considero que tomar pequeños
+artículos del trabajo sin permiso es aceptable si son de bajo
+valor”</em> y <em>“He utilizado recursos de la empresa para fines
+personales sin autorización”</em>. Podrían constituir <strong>datos
+sensibles por auto-incriminación de conducta ilícita</strong>.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Estado:</strong> IMPLEMENTADO PARCIALMENTE — se procesan 3
+categorías explícitamente sensibles (personalidad, psicológico,
+integridad). <strong>No hay categorías expresamente protegidas
+(religión, política, etc.) pero los items de integridad 7-8 requieren
+revisión legal.</strong></p>
+<hr />
+<h2 id="consentimiento">CONSENTIMIENTO</h2>
+<h3 id="pantalla-que-ve-el-candidato-consentview.tsx">Pantalla que ve el
+candidato (<code>ConsentView.tsx</code>)</h3>
+<table>
+<colgroup>
+<col style="width: 32%" />
+<col style="width: 41%" />
+<col style="width: 25%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Elemento</th>
+<th>Obligatorio</th>
+<th>Estado</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Opción A — Evaluación Completa (radio card)</td>
+<td>Sí (A o B requeridos)</td>
+<td>IMPLEMENTADO</td>
+</tr>
+<tr class="even">
+<td>Opción B — Solo Conocimientos (radio card)</td>
+<td>Sí</td>
+<td>IMPLEMENTADO</td>
+</tr>
+<tr class="odd">
+<td>Opción C — Estadísticas Anónimas (checkbox independiente)</td>
+<td>No</td>
+<td>IMPLEMENTADO</td>
+</tr>
+<tr class="even">
+<td>Checkbox “He leído y comprendo las 3 opciones + ARCO”</td>
+<td>Sí</td>
+<td>IMPLEMENTADO</td>
+</tr>
+<tr class="odd">
+<td><strong>Botón “No consiento” / Rechazar</strong></td>
+<td><strong>N/A</strong></td>
+<td><strong>NO EXISTE</strong> — candidato en callejón sin salida</td>
+</tr>
+</tbody>
+</table>
+<h3 id="body-enviado-a-api-consentview.tsx85-91">Body enviado a API
+(<code>ConsentView.tsx:85-91</code>)</h3>
+<pre class="js"><code>{ userId, consentOption, anonymousStats, confirmedReading: true }</code></pre>
+<h3 id="almacenado-en-db-user-schema45-51">Almacenado en DB
+(<code>User</code> schema:45-51)</h3>
+<table>
+<colgroup>
+<col style="width: 38%" />
+<col style="width: 61%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Campo</th>
+<th>Capturado</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>consentGiven</code></td>
+<td>SI</td>
+</tr>
+<tr class="even">
+<td><code>consentDate</code></td>
+<td>SI timestamp</td>
+</tr>
+<tr class="odd">
+<td><code>consentOption</code></td>
+<td>SI FULL / KNOWLEDGE_ONLY</td>
+</tr>
+<tr class="even">
+<td><code>anonymousStats</code></td>
+<td>SI boolean</td>
+</tr>
+<tr class="odd">
+<td><code>consentConfirmed</code></td>
+<td>SI</td>
+</tr>
+<tr class="even">
+<td><code>consentWithdrawnAt</code></td>
+<td>SI (al retirar)</td>
+</tr>
+<tr class="odd">
+<td><code>consentVersion</code></td>
+<td><code>'2026-01-v1'</code> (mismatch con notice
+<code>'2026-01-v2'</code>)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="consentlog-audit-trail-schema77-89"><code>ConsentLog</code>
+(audit trail — schema:77-89)</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Campo</th>
+<th>Capturado</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>userId</code></td>
+<td>SI</td>
+</tr>
+<tr class="even">
+<td><code>action</code> (GIVEN/WITHDRAWN/MODIFIED)</td>
+<td>SI</td>
+</tr>
+<tr class="odd">
+<td><code>previousOption</code>, <code>newOption</code></td>
+<td>SI</td>
+</tr>
+<tr class="even">
+<td><code>anonymousStats</code></td>
+<td>SI</td>
+</tr>
+<tr class="odd">
+<td><code>consentVersion</code></td>
+<td>SI</td>
+</tr>
+<tr class="even">
+<td><code>ipAddress</code></td>
+<td>SI (<code>x-forwarded-for</code> / <code>x-real-ip</code>)</td>
+</tr>
+<tr class="odd">
+<td><strong><code>userAgent</code></strong></td>
+<td><strong>NO CAPTURADO</strong></td>
+</tr>
+<tr class="even">
+<td><strong>Hash del texto del aviso</strong></td>
+<td><strong>NO CAPTURADO</strong></td>
+</tr>
+<tr class="odd">
+<td><strong>Geo (país desde IP)</strong></td>
+<td>NO</td>
+</tr>
+<tr class="even">
+<td><code>createdAt</code></td>
+<td>SI</td>
+</tr>
+</tbody>
+</table>
+<h3 id="revocación-apiconsent-patch-route.ts281-387">Revocación
+(<code>/api/consent</code> PATCH, <code>route.ts:281-387</code>)</h3>
+<ul>
+<li><strong>Botón visible:</strong> “Retirar consentimiento de datos
+sensibles” (<code>EvaluationView.tsx:876-893</code>) — solo si
+<code>consentOption === 'FULL'</code></li>
+<li><strong>UI promete:</strong> <em>“Sus respuestas serán marcadas para
+eliminación”</em> (<code>EvaluationView.tsx:912-938</code>)</li>
+<li><strong>API hace:</strong> Solo
+<code>consentOption → KNOWLEDGE_ONLY</code>, marca
+<code>consentWithdrawnAt</code>. <strong>NO elimina ninguna
+respuesta.</strong> Comentario explícito
+(<code>route.ts:277-280</code>): <em>“We don’t delete the sensitive
+responses immediately, but flag the consent as withdrawn.”</em></li>
+<li><strong>No existe job programado de eliminación
+posterior.</strong></li>
+</ul>
+<h3 id="versión-y-re-consentimiento">Versión y re-consentimiento</h3>
+<ul>
+<li><code>consentVersion</code> se almacena pero <strong>NO se
+compara</strong> con la versión actual al hacer login. Si el aviso
+cambia, candidatos antiguos <strong>NO son forzados a
+re-consentir</strong>.</li>
+</ul>
+<h3 id="retroactividad-apiconsentfix-crítico">Retroactividad —
+<code>/api/consent/fix</code> (CRÍTICO)</h3>
+<p>Endpoint accesible por RH/GERENTE/SUPER_ADMIN que <strong>crea
+registros <code>consentGiven=true</code> después de completada la
+evaluación</strong>, con <code>consentVersion: 'retroactive-fix'</code>
+(<code>route.ts:80</code>). Respuesta del API admite: <em>“Este
+consentimiento fue registrado retroactivamente por un
+administrador.”</em></p>
+<p><strong>VIOLACIÓN LFPDPPP Art. 8</strong> — consentimiento para datos
+sensibles debe ser <strong>previo, expreso e informado</strong>.</p>
+<p><strong>Estado:</strong> IMPLEMENTADO PARCIALMENTE — existe flujo de
+consentimiento, pero con gaps críticos: sin server-side enforcement, sin
+eliminación real al retirar, sin re-consentimiento al cambiar versión,
+con fabricación retroactiva ilegal.</p>
+<hr />
+<h2 id="arco">ARCO</h2>
+<blockquote>
+<p><strong>NO IMPLEMENTADO como workflow. Solo menciones
+textuales.</strong></p>
+</blockquote>
+<table>
+<colgroup>
+<col style="width: 15%" />
+<col style="width: 17%" />
+<col style="width: 24%" />
+<col style="width: 28%" />
+<col style="width: 14%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Derecho</th>
+<th>Endpoint</th>
+<th>UI candidato</th>
+<th>Workflow admin</th>
+<th>Estado</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>A</strong>cceso</td>
+<td>Ninguno</td>
+<td>Sin UI de exportación propia</td>
+<td>Sin UI admin</td>
+<td><strong>NO IMPLEMENTADO</strong></td>
+</tr>
+<tr class="even">
+<td><strong>R</strong>ectificación</td>
+<td>Ninguno (solo admin vía <code>/api/users</code>)</td>
+<td>Sin self-service</td>
+<td>RH puede editar manualmente</td>
+<td><strong>NO IMPLEMENTADO</strong></td>
+</tr>
+<tr class="odd">
+<td><strong>C</strong>ancelación</td>
+<td><code>/api/candidates</code> DELETE requiere SA/RH/GERENTE</td>
+<td>Sin botón candidato</td>
+<td>SA/RH puede borrar</td>
+<td><strong>NO IMPLEMENTADO</strong> (candidato no puede
+autogestionarse)</td>
+</tr>
+<tr class="even">
+<td><strong>O</strong>posición</td>
+<td>Ninguno</td>
+<td>Ninguno</td>
+<td>Ninguno</td>
+<td><strong>NO IMPLEMENTADO</strong></td>
+</tr>
+</tbody>
+</table>
+<h3 id="workflow-real">Workflow real</h3>
+<ul>
+<li><strong>Quién recibe:</strong> Email
+<code>recursos.humanos@cafedechiapas.mx</code> (hardcoded en
+<code>ConsentView.tsx:207,432</code> y
+<code>EvaluationCompleteView.tsx:155</code>)</li>
+<li><strong>Quién procesa:</strong> Manual, por humano de RRHH</li>
+<li><strong>SLA:</strong> 20 días hábiles (declarado en aviso,
+<strong>no enforced</strong> por sistema)</li>
+<li><strong>Seguimiento:</strong> Ninguno — no hay tabla
+<code>ArcoRequest</code>, no hay estados, no hay tickets</li>
+<li><strong>Auditoría de ARCO:</strong> Ninguna</li>
+</ul>
+<h3 id="eliminación-efectiva">Eliminación efectiva</h3>
+<ul>
+<li><code>/api/candidates</code> DELETE (<code>route.ts:302-390</code>)
+ejecuta cascade raw SQL</li>
+<li><strong>Destruye <code>ConsentLog</code></strong> junto con el
+candidato (<code>route.ts:347, 381-383</code>) — <strong>destruye
+evidencia de consentimiento</strong>, violando Art. 88 del Reglamento
+LFPDPPP (retención de evidencia)</li>
+<li>No hay backups separados; no hay anonimización; no hay
+“soft-delete”</li>
+</ul>
+<h3 id="email-inconsistente">Email inconsistente</h3>
+<ul>
+<li>UI (<code>ConsentView.tsx:207</code>):
+<code>recursos.humanos@cafedechiapas.mx</code></li>
+<li>Aviso dinámico (<code>privacy-notice.ts:33-38</code>):
+<code>rrhh@&lt;empresa-slug&gt;.com</code></li>
+<li><strong>Mails diferentes</strong> según la pantalla que vea el
+candidato</li>
+</ul>
+<p><strong>Estado:</strong> <strong>NO IMPLEMENTADO</strong> — los
+derechos ARCO son solo declaraciones en aviso y UI, sin respaldo
+técnico.</p>
+<hr />
+<h2 id="conservación">CONSERVACIÓN</h2>
+<table>
+<colgroup>
+<col style="width: 16%" />
+<col style="width: 31%" />
+<col style="width: 27%" />
+<col style="width: 24%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Tipo de dato</th>
+<th>Período declarado en aviso</th>
+<th>Período REAL en código</th>
+<th>¿Auto-eliminación?</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Datos personales (nombre, email, teléfono)</td>
+<td>2 años post-evaluación (<code>privacy-notice.ts:572-584</code>)</td>
+<td><strong>INDEFINIDO</strong></td>
+<td>NO</td>
+</tr>
+<tr class="even">
+<td>Respuestas sensibles (psicométricas, psicológicas, integridad)</td>
+<td>“Eliminados al concluir proceso o al retirar consentimiento”
+(<code>:589-608</code>)</td>
+<td><strong>INDEFINIDO</strong> — <code>EvaluationResponse</code>
+persiste siempre</td>
+<td>NO</td>
+</tr>
+<tr class="odd">
+<td>Datos de conocimientos</td>
+<td>2 años</td>
+<td>INDEFINIDO</td>
+<td>NO</td>
+</tr>
+<tr class="even">
+<td>Resultados (scores)</td>
+<td>2 años</td>
+<td>INDEFINIDO</td>
+<td>NO</td>
+</tr>
+<tr class="odd">
+<td>Consent logs</td>
+<td>No declarado</td>
+<td>INDEFINIDO</td>
+<td>NO</td>
+</tr>
+<tr class="even">
+<td>Logs de acceso / auditoría</td>
+<td>No declarado</td>
+<td><strong>EFÍMERO</strong> (stdout, no persistente)</td>
+<td>N/A</td>
+</tr>
+<tr class="odd">
+<td>IP</td>
+<td>90 días (<code>privacy-notice.ts:813-828</code>)</td>
+<td><strong>INDEFINIDO</strong> en
+<code>ConsentLog.ipAddress</code></td>
+<td>NO</td>
+</tr>
+<tr class="even">
+<td>Estadísticas anónimas</td>
+<td>Sin límite</td>
+<td><strong>NO EXISTEN</strong> (Option C es un checkbox vacío)</td>
+<td>N/A</td>
+</tr>
+<tr class="odd">
+<td>Backups</td>
+<td>No declarado</td>
+<td>Dependiente de Supabase (no gestionado por app)</td>
+<td>N/A</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Discrepancias aviso vs realidad (CRÍTICO):</strong></p>
+<table>
+<colgroup>
+<col style="width: 65%" />
+<col style="width: 34%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Promesa del aviso</th>
+<th>Realidad</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>“Datos sensibles eliminados al concluir proceso”</td>
+<td>FALSO — persisten indefinidamente</td>
+</tr>
+<tr class="even">
+<td>“Cifrado en reposo” (<code>:627-628</code>)</td>
+<td>FALSO — sin cifrado columnar en schema</td>
+</tr>
+<tr class="odd">
+<td>“Eliminación inmediata al retirar consentimiento”</td>
+<td>FALSO — no se elimina nada</td>
+</tr>
+<tr class="even">
+<td>“Opción B no recopila datos sensibles” (<code>:545-547</code>)</td>
+<td>FALSO — servidor las acepta igual</td>
+</tr>
+<tr class="odd">
+<td>“IP retenida 90 días”</td>
+<td>FALSO — retenida indefinidamente</td>
+</tr>
+<tr class="even">
+<td>“20 días hábiles ARCO”</td>
+<td>Solo textual, sin enforcement</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Estado:</strong> IMPLEMENTADO PARCIALMENTE — existe campo
+<code>consentWithdrawnAt</code> pero <strong>ninguna política de
+retención está implementada técnicamente</strong>. El aviso de
+privacidad <strong>describe un comportamiento que el código no
+cumple</strong>.</p>
+<hr />
+<h2 id="supabase">SUPABASE</h2>
+<h3 id="arquitectura">Arquitectura</h3>
+<ul>
+<li><strong>Proveedor:</strong> Supabase Postgres 17 (región
+<code>ca-central-1</code>, Canada Central)</li>
+<li><strong>Pooler:</strong>
+<code>aws-0-ca-central-1.pooler.supabase.com:6543</code>
+(PgBouncer)</li>
+<li><strong>Conexión:</strong> Prisma ORM 6.11.1 (NO se usa
+<code>@supabase/supabase-js</code> en runtime)</li>
+<li><strong>Auth de Supabase:</strong> NO USADO (auth propia con JWT
+HS256)</li>
+<li><strong>Storage de Supabase:</strong> NO USADO (no hay buckets)</li>
+<li><strong>Realtime:</strong> NO USADO</li>
+</ul>
+<h3 id="rls-estado-crítico">RLS — Estado CRÍTICO</h3>
+<table>
+<colgroup>
+<col style="width: 24%" />
+<col style="width: 32%" />
+<col style="width: 44%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Capa</th>
+<th>Estado</th>
+<th>Evidencia</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>DB-level RLS (Postgres policies)</td>
+<td><strong>NO ACTIVADO</strong></td>
+<td><code>/api/rls-audit</code> retorna
+<code>databaseLevel.enabled: false</code></td>
+</tr>
+<tr class="even">
+<td>Archivo <code>prisma/rls-policies.sql</code> (437 líneas)</td>
+<td>Definido pero NO aplicado</td>
+<td>Sin <code>FORCE ROW LEVEL SECURITY</code> — owner bypassa</td>
+</tr>
+<tr class="odd">
+<td>App-level RLS (Prisma extension)</td>
+<td>Funciona</td>
+<td><code>src/lib/rls.ts:99-274</code></td>
+</tr>
+<tr class="even">
+<td><code>getUnscopedClient()</code> bypass</td>
+<td>41 usos en 14 archivos</td>
+<td>Auth, cleanup, consent, users, etc.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Conexión Prisma usa rol <code>postgres</code></strong>
+(superuser con <code>BYPASSRLS</code>) — incluso si se aplicaran las
+policies, serían bypassadas.</p>
+<h3 id="multi-tenant-isolation">Multi-tenant isolation</h3>
+<ul>
+<li><strong>App-level RLS</strong> auto-inyecta <code>companyId</code>
+en <code>where</code> clauses para modelos tenant-scoped
+(<code>src/lib/rls.ts:108-271</code>)</li>
+<li><strong>SUPER_ADMIN</strong> bypassa todo RLS
+(<code>rls.ts:310</code>, <code>:326-332</code>)</li>
+<li><strong>SUPER_ADMIN puede impersonar</strong> tenant vía
+<code>?companyId=xxx</code>
+(<code>createSuperAdminRLSClient</code>)</li>
+<li><strong>Auditoría de impersonación:</strong> Solo
+<code>console.log('[AUDIT] SA impersonating company', ...)</code> — no
+persistente, no tamper-evident</li>
+</ul>
+<h3 id="roles-db">Roles DB</h3>
+<ul>
+<li><strong>No hay roles Postgres</strong> definidos (solo
+<code>postgres</code> superuser)</li>
+<li><strong>No hay <code>GRANT</code>/<code>REVOKE</code></strong> en
+archivos SQL</li>
+<li>Roles solo existen en app (<code>User.role</code> string:
+SUPER_ADMIN/RH/GERENTE/CANDIDATO)</li>
+</ul>
+<h3 id="storage-buckets">Storage buckets</h3>
+<ul>
+<li><strong>NO DEFINIDOS</strong> —
+<code>supabase/config.toml:120-125</code> todos comentados</li>
+<li>Campo <code>VacancyApplication.videoUrl</code> declarado pero
+<strong>nunca usado</strong></li>
+</ul>
+<h3 id="backups">Backups</h3>
+<ul>
+<li>Dependiente de Supabase managed backups (no gestionado por la
+app)</li>
+<li>No hay backup lógico propio</li>
+</ul>
+<h3 id="acceso-administrativo">Acceso administrativo</h3>
+<ul>
+<li>Supabase dashboard (proyecto <code>ulgrgxjryezkedruvhdb</code>) —
+fuera del control de la app</li>
+<li><code>service_role</code> JWT hardcodeado en
+<code>scripts/seed-supabase-clean.mjs:9</code> (expira 2036) —
+<strong>credencial expuesta en git</strong></li>
+<li>DB password <code>9042mgt0993</code> hardcodeado en
+<code>scripts/apply-supabase-schema.mjs:12</code> — <strong>expuesta en
+git</strong></li>
+</ul>
+<h3 id="vulnerabilidades-de-acceso-cruzado">Vulnerabilidades de acceso
+cruzado</h3>
+<table style="width:100%;">
+<colgroup>
+<col style="width: 28%" />
+<col style="width: 42%" />
+<col style="width: 28%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Vector</th>
+<th>Verificado</th>
+<th>Estado</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Candidato A ve resultados de Candidato B</td>
+<td><strong>POSIBLE</strong></td>
+<td><code>/api/results?resultId=X</code> no verifica
+<code>candidateId</code> ownership para CANDIDATO (solo companyId)</td>
+</tr>
+<tr class="even">
+<td>RH empresa A ve candidatos empresa B</td>
+<td>Bloqueado</td>
+<td>App-RLS filtra por <code>companyId</code></td>
+</tr>
+<tr class="odd">
+<td>SUPER_ADMIN ve todo</td>
+<td>Por diseño</td>
+<td>Bypassa RLS</td>
+</tr>
+<tr class="even">
+<td>Token invitation reusado cross-tenant</td>
+<td><strong>POSIBLE</strong></td>
+<td><code>auth/route.ts:193-216</code> muta <code>companyId</code> de
+User existente si mismatch</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Estado:</strong> IMPLEMENTADO PARCIALMENTE — la arquitectura
+funciona pero RLS DB está inactivo, hay 41 bypasses vía
+<code>getUnscopedClient()</code>, y existen 2 vulnerabilidades de
+escalación horizontal.</p>
+<hr />
+<h2 id="terceros">TERCEROS</h2>
+<table>
+<colgroup>
+<col style="width: 13%" />
+<col style="width: 17%" />
+<col style="width: 11%" />
+<col style="width: 19%" />
+<col style="width: 26%" />
+<col style="width: 11%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Proveedor</th>
+<th>Datos recibidos</th>
+<th>Propósito</th>
+<th>Almacenamiento</th>
+<th>Opt-out entrenamiento</th>
+<th>Contrato</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Supabase</strong> (Postgres, ca-central-1, Canada)</td>
+<td>TODOS los datos de la app (PII, sensible, scores)</td>
+<td>DB hosting</td>
+<td>Sí (es el almacenamiento principal)</td>
+<td>N/A (no es IA)</td>
+<td>NO DETERMINABLE (términos Supabase)</td>
+</tr>
+<tr class="even">
+<td><strong>Vercel</strong></td>
+<td>Logs de requests (pueden incluir PII en URL params), variables de
+entorno</td>
+<td>Hosting Next.js</td>
+<td>Logs efímeros</td>
+<td>N/A</td>
+<td>NO DETERMINABLE</td>
+</tr>
+<tr class="odd">
+<td><strong>GitHub</strong> (repositorio)</td>
+<td>Solo código (PERO credenciales hardcodeadas en
+<code>scripts/</code>)</td>
+<td>Versionado</td>
+<td>Persistente</td>
+<td>N/A</td>
+<td>NO DETERMINABLE</td>
+</tr>
+<tr class="even">
+<td><strong>Proveedores de IA (OpenAI, Anthropic, etc.)</strong></td>
+<td><strong>NINGUNO</strong></td>
+<td>N/A</td>
+<td>N/A</td>
+<td>N/A</td>
+<td>N/A</td>
+</tr>
+<tr class="odd">
+<td><strong>Email/WhatsApp</strong> (para invitaciones)</td>
+<td>Solo envío (no gestionado por app)</td>
+<td>Canal de invitación</td>
+<td>La app no envía, solo genera link</td>
+<td>N/A</td>
+<td>N/A</td>
+</tr>
+<tr class="even">
+<td><strong>Analytics</strong></td>
+<td>NINGUNO</td>
+<td>N/A</td>
+<td>N/A</td>
+<td>N/A</td>
+<td>N/A</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Transferencias internacionales:</strong> - Aviso de
+privacidad §11 declara: <em>“No se transfieren datos personales a
+terceros”</em> (<code>privacy-notice.ts:388-408</code>) -
+<strong>REALIDAD:</strong> Supabase está en <code>ca-central-1</code>
+(Canada) y Vercel puede desplegar en múltiples regiones → <strong>SÍ hay
+transferencia internacional</strong> a Canadá (y posiblemente USA si
+Vercel routing pasa por allá). El aviso <strong>omite esto</strong>.</p>
+<p><strong>Estado:</strong> IMPLEMENTADO PARCIALMENTE — el aviso declara
+“no transferencias” pero la realidad técnica sí las involucra (Supabase
+Canada, Vercel).</p>
+<hr />
+<h2 id="seguridad">SEGURIDAD</h2>
+<h3 id="controles-implementados">Controles implementados</h3>
+<table>
+<colgroup>
+<col style="width: 32%" />
+<col style="width: 28%" />
+<col style="width: 39%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Control</th>
+<th>Estado</th>
+<th>Evidencia</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>HTTPS</td>
+<td>SI Vercel enforced</td>
+<td>Default Vercel</td>
+</tr>
+<tr class="even">
+<td>HSTS</td>
+<td><strong>NO IMPLEMENTADO</strong></td>
+<td>Sin headers config</td>
+</tr>
+<tr class="odd">
+<td>Cifrado en tránsito</td>
+<td>SI TLS</td>
+<td>Default</td>
+</tr>
+<tr class="even">
+<td>Cifrado en reposo DB</td>
+<td>SI Supabase managed</td>
+<td>Default</td>
+</tr>
+<tr class="odd">
+<td>Cifrado columnar sensible</td>
+<td><strong>NO IMPLEMENTADO</strong></td>
+<td>Aviso lo afirma falsamente (<code>:627-628</code>)</td>
+</tr>
+<tr class="even">
+<td>Password hashing</td>
+<td>SI bcrypt 12 rounds</td>
+<td><code>src/lib/password.ts:4</code></td>
+</tr>
+<tr class="odd">
+<td>Legacy SHA-256</td>
+<td>Migra a bcrypt on login</td>
+<td><code>password.ts:31-33</code></td>
+</tr>
+<tr class="even">
+<td>JWT HS256 expira 8h</td>
+<td>SI</td>
+<td><code>auth.ts:7</code></td>
+</tr>
+<tr class="odd">
+<td>Cookie httpOnly + secure + sameSite=lax</td>
+<td>SI</td>
+<td><code>auth/route.ts:122</code></td>
+</tr>
+<tr class="even">
+<td>Token en localStorage</td>
+<td><strong>DUPLICA httpOnly</strong> — XSS puede robarlo</td>
+<td><code>store.ts:161</code></td>
+</tr>
+<tr class="odd">
+<td>MFA</td>
+<td><strong>NO IMPLEMENTADO</strong></td>
+<td>Confirmado ausente</td>
+</tr>
+<tr class="even">
+<td>Account lockout</td>
+<td><strong>NO IMPLEMENTADO</strong></td>
+<td>Sin <code>failedAttempts</code> counter</td>
+</tr>
+<tr class="odd">
+<td>Password reset flow</td>
+<td><strong>NO IMPLEMENTADO</strong></td>
+<td>Solo admin vía <code>/api/users</code> PATCH</td>
+</tr>
+<tr class="even">
+<td>Rate limiting</td>
+<td><strong>NO IMPLEMENTADO</strong> en ninguna ruta</td>
+<td>Sin paquetes</td>
+</tr>
+<tr class="odd">
+<td>CSRF protection</td>
+<td>Solo SameSite=Lax</td>
+<td>Sin token CSRF</td>
+</tr>
+<tr class="even">
+<td>CORS config</td>
+<td>No definido</td>
+<td>Default same-origin</td>
+</tr>
+<tr class="odd">
+<td>Security headers (CSP, X-Frame, etc.)</td>
+<td><strong>NO IMPLEMENTADO</strong></td>
+<td>Sin helmet, sin config</td>
+</tr>
+<tr class="even">
+<td>SQL injection</td>
+<td>SI Prisma parameterized</td>
+<td>Safe</td>
+</tr>
+<tr class="odd">
+<td>XSS sanitization</td>
+<td><strong>NO IMPLEMENTADO</strong></td>
+<td><code>CompanyPrivacyNotice.contentHtml</code> raw — <strong>stored
+XSS risk</strong> si RH inyecta <code>&lt;script&gt;</code></td>
+</tr>
+<tr class="even">
+<td>File upload validation</td>
+<td>N/A</td>
+<td>No hay uploads</td>
+</tr>
+<tr class="odd">
+<td>Session revocation list</td>
+<td>NO</td>
+<td>Token válido hasta expiración</td>
+</tr>
+<tr class="even">
+<td>Audit log (DB table)</td>
+<td>NO</td>
+<td>Solo <code>console.log</code></td>
+</tr>
+<tr class="odd">
+<td><code>JWT_SECRET</code> fallback</td>
+<td><strong>CRÍTICO</strong></td>
+<td><code>'fallback-dev-secret-change-in-production'</code> hardcodeado
+en <code>auth.ts:3-5</code> y <code>middleware.ts:4-6</code></td>
+</tr>
+<tr class="even">
+<td>Secrets en código</td>
+<td><strong>CRÍTICO</strong></td>
+<td>service_role + DB password en <code>scripts/</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="vulnerabilidades-importantes">Vulnerabilidades importantes</h3>
+<table>
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 53%" />
+<col style="width: 36%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>#</th>
+<th>Vulnerabilidad</th>
+<th>Severidad</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>V1</td>
+<td><code>JWT_SECRET</code> con fallback público → si env var falta,
+JWTs firmables por cualquiera</td>
+<td>CRÍTICO</td>
+</tr>
+<tr class="even">
+<td>V2</td>
+<td><code>/api/health</code> público expone email SUPER_ADMIN + prefijo
+<code>JWT_SECRET</code> + conteos</td>
+<td>CRÍTICO</td>
+</tr>
+<tr class="odd">
+<td>V3</td>
+<td><code>/api/cleanup</code> destrucción multi-tenant irreversible sin
+auditoría ni confirmación</td>
+<td>CRÍTICO</td>
+</tr>
+<tr class="even">
+<td>V4</td>
+<td>service_role Supabase + DB password hardcodeados en
+<code>scripts/</code> committed a git</td>
+<td>CRÍTICO</td>
+</tr>
+<tr class="odd">
+<td>V5</td>
+<td>Token JWT en localStorage — derrote httpOnly, habilita robo por
+XSS</td>
+<td>ALTO</td>
+</tr>
+<tr class="even">
+<td>V6</td>
+<td>Stored XSS vía <code>CompanyPrivacyNotice.contentHtml</code> sin
+sanitización</td>
+<td>ALTO</td>
+</tr>
+<tr class="odd">
+<td>V7</td>
+<td>Sin rate limiting → brute-force <code>/api/auth</code> y enumeración
+de invitation tokens</td>
+<td>ALTO</td>
+</tr>
+<tr class="even">
+<td>V8</td>
+<td>Sin account lockout → unlimited password attempts</td>
+<td>ALTO</td>
+</tr>
+<tr class="odd">
+<td>V9</td>
+<td>Sin security headers (HSTS, CSP, X-Frame-Options)</td>
+<td>ALTO</td>
+</tr>
+<tr class="even">
+<td>V10</td>
+<td>Escalación horizontal candidato→candidato vía
+<code>/api/results?resultId=</code></td>
+<td>MEDIO</td>
+</tr>
+<tr class="odd">
+<td>V11</td>
+<td><code>/api/users</code> PUT sin verificar <code>companyId</code>
+cross-tenant para RH</td>
+<td>ALTO</td>
+</tr>
+<tr class="even">
+<td>V12</td>
+<td>Auto-login muta <code>companyId</code> si mismatch — token replay
+cross-tenant</td>
+<td>MEDIO</td>
+</tr>
+<tr class="odd">
+<td>V13</td>
+<td><code>/api/public/invitation</code> expone PII completa (nombre,
+email, teléfono) a cualquiera con el token</td>
+<td>MEDIO</td>
+</tr>
+<tr class="even">
+<td>V14</td>
+<td>Errores retornan <code>details: String(error)</code> → info
+disclosure</td>
+<td>BAJO</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Estado:</strong> IMPLEMENTADO PARCIALMENTE — controles
+básicos (bcrypt, JWT, httpOnly cookie) presentes, pero faltan controles
+críticos (rate limiting, MFA, account lockout, security headers,
+sanitización XSS, sesión revocation).</p>
+<hr />
+<h2 id="auditoría-trazabilidad">AUDITORÍA (Trazabilidad)</h2>
+<table>
+<colgroup>
+<col style="width: 28%" />
+<col style="width: 50%" />
+<col style="width: 21%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Evento</th>
+<th>¿Registrado?</th>
+<th>Dónde</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Quién creó evaluación (puesto)</td>
+<td>NO Solo <code>createdAt</code>, sin <code>createdBy</code></td>
+<td><code>Position.createdAt</code></td>
+</tr>
+<tr class="even">
+<td>Quién modificó puesto</td>
+<td>NO Sin <code>updatedBy</code></td>
+<td><code>Position.updatedAt</code> (solo timestamp)</td>
+</tr>
+<tr class="odd">
+<td>Qué versión de plantilla se aplicó</td>
+<td>PARCIAL Solo <code>consentVersion</code> en User, no en
+Template</td>
+<td><code>EvaluationTemplate</code> sin versionado</td>
+</tr>
+<tr class="even">
+<td>Qué preguntas recibió el candidato</td>
+<td>SI Via <code>EvaluationResponse.questionId</code></td>
+<td>DB</td>
+</tr>
+<tr class="odd">
+<td>Qué fórmula se utilizó</td>
+<td><strong>NO REGISTRADO</strong></td>
+<td>Solo código estático</td>
+</tr>
+<tr class="even">
+<td>Qué resultado obtuvo</td>
+<td>SI <code>EvaluationResult</code> scores</td>
+<td>DB</td>
+</tr>
+<tr class="odd">
+<td>Qué recommendation produjo sistema</td>
+<td>SI <code>EvaluationResult.recommendation</code></td>
+<td>DB</td>
+</tr>
+<tr class="even">
+<td>Quién vio los resultados</td>
+<td><strong>NO REGISTRADO</strong></td>
+<td>Sin log de acceso lectura</td>
+</tr>
+<tr class="odd">
+<td>Quién cambió una decisión</td>
+<td><strong>N/A</strong> — no hay decisión registrada</td>
+<td>N/A</td>
+</tr>
+<tr class="even">
+<td>Cuándo ocurrió</td>
+<td>PARCIAL Solo <code>createdAt</code>/<code>updatedAt</code></td>
+<td>Sin <code>decisionAt</code></td>
+</tr>
+<tr class="odd">
+<td>Motivo del cambio</td>
+<td><strong>NO REGISTRADO</strong></td>
+<td>N/A</td>
+</tr>
+<tr class="even">
+<td>Consentimiento otorgado</td>
+<td>SI <code>ConsentLog</code> con IP, timestamp, versión</td>
+<td>DB</td>
+</tr>
+<tr class="odd">
+<td>Consentimiento retirado</td>
+<td>SI <code>ConsentLog.action: 'WITHDRAWN'</code></td>
+<td>DB</td>
+</tr>
+<tr class="even">
+<td>Login de usuario</td>
+<td><strong>NO REGISTRADO</strong></td>
+<td>Sin login log</td>
+</tr>
+<tr class="odd">
+<td>SUPER_ADMIN impersonando tenant</td>
+<td>PARCIAL Solo <code>console.log</code> efímero</td>
+<td>stdout</td>
+</tr>
+<tr class="even">
+<td>Acceso a datos sensibles</td>
+<td><strong>NO REGISTRADO</strong></td>
+<td>Sin access log</td>
+</tr>
+<tr class="odd">
+<td>Eliminación de candidato</td>
+<td>PARCIAL Solo elimina el registro (destruye evidencia)</td>
+<td>DB</td>
+</tr>
+<tr class="even">
+<td>Cambios en aviso de privacidad</td>
+<td>PARCIAL <code>CompanyPrivacyNotice.version</code> pero <strong>sin
+historial</strong> — overwrite</td>
+<td>DB</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Estado:</strong> IMPLEMENTADO PARCIALMENTE — trazabilidad
+limitada a consentimiento y timestamps. <strong>No existe bitácora de
+acceso</strong>, <strong>no existe auditoría de decisiones</strong>,
+<strong>no existe historial de versiones del aviso</strong>.</p>
+<hr />
+<h2 id="responsabilidad">RESPONSABILIDAD</h2>
+<h3
+id="responsabilidad-que-actualmente-asume-la-empresa-contratante-responsable">Responsabilidad
+que actualmente asume la EMPRESA CONTRATANTE (Responsable)</h3>
+<p>Conforme al aviso de privacidad
+(<code>privacy-notice.ts:174, 199-205</code>) y la arquitectura:</p>
+<ol type="1">
+<li><strong>Definir el puesto y categoría</strong> — La empresa crea el
+<code>Position</code> con <code>title</code>, <code>sector</code>,
+<code>category</code>. EvaluHR solo ofrece categorías predefinidas, no
+propone criterios.</li>
+<li><strong>Invitar candidatos</strong> — Solo RH/SA de la empresa emite
+invitaciones (<code>/api/invite</code> POST).</li>
+<li><strong>TOMAR LA DECISIÓN FINAL DE CONTRATACIÓN</strong> — El
+sistema <strong>no tiene</strong> botón “contratar”, no registra
+decisión, no envía comunicación de aceptación/rechazo. Todo ocurre fuera
+del sistema.</li>
+<li><strong>Responder solicitudes ARCO</strong> — Email
+<code>recursos.humanos@cafedechiapas.mx</code> es de la empresa. EvaluHR
+solo provee el texto del aviso.</li>
+<li><strong>Cumplir con NOM-035-STPS-2018</strong> — El aviso la
+menciona pero la responsabilidad legal es de la empresa.</li>
+</ol>
+<h3
+id="responsabilidad-que-actualmente-podría-asumir-evaluhr-encargado">Responsabilidad
+que actualmente podría asumir EVALUHR (Encargado)</h3>
+<p>Conforme al aviso (§12, <code>privacy-notice.ts:413-425</code>),
+EvaluHR se declara <strong>Encargado</strong> bajo Art. 12 LFPDPPP:</p>
+<ol type="1">
+<li><strong>Proveer infraestructura tecnológica</strong> — Hosting, DB,
+autenticación, UI.</li>
+<li><strong>Diseño de las pruebas</strong> — <strong>AQUÍ HAY
+RIESGO</strong>: las 4 plantillas con sus items y fórmulas fueron
+creadas por EvaluHR (no por la empresa). Si una prueba es
+psicometricamente inválida o discrimina, EvaluHR podría ser considerado
+más que encargado.</li>
+<li><strong>Cálculo de scores</strong> — EvaluHR define las fórmulas (no
+la empresa). Si una fórmula produce sesgo discriminatorio, EvaluHR es
+responsable del algoritmo.</li>
+<li><strong>Generación del <code>summary</code> textual</strong> —
+EvaluHR redacta el texto orientativo que ve RH. Si el texto sugiere
+“excluir”, EvaluHR participa en la decisión.</li>
+<li><strong>Hosting de datos sensibles</strong> — EvaluHR (vía Supabase)
+almacena respuestas psicológicas y de integridad. Si hay breach,
+responsabilidad compartida.</li>
+</ol>
+<h3
+id="situaciones-donde-evaluhr-podría-ser-considerado-más-que-encargado">Situaciones
+donde EVALUHR podría ser considerado MÁS QUE ENCARGADO</h3>
+<table>
+<colgroup>
+<col style="width: 42%" />
+<col style="width: 26%" />
+<col style="width: 30%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Situación</th>
+<th>Razón</th>
+<th>Riesgo</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Diseño de pruebas psicométricas no validadas</strong></td>
+<td>EvaluHR creó items + fórmulas, no adaptó instrumentos validados. Si
+un candidato demandara por daño (p.ej. no contratado por “neuroticismo
+alto”), EvaluHR sería co-responsable del instrumento.</td>
+<td>ALTO</td>
+</tr>
+<tr class="even">
+<td><strong>Generación de <code>recommendation</code></strong></td>
+<td>Aunque ahora es solo “orientación”, el campo se llama
+<code>recommendation</code> y RH lo ve. Si un candidato es excluido por
+PERFIL_PARCIAL, EvaluHR proveyó la categoría.</td>
+<td>MEDIO</td>
+</tr>
+<tr class="odd">
+<td><strong><code>summary</code> textual con sugerencias</strong></td>
+<td>El texto generado por <code>generateSummary</code>
+(<code>route.ts:227-323</code>) incluye frases como “fortalezas” y
+“áreas a explorar” que influyen en la decisión de RH.</td>
+<td>MEDIO</td>
+</tr>
+<tr class="even">
+<td><strong>Fabricación retroactiva de consentimiento</strong></td>
+<td><code>/api/consent/fix</code> permite a RH crear evidencia falsa de
+consentimiento. EvaluHR proveyó la herramienta → complicidad técnica en
+violación Art. 8.</td>
+<td>CRÍTICO</td>
+</tr>
+<tr class="odd">
+<td><strong>Decisiones automatizadas implícitas</strong></td>
+<td>A pesar del disclaimer “no decisiones automatizadas”, el
+<code>overallScore</code> y <code>recommendation</code> son outputs
+algorítmicos que RH puede usar como único criterio. Art. 37 Bis fr. IV
+requiere que el candidato pueda solicitar revisión humana — <strong>no
+existe</strong> endpoint para esto.</td>
+<td>ALTO</td>
+</tr>
+</tbody>
+</table>
+<h3
+id="situaciones-donde-evaluhr-actúa-como-proveedor-tecnológico-puro">Situaciones
+donde EvaluHR actúa como PROVEEDOR TECNOLÓGICO puro</h3>
+<ul>
+<li>Hosting de la DB (vía Supabase)</li>
+<li>Autenticación JWT</li>
+<li>UI de administración</li>
+<li>UI de evaluación</li>
+<li>Cálculo mecánico de scores (cuando las fórmulas son neutrales)</li>
+</ul>
+<h3
+id="situaciones-donde-evaluhr-participa-en-la-decisión-de-selección">Situaciones
+donde EvaluHR PARTICIPA EN LA DECISIÓN DE SELECCIÓN</h3>
+<ul>
+<li>Cuando RH usa <code>overallScore</code> como filtro (aunque no haya
+<code>WHERE</code> automático, RH puede filtrar manualmente)</li>
+<li>Cuando RH usa <code>recommendation = PERFIL_COMPLETO</code> como
+shortlist</li>
+<li>Cuando RH lee el <code>summary</code> y se forma impresión</li>
+</ul>
+<h3 id="riesgos-derivados-de-que-evaluhr-genere-recomendaciones">RIESGOS
+DERIVADOS DE QUE EVALUHR GENERE RECOMENDACIONES</h3>
+<blockquote>
+<p>Aunque el <code>recommendation</code> actual es solo orientación de
+completitud (no APTO/NO_APTO):</p>
+</blockquote>
+<ol type="1">
+<li><strong>RH puede interpretarlo como recomendación real</strong> — el
+nombre del campo es <code>recommendation</code>.</li>
+<li><strong>No hay disclaimer visible en
+<code>CandidateDetailView</code></strong> junto al campo — el disclaimer
+solo está en <code>summary</code> textual, no en el badge visual.</li>
+<li><strong>Si se reintrodujera APTO/NO_APTO</strong> (legacy en seed),
+EvaluHR pasaría a tomar decisión automatizada → Art. 37 Bis
+violación.</li>
+</ol>
+<h3 id="riesgos-derivados-de-que-evaluhr-determine-aptono_apto">RIESGOS
+DERIVADOS DE QUE EVALUHR DETERMINE APTO/NO_APTO</h3>
+<blockquote>
+<p><strong>Actualmente NO determina</strong> (eliminado del código).
+Pero el campo <code>recommendation</code> persiste con el nombre, y los
+datos semilla obsoletos (<code>APTO</code>, <code>NO_RECOMENDADO</code>)
+podrían confundir a un auditor.</p>
+</blockquote>
+<h3 id="riesgos-derivados-de-decisiones-automatizadas">RIESGOS DERIVADOS
+DE DECISIONES AUTOMATIZADAS</h3>
+<ul>
+<li><code>overallScore</code> es automático y se muestra a RH.</li>
+<li>No existe mecanismo para que el candidato solicite <strong>revisión
+humana</strong> del score (Art. 37 Bis fr. IV).</li>
+<li>No existe endpoint “dispute my score”.</li>
+</ul>
+<h3 id="riesgos-derivados-de-ia">RIESGOS DERIVADOS DE IA</h3>
+<blockquote>
+<p><strong>No hay IA en producción</strong> → riesgo directo por IA =
+NINGUNO.</p>
+</blockquote>
+<p><strong>Riesgo indirecto:</strong> - Dependencia
+<code>z-ai-web-dev-sdk</code> instalada pero no usada →
+<strong>capacidad técnica latente</strong>. Si se activara sin
+actualizar el consentimiento y aviso, sería violación Art. 8
+(consentimiento no informado para nuevo tratamiento). - Documentación
+<code>PROJECT_STATUS.md</code> menciona funcionalidad IA que no existe →
+si un auditor la lee, podría asumir que sí funciona.</p>
+<hr />
+<h2 id="riesgos-críticos">RIESGOS CRÍTICOS</h2>
+<table>
+<colgroup>
+<col style="width: 8%" />
+<col style="width: 21%" />
+<col style="width: 29%" />
+<col style="width: 40%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>#</th>
+<th>Riesgo</th>
+<th>Severidad</th>
+<th>Estado código</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>R1</td>
+<td><strong>Fabricación retroactiva de consentimiento</strong>
+(<code>/api/consent/fix</code>) — violación LFPDPPP Art. 8</td>
+<td>CRÍTICO</td>
+<td>IMPLEMENTADO (funciona)</td>
+</tr>
+<tr class="even">
+<td>R2</td>
+<td><strong>Option B no se cumple server-side</strong> — candidato con
+consent “solo conocimientos” puede vía API responder items sensibles que
+se almacenan</td>
+<td>CRÍTICO</td>
+<td>NO IMPLEMENTADO server-side</td>
+</tr>
+<tr class="odd">
+<td>R3</td>
+<td><strong>Revocación miente</strong> — UI promete eliminación, API no
+elimina nada</td>
+<td>CRÍTICO</td>
+<td>IMPLEMENTADO PARCIALMENTE</td>
+</tr>
+<tr class="even">
+<td>R4</td>
+<td><strong>Aviso de privacidad describe comportamientos que el código
+no cumple</strong> (eliminación al concluir, cifrado en reposo, Option B
+no recopila sensible, IP 90 días)</td>
+<td>CRÍTICO</td>
+<td>NO IMPLEMENTADO</td>
+</tr>
+<tr class="odd">
+<td>R5</td>
+<td><strong>Credenciales hardcodeadas en git</strong> (service_role JWT,
+DB password, JWT_SECRET fallback)</td>
+<td>CRÍTICO</td>
+<td>EXPOSICIÓN</td>
+</tr>
+<tr class="even">
+<td>R6</td>
+<td><strong>Derechos ARCO no implementados</strong> como workflow — solo
+textuales</td>
+<td>CRÍTICO</td>
+<td>NO IMPLEMENTADO</td>
+</tr>
+<tr class="odd">
+<td>R7</td>
+<td><strong>Pruebas psicométricas no validadas</strong> — items
+originales sin baremo, sin fiabilidad documentada, 2 items/dimensión
+insuficiente</td>
+<td>CRÍTICO</td>
+<td>NO IMPLEMENTADO (validación)</td>
+</tr>
+<tr class="even">
+<td>R8</td>
+<td><strong>Items de integridad elicitan auto-incriminación de
+robo</strong> — pueden constituir datos sensibles adicionales</td>
+<td>ALTO</td>
+<td>IMPLEMENTADO</td>
+</tr>
+<tr class="odd">
+<td>R9</td>
+<td><strong>DB-level RLS no aplicado</strong> — solo app-level, 41
+bypasses vía <code>getUnscopedClient()</code></td>
+<td>ALTO</td>
+<td>IMPLEMENTADO PARCIALMENTE</td>
+</tr>
+<tr class="even">
+<td>R10</td>
+<td><strong><code>/api/health</code> público expone</strong> email
+SUPER_ADMIN + prefijo JWT_SECRET + conteos</td>
+<td>ALTO</td>
+<td>NO IMPLEMENTADO (mitigación)</td>
+</tr>
+<tr class="odd">
+<td>R11</td>
+<td><strong><code>/api/cleanup</code> destrucción multi-tenant
+irreversible</strong> sin auditoría ni confirmación</td>
+<td>ALTO</td>
+<td>IMPLEMENTADO (peligroso)</td>
+</tr>
+<tr class="even">
+<td>R12</td>
+<td><strong>Token JWT en localStorage</strong> — derrota httpOnly,
+habilita robo por XSS</td>
+<td>ALTO</td>
+<td>NO IMPLEMENTADO (mitigación)</td>
+</tr>
+<tr class="odd">
+<td>R13</td>
+<td><strong>Stored XSS vía
+<code>CompanyPrivacyNotice.contentHtml</code></strong> sin
+sanitización</td>
+<td>ALTO</td>
+<td>NO IMPLEMENTADO (mitigación)</td>
+</tr>
+<tr class="even">
+<td>R14</td>
+<td><strong>Sin rate limiting</strong> — brute-force en
+<code>/api/auth</code> y enumeración de tokens</td>
+<td>ALTO</td>
+<td>NO IMPLEMENTADO</td>
+</tr>
+<tr class="odd">
+<td>R15</td>
+<td><strong>Sin account lockout</strong> — unlimited password
+attempts</td>
+<td>ALTO</td>
+<td>NO IMPLEMENTADO</td>
+</tr>
+<tr class="even">
+<td>R16</td>
+<td><strong>Sin security headers</strong> (HSTS, CSP,
+X-Frame-Options)</td>
+<td>ALTO</td>
+<td>NO IMPLEMENTADO</td>
+</tr>
+<tr class="odd">
+<td>R17</td>
+<td><strong>Escalación horizontal candidato→candidato</strong> vía
+<code>/api/results?resultId=</code></td>
+<td>MEDIO</td>
+<td>IMPLEMENTADO PARCIALMENTE</td>
+</tr>
+<tr class="even">
+<td>R18</td>
+<td><strong><code>/api/users</code> PUT sin verificar
+cross-tenant</strong> para RH</td>
+<td>ALTO</td>
+<td>IMPLEMENTADO PARCIALMENTE</td>
+</tr>
+<tr class="odd">
+<td>R19</td>
+<td><strong>Auto-login muta <code>companyId</code></strong> si mismatch
+— token replay cross-tenant</td>
+<td>MEDIO</td>
+<td>IMPLEMENTADO PARCIALMENTE</td>
+</tr>
+<tr class="even">
+<td>R20</td>
+<td><strong>No hay registro de decisión final de contratación</strong> —
+impossibilidad de auditoría de decisiones laborales</td>
+<td>MEDIO</td>
+<td>NO IMPLEMENTADO</td>
+</tr>
+<tr class="odd">
+<td>R21</td>
+<td><strong>No hay re-consentimiento al cambiar versión del
+aviso</strong></td>
+<td>MEDIO</td>
+<td>NO IMPLEMENTADO</td>
+</tr>
+<tr class="even">
+<td>R22</td>
+<td><strong>ConsentLog sin <code>userAgent</code> ni hash del
+aviso</strong> — evidencia incompleta</td>
+<td>MEDIO</td>
+<td>IMPLEMENTADO PARCIALMENTE</td>
+</tr>
+<tr class="odd">
+<td>R23</td>
+<td><strong>Version mismatch</strong> (<code>v1</code> en código vs
+<code>v2</code> en schema default)</td>
+<td>BAJO</td>
+<td>IMPLEMENTADO PARCIALMENTE</td>
+</tr>
+<tr class="even">
+<td>R24</td>
+<td><strong>Datos semilla obsoletos</strong>
+(<code>APTO</code>/<code>NO_RECOMENDADO</code> en <code>seed.ts</code>)
+pueden confundir auditoría</td>
+<td>BAJO</td>
+<td>IMPLEMENTADO PARCIALMENTE</td>
+</tr>
+<tr class="odd">
+<td>R25</td>
+<td><strong>Email inconsistente</strong> entre UI
+(<code>recursos.humanos@cafedechiapas.mx</code>) y aviso dinámico
+(<code>rrhh@&lt;slug&gt;.com</code>)</td>
+<td>BAJO</td>
+<td>IMPLEMENTADO PARCIALMENTE</td>
+</tr>
+<tr class="even">
+<td>R26</td>
+<td><strong>Transferencia internacional no declarada</strong> (Supabase
+Canada, Vercel) — aviso dice “no transferencias”</td>
+<td>MEDIO</td>
+<td>IMPLEMENTADO PARCIALMENTE</td>
+</tr>
+<tr class="odd">
+<td>R27</td>
+<td><strong><code>Option C</code> (estadísticas anónimas) no
+anonimiza</strong> — solo checkbox vacío</td>
+<td>MEDIO</td>
+<td>NO IMPLEMENTADO</td>
+</tr>
+<tr class="even">
+<td>R28</td>
+<td><strong>Eliminación de candidato destruye ConsentLog</strong> —
+viola Art. 88 Reglamento</td>
+<td>MEDIO</td>
+<td>IMPLEMENTADO (incorrecto)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="cambios-recomendados">CAMBIOS RECOMENDADOS</h2>
+<blockquote>
+<p><strong>No implementados. Solo enumeración para revisión
+jurídica.</strong></p>
+</blockquote>
+<h3 id="críticos-bloqueantes-para-producción-legal">CRÍTICOS
+(bloqueantes para producción legal)</h3>
+<ol type="1">
+<li><strong>Eliminar <code>/api/consent/fix</code></strong> —
+fabricación retroactiva de consentimiento es ilegal (LFPDPPP Art.
+8).</li>
+<li><strong>Implementar server-side enforcement de Option B</strong> —
+<code>/api/evaluations</code> POST debe verificar
+<code>consentOption</code> antes de aceptar respuestas a items
+sensibles.</li>
+<li><strong>Implementar eliminación real al retirar
+consentimiento</strong> — ya sea inmediata o vía job programado, pero la
+UI no debe prometer lo que no se cumple.</li>
+<li><strong>Alinear aviso de privacidad con la realidad técnica</strong>
+— eliminar claims falsos (cifrado en reposo, eliminación al concluir, IP
+90 días) o implementarlos.</li>
+<li><strong>Rotar credenciales expuestas</strong> — service_role JWT, DB
+password, JWT_SECRET fallback. Mover todo a env vars con
+fail-closed.</li>
+<li><strong>Implementar endpoints ARCO</strong> — al menos
+<code>GET /api/arco/access</code> (auto-servicio candidato),
+<code>DELETE /api/arco/cancellation</code>, con workflow admin y SLA
+tracking.</li>
+<li><strong>Reemplazar pruebas con instrumentos validados</strong>
+(IPIP-NEO short form es público) o añadir disclaimer explícito de “no es
+instrumento validado” + comisión de estudio de validez.</li>
+<li><strong>Eliminar items 7-8 de INTEGRIDAD</strong>
+(auto-incriminación de robo) o someterlos a revisión legal
+específica.</li>
+</ol>
+<h3 id="altos">ALTOS</h3>
+<ol start="9" type="1">
+<li><strong>Aplicar <code>prisma/rls-policies.sql</code></strong> +
+crear rol Postgres no-superuser +
+<code>FORCE ROW LEVEL SECURITY</code>.</li>
+<li><strong>Remover <code>/api/health</code> de rutas públicas</strong>
+o sanitizar output (no exponer email admin, prefijo JWT_SECRET).</li>
+<li><strong>Eliminar o hard-gate <code>/api/cleanup</code></strong>
+(worklog ya lo marca como “temporal”).</li>
+<li><strong>Eliminar token de localStorage</strong> — usar
+cookie-only.</li>
+<li><strong>Sanitizar
+<code>CompanyPrivacyNotice.contentHtml</code></strong> con
+<code>isomorphic-dompurify</code> o <code>sanitize-html</code>.</li>
+<li><strong>Agregar rate limiting</strong>
+(<code>rate-limiter-flexible</code>) en <code>/api/auth</code> y
+<code>/api/public/invitation</code>.</li>
+<li><strong>Agregar account lockout</strong>
+(<code>failedAttempts</code> + <code>lockedUntil</code> en
+<code>User</code>).</li>
+<li><strong>Agregar password reset flow</strong> con token
+time-limited.</li>
+<li><strong>Agregar security headers</strong> (HSTS, CSP,
+X-Frame-Options) en <code>next.config.ts</code>.</li>
+<li><strong>Agregar <code>candidateId</code> ownership check</strong> en
+<code>/api/results?resultId=</code>.</li>
+<li><strong>Agregar <code>companyId</code> cross-tenant check</strong>
+en <code>/api/users</code> PUT para RH.</li>
+<li><strong>Implementar re-consentimiento</strong> al cambiar versión
+del aviso.</li>
+<li><strong>Capturar <code>userAgent</code> y hash del aviso</strong> en
+<code>ConsentLog</code>.</li>
+</ol>
+<h3 id="medios">MEDIOS</h3>
+<ol start="22" type="1">
+<li><strong>Implementar Option C</strong> (pipeline real de
+anonimización) o eliminar el checkbox.</li>
+<li><strong>Agregar <code>AuditLog</code> table</strong> para
+SUPER_ADMIN impersonation, cleanup, migrate, consent admin actions.</li>
+<li><strong>Implementar mecanismo de revisión humana solicitable por
+candidato</strong> (Art. 37 Bis fr. IV).</li>
+<li><strong>Agregar <code>decisionById</code>, <code>decisionAt</code>,
+<code>decisionReason</code></strong> a <code>EvaluationResult</code> o
+tabla separada, para registrar decisión final.</li>
+<li><strong>Declarar transferencias internacionales</strong> (Supabase
+Canada, Vercel) en aviso.</li>
+<li><strong>Unificar email de contacto</strong> entre UI y aviso
+dinámico.</li>
+<li><strong>No destruir <code>ConsentLog</code> al eliminar
+candidato</strong> — retener evidencia (Art. 88 Reglamento).</li>
+<li><strong>Reconciliar item sets</strong> entre <code>seed.ts</code>,
+<code>seed-supabase.ts</code>, <code>generate-templates.ts</code>.</li>
+<li><strong>Limpiar datos semilla obsoletos</strong>
+(<code>APTO</code>/<code>NO_RECOMENDADO</code>).</li>
+</ol>
+<h3 id="bajos">BAJOS</h3>
+<ol start="31" type="1">
+<li><strong>Eliminar dependencia <code>z-ai-web-dev-sdk</code></strong>
+del <code>package.json</code> (no se usa).</li>
+<li><strong>Actualizar <code>PROJECT_STATUS.md</code></strong> para
+remover referencias a funcionalidad IA inexistente.</li>
+<li><strong>Unificar versiones de consentimiento</strong>
+(<code>v1</code> vs <code>v2</code>).</li>
+<li><strong>Agregar botón “No consiento”</strong> en
+<code>ConsentView</code> con salida graceful.</li>
+</ol>
+<hr />
+<h2 id="información-que-no-puedes-determinar">INFORMACIÓN QUE NO PUEDES
+DETERMINAR</h2>
+<table>
+<colgroup>
+<col style="width: 5%" />
+<col style="width: 36%" />
+<col style="width: 11%" />
+<col style="width: 46%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>#</th>
+<th>Item no determinable</th>
+<th>Razón</th>
+<th>Qué se necesitaría revisar</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td>Configuración real de <code>JWT_SECRET</code> en producción
+Vercel</td>
+<td>Variables env no están en el repo</td>
+<td>Acceso al dashboard Vercel</td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td>Si <code>prisma/rls-policies.sql</code> fue aplicado manualmente a
+la DB</td>
+<td>El código no lo ejecuta, pero alguien podría haberlo corrido
+manualmente</td>
+<td>Conexión directa a Supabase +
+<code>SELECT * FROM pg_policies</code></td>
+</tr>
+<tr class="odd">
+<td>3</td>
+<td>Rol Postgres real de la conexión Prisma en prod</td>
+<td><code>.env.example</code> sugiere <code>postgres</code> user pero
+<code>.env</code> real no está en repo</td>
+<td>Verificar <code>DATABASE_URL</code> en Vercel env vars</td>
+</tr>
+<tr class="even">
+<td>4</td>
+<td>Versión del PDF estático
+<code>/public/Aviso_de_Privacidad_Consentimiento_EvaluHR.pdf</code></td>
+<td>No se puede verificar contenido programáticamente</td>
+<td>Abrir el PDF manualmente</td>
+</tr>
+<tr class="odd">
+<td>5</td>
+<td>Si <code>CompanyPrivacyNotice.contentHtml</code> está siendo
+inyectado con scripts por usuarios RH</td>
+<td>Depende de datos runtime</td>
+<td>Auditar registros en prod DB</td>
+</tr>
+<tr class="even">
+<td>6</td>
+<td>Política real de backups de Supabase</td>
+<td>Gestionado por Supabase, no por la app</td>
+<td>Dashboard Supabase</td>
+</tr>
+<tr class="odd">
+<td>7</td>
+<td>Configuración de retención de logs de Vercel</td>
+<td>Gestionado por Vercel</td>
+<td>Dashboard Vercel</td>
+</tr>
+<tr class="even">
+<td>8</td>
+<td>Términos contractuales Supabase/Vercel con el cliente</td>
+<td>Fuera del repo</td>
+<td>Contratos</td>
+</tr>
+<tr class="odd">
+<td>9</td>
+<td>Si la migración de <code>Position.status</code> (worklog Task ID 1)
+fue la única ejecutada en prod o si hubo otras</td>
+<td><code>/api/migrate</code> es idempotente pero no auditable</td>
+<td>Logs de Supabase</td>
+</tr>
+<tr class="even">
+<td>10</td>
+<td>Versión de consentimiento realmente almacenada para usuarios
+existentes en prod</td>
+<td>Depende de cuándo se registraron</td>
+<td><code>SELECT consentVersion, COUNT(*) FROM User GROUP BY consentVersion</code></td>
+</tr>
+<tr class="odd">
+<td>11</td>
+<td>Si el campo <code>VacancyApplication.videoUrl</code> fue usado en
+algún momento y luego desactivado</td>
+<td>El código actual no lo usa pero el schema lo tiene</td>
+<td>Git history / migraciones anteriores</td>
+</tr>
+<tr class="even">
+<td>12</td>
+<td>Si existe algún job cron externo (Vercel Cron, Supabase Edge
+Function) que ejecute limpieza</td>
+<td>No hay <code>vercel.json</code> con cron, pero podría configurarse
+externamente</td>
+<td>Dashboard Vercel/Supabase</td>
+</tr>
+<tr class="odd">
+<td>13</td>
+<td>Si los items de las pruebas fueron revisados por un psicólogo
+certificado</td>
+<td>No hay documentación de eso en el repo</td>
+<td>Documentación externa / proceso de diseño</td>
+</tr>
+<tr class="even">
+<td>14</td>
+<td>Si la empresa “Café de Chiapas” es el único cliente real o hay otros
+en prod</td>
+<td>Depende de datos runtime</td>
+<td><code>SELECT COUNT(*) FROM Company</code></td>
+</tr>
+<tr class="odd">
+<td>15</td>
+<td>Si las transferencias internacionales a Canada/USA tienen cláusulas
+contractuales estándar (SCC)</td>
+<td>Fuera del código</td>
+<td>Contratos Supabase/Vercel</td>
+</tr>
+<tr class="even">
+<td>16</td>
+<td>Compliance real con NOM-035-STPS-2018 (la app la menciona pero no es
+una herramienta NOM-035)</td>
+<td>Fuera del código</td>
+<td>Documentación legal externa</td>
+</tr>
+<tr class="odd">
+<td>17</td>
+<td>Si existe un DPO (Data Protection Officer) designado</td>
+<td>Fuera del código</td>
+<td>Documentación organizacional</td>
+</tr>
+<tr class="even">
+<td>18</td>
+<td>Si el contacto <code>recursos.humanos@cafedechiapas.mx</code> está
+activo y monitoreado</td>
+<td>Fuera del código</td>
+<td>Verificación con la empresa</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<p><strong>FIN DE LA AUDITORÍA.</strong></p>
+<p>Esta auditoría se basa exclusivamente en evidencia del código fuente
+en <code>/home/z/my-project</code> (commit <code>1249353</code> al
+momento de la revisión). Ninguna afirmación es especulativa. Toda
+declaración de estado está respaldada por archivo y línea citable en los
+reportes de los 6 agentes de exploración. La respuesta está lista para
+ser entregada al sistema de IA especializado en análisis jurídico bajo
+legislación mexicana (LFPDPPP, NOM-035-STPS-2018, Art. 37 Bis).</p>
+
+</body>
+</html>
