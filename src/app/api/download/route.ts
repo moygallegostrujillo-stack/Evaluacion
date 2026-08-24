@@ -13,6 +13,16 @@ export async function GET(req: NextRequest) {
         name: 'Aviso_de_Privacidad_Consentimiento_EvaluHR.pdf',
         type: 'application/pdf',
       },
+      'auditoria-pdf': {
+        file: 'AUDITORIA_EVALUHR.pdf',
+        name: 'AUDITORIA_EVALUHR.pdf',
+        type: 'application/pdf',
+      },
+      'auditoria-md': {
+        file: 'AUDITORIA_EVALUHR.md',
+        name: 'AUDITORIA_EVALUHR.md',
+        type: 'text/markdown; charset=utf-8',
+      },
     }
 
     const docConfig = documents[doc || '']
