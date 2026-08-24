@@ -20,7 +20,7 @@ import { Separator } from '@/components/ui/separator'
 import {
   LayoutDashboard, Users, UserPlus,
   BarChart3, Calendar, LogOut, Menu, X, HelpCircle,
-  Building2, FileDown
+  Building2, FileDown, FileText, Download
 } from 'lucide-react'
 
 // Restore auth from localStorage
@@ -306,6 +306,67 @@ export default function Home() {
   const hasInvitationToken =
     typeof window !== 'undefined' &&
     new URLSearchParams(window.location.search).has('token')
+
+  // Audit document download page — accessible via ?auditoria=1
+  // Renders a simple landing page with download buttons for PDF and MD
+  const hasAuditoriaQuery =
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).has('auditoria')
+
+  if (hasAuditoriaQuery) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 flex items-center justify-center p-4">
+        <div className="max-w-lg w-full bg-white rounded-2xl shadow-xl border border-emerald-100 p-8 space-y-6">
+          <div className="text-center space-y-2">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white mb-2 shadow-lg">
+              <FileText className="w-8 h-8" />
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900">Auditoría EvaluHR</h1>
+            <p className="text-sm text-gray-500">Revisión técnica y funcional — Documento confidencial</p>
+          </div>
+          <div className="space-y-3">
+            <a
+              href="/api/auditoria/pdf"
+              className="flex items-center gap-3 p-4 rounded-xl border-2 border-emerald-200 bg-emerald-50 hover:bg-emerald-100 transition-colors"
+            >
+              <FileText className="w-6 h-6 text-emerald-600 flex-shrink-0" />
+              <div className="flex-1">
+                <p className="font-semibold text-gray-900">Descargar PDF</p>
+                <p className="text-xs text-gray-500">34 páginas · 210 KB · Formato imprimible</p>
+              </div>
+              <Download className="w-5 h-5 text-emerald-600" />
+            </a>
+            <a
+              href="/api/auditoria/md"
+              className="flex items-center gap-3 p-4 rounded-xl border-2 border-gray-200 bg-white hover:bg-gray-50 transition-colors"
+            >
+              <FileText className="w-6 h-6 text-gray-600 flex-shrink-0" />
+              <div className="flex-1">
+                <p className="font-semibold text-gray-900">Descargar Markdown</p>
+                <p className="text-xs text-gray-500">58 KB · Texto plano editable</p>
+              </div>
+              <Download className="w-5 h-5 text-gray-600" />
+            </a>
+          </div>
+          <div className="border-t border-gray-100 pt-4 space-y-2">
+            <p className="text-xs text-gray-500 leading-relaxed">
+              <strong>Base de evidencia:</strong> Código fuente commit 1249353<br/>
+              <strong>Alcance:</strong> 22 rutas API · 16 modelos Prisma · 4 plantillas<br/>
+              <strong>Destino:</strong> Revisión jurídica LFPDPPP / NOM-035-STPS-2018
+            </p>
+          </div>
+          <div className="text-center">
+            <a
+              href="/"
+              className="text-xs text-gray-400 hover:text-gray-600 underline"
+            >
+              Volver a EvaluHR
+            </a>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   // Invitation welcome page - no auth required (shows company/position info)
   if (hasInvitationToken || currentView === 'invitation-welcome') {
