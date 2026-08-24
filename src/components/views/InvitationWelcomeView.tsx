@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
-  Building2, Briefcase, Clock, Shield, Brain, BookOpen,
+  Building2, Briefcase, Clock, Shield, ShieldCheck, Brain, BookOpen,
   CheckCircle2, AlertTriangle, XCircle, ArrowRight, User,
   ClipboardList, ChevronRight, Utensils, ShoppingBag, Loader2
 } from 'lucide-react'
@@ -302,13 +302,22 @@ export default function InvitationWelcomeView() {
                 </div>
                 <div>
                   <p className="font-medium text-sm text-gray-900">Evaluación de Conocimientos</p>
-                  <p className="text-xs text-gray-500">Preguntas específicas del puesto — opcional según la vacante</p>
+                  <p className="text-xs text-gray-500">Preguntas específicas del puesto</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-rose-50/60">
+                <div className="w-8 h-8 rounded-lg bg-rose-100 flex items-center justify-center flex-shrink-0">
+                  <ShieldCheck className="w-4 h-4 text-rose-600" />
+                </div>
+                <div>
+                  <p className="font-medium text-sm text-gray-900">Evaluación de Integridad</p>
+                  <p className="text-xs text-gray-500">Orientativo — valores y conductas profesionales</p>
                 </div>
               </div>
 
               <div className="flex items-center gap-2 text-sm text-gray-500 pt-2 border-t border-gray-100">
                 <Clock className="w-4 h-4" />
-                <span>Tiempo estimado: <strong>10–15 minutos</strong></span>
+                <span>Tiempo estimado: <strong>15–20 minutos</strong></span>
               </div>
             </CardContent>
           </Card>
