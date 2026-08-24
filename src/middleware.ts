@@ -10,6 +10,7 @@ const PUBLIC_ROUTES = [
   '/api/auth',           // login/register
   '/api/public',         // public evaluation flow
   '/api/download',       // document downloads (privacy notice, etc.)
+  '/api/auditoria',      // audit document downloads (PDF + MD)
   '/api/seed',           // seed (has its own protection)
   '/api/health',         // health check / diagnostics
 ]
