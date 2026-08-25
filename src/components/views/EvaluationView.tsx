@@ -920,7 +920,7 @@ export default function EvaluationView() {
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0 mt-1.5" />
                 <span>
                   Sus respuestas psicométricas, psicológicas y de integridad serán{' '}
-                  <strong>marcadas para eliminación</strong>.
+                  <strong>eliminadas de forma inmediata</strong>.
                 </span>
               </li>
               <li className="flex items-start gap-2">

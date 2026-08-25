@@ -45,10 +45,13 @@ model User {
   consentGiven     Boolean   @default(false)
   consentDate      DateTime?
   consentOption    String?   // FULL, KNOWLEDGE_ONLY — which consent option the candidate chose
-  anonymousStats   Boolean   @default(false) // Option C: anonymous statistics consent
+  anonymousStats   Boolean   @default(false) // Option C: anonymous statistics consent (DEPRECATED — not used in current flow)
   consentConfirmed Boolean   @default(false) // Did candidate confirm reading all options + ARCO?
   consentWithdrawnAt DateTime? // When consent was withdrawn (retracted from FULL to KNOWLEDGE_ONLY)
   consentVersion   String?   // Version of the privacy notice the candidate consented to
+  // Retention fields (Phase 3)
+  piiPurgeAt       DateTime? // When candidate PII should be purged (2 years after eval)
+  sensitivePurgeAt DateTime? // When sensitive data should be purged (on conclusion/withdrawal)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
@@ -58,6 +61,7 @@ model User {
   sentInvitations  CandidateInvitation[] @relation("InvitationSender")
   interviews       InterviewSchedule[]   @relation("InterviewCandidate")
   consentLogs      ConsentLog[]
+  auditLogs        AuditLog[]             @relation("AuditActor")
 }
 
 model CompanyPrivacyNotice {
@@ -77,12 +81,16 @@ model CompanyPrivacyNotice {
 model ConsentLog {
   id              String   @id @default(cuid())
   userId          String
-  action          String   // GIVEN, WITHDRAWN, MODIFIED
+  action          String   // GIVEN, WITHDRAWN, MODIFIED, REVOKED
   previousOption  String?
   newOption       String?
   anonymousStats  Boolean  @default(false)
   consentVersion  String?
   ipAddress       String?
+  userAgent       String?  // Browser user-agent string for evidentiary completeness
+  companyId       String?  // Tenant context at time of consent
+  adminUserId     String?  // If action was performed by an admin (e.g., system override)
+  reason          String?  // Optional reason for withdrawal/modification
   createdAt       DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -230,6 +238,10 @@ model EvaluationResult {
   recommendation    String   @default("PENDIENTE") // PERFIL_COMPLETO, PERFIL_PARCIAL, PENDIENTE
   summary           String?
 
+  // Retention fields (Phase 3)
+  retainedUntil     DateTime? // When this result should be purged (2 years after createdAt)
+  purgedAt          DateTime? // When the result was actually purged/anonymized
+
   createdAt         DateTime @default(now())
 
   session           EvaluationSession @relation(fields: [sessionId], references: [id])
@@ -350,4 +362,28 @@ model VacancyApplicationResponse {
 
   application     VacancyApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   vacancyQuestion VacancyQuestion?   @relation(fields: [vacancyQuestionId], references: [id])
+}
+
+// AuditLog — Security event log (Phase 1.7)
+// Records access, modification, deletion, consent changes, and admin actions.
+// NEVER store passwords, tokens, or sensitive values in this table.
+model AuditLog {
+  id          String   @id @default(cuid())
+  actorId     String?  // User who performed the action (null = system/anonymous)
+  action      String   // LOGIN, LOGOUT, ACCESS, CREATE, UPDATE, DELETE, CONSENT_CHANGE, PERMISSION_CHANGE, ADMIN_ACCESS, UNAUTHORIZED_ATTEMPT
+  resource    String?  // Model/table affected (e.g., "User", "EvaluationResult")
+  resourceId  String?  // ID of the affected record
+  companyId   String?  // Tenant context
+  details     String?  // JSON string with additional context (NO secrets)
+  ipAddress   String?  // Client IP
+  userAgent   String?  // Client user-agent
+  success     Boolean  @default(true) // false = failed/unauthorized attempt
+  createdAt   DateTime @default(now())
+
+  actor User? @relation("AuditActor", fields: [actorId], references: [id])
+
+  @@index([actorId])
+  @@index([companyId])
+  @@index([action])
+  @@index([createdAt])
 }

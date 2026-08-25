@@ -38,8 +38,7 @@ export default function CandidateDetailView() {
   const [scheduling, setScheduling] = useState(false)
   const [scheduleSuccess, setScheduleSuccess] = useState(false)
   const [scheduleError, setScheduleError] = useState('')
-  const [fixingConsent, setFixingConsent] = useState(false)
-  const [consentFixed, setConsentFixed] = useState(false)
+  const [showWithdrawDialog, setShowWithdrawDialog] = useState(false)
 
   useEffect(() => {
     if (!selectedResultId) {
@@ -234,14 +233,14 @@ export default function CandidateDetailView() {
       </Card>
 
       {/* Consent & Legal Card */}
-      <Card className={`shadow-sm ${candidateContact.consentGiven || consentFixed ? 'border-emerald-200 bg-emerald-50/30' : 'border-amber-200 bg-amber-50/30'}`}>
+      <Card className={`shadow-sm ${candidateContact.consentGiven ? 'border-emerald-200 bg-emerald-50/30' : 'border-amber-200 bg-amber-50/30'}`}>
         <CardHeader className="pb-2">
           <CardTitle className="text-lg flex items-center gap-2">
             <Scale className="w-5 h-5 text-emerald-600" /> Consentimiento Legal
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {(candidateContact.consentGiven || consentFixed) ? (
+          {candidateContact.consentGiven ? (
             <div className="space-y-3">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center">
@@ -252,16 +251,10 @@ export default function CandidateDetailView() {
                   <p className="font-medium text-emerald-700">Aceptó aviso de privacidad</p>
                 </div>
               </div>
-              {(candidateContact.consentDate || consentFixed) && (
+              {candidateContact.consentDate && (
                 <div className="flex items-center gap-2 text-sm text-gray-600">
                   <Calendar className="w-4 h-4 text-gray-400" />
                   <span>Aceptado el {new Date(candidateContact.consentDate || result.createdAt).toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} a las {new Date(candidateContact.consentDate || result.createdAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</span>
-                </div>
-              )}
-              {consentFixed && (
-                <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
-                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                  <span>Consentimiento registrado retroactivamente. El prospecto completó la evaluación, por lo que necesariamente aceptó los términos previamente.</span>
                 </div>
               )}
               <p className="text-xs text-gray-500 italic">
@@ -290,37 +283,18 @@ export default function CandidateDetailView() {
               </div>
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-700">
                 <p className="font-medium mb-1">Nota importante:</p>
-                <p>Para responder los exámenes psicométrico, psicológico y de conocimientos, el prospecto necesariamente aceptó los términos y condiciones y el aviso de privacidad. Si aparece sin consentimiento, fue un error del sistema o se omitió en el registro.</p>
+                <p>
+                  Este registro indica que la evaluación se completó sin evidencia de consentimiento válido.
+                  La funcionalidad de &quot;registrar consentimiento retroactivamente&quot; ha sido eliminada del sistema
+                  por no ser conforme con el Art. 8 de la LFPDPPP (el consentimiento debe ser previo, expreso e informado).
+                </p>
+                <p className="mt-2 font-medium">Acción recomendada:</p>
+                <p>
+                  Si el candidato desea continuar en el proceso, debe ser invitado nuevamente para
+                  que otorgue su consentimiento de manera informada antes de cualquier tratamiento.
+                  Los datos sensibles de esta evaluación no deben utilizarse como base para decisiones laborales.
+                </p>
               </div>
-              <Button
-                size="sm"
-                className="bg-amber-600 hover:bg-amber-700"
-                disabled={fixingConsent}
-                onClick={async () => {
-                  setFixingConsent(true)
-                  try {
-                    const res = await apiFetch('/api/consent/fix', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ candidateId: result.candidateId }),
-                    })
-                    if (res.ok) {
-                      setConsentFixed(true)
-                      setCandidateContact(prev => ({ ...prev, consentGiven: true, consentDate: new Date().toISOString() }))
-                    }
-                  } catch (e) {
-                    console.error('Error fixing consent', e)
-                  } finally {
-                    setFixingConsent(false)
-                  }
-                }}
-              >
-                {fixingConsent ? (
-                  <><RefreshCw className="w-4 h-4 mr-1 animate-spin" /> Corrigiendo...</>
-                ) : (
-                  <><ShieldCheck className="w-4 h-4 mr-1" /> Registrar consentimiento retroactivamente</>
-                )}
-              </Button>
             </div>
           )}
         </CardContent>

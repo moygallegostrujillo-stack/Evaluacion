@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createRLSClient, createSuperAdminRLSClient, getUnscopedClient } from '@/lib/rls'
 import { getAuthFromHeaders } from '@/lib/auth'
+import { logAuditEvent, logUnauthorizedAccess } from '@/lib/audit'
 
 export async function GET(req: NextRequest) {
   try {
@@ -77,9 +78,31 @@ export async function GET(req: NextRequest) {
       ? createSuperAdminRLSClient(targetCompanyId)
       : createRLSClient(auth)
 
-    const candidateId = req.nextUrl.searchParams.get('candidateId')
+    const candidateIdParam = req.nextUrl.searchParams.get('candidateId')
     const resultId = req.nextUrl.searchParams.get('resultId')
     const compareIds = req.nextUrl.searchParams.get('compareIds')
+
+    // SECURITY FIX (Phase 1.2): CANDIDATO role is force-bound to own userId.
+    // A candidate CANNOT query results for another candidateId — even if they
+    // know the ID. Previously this check was missing, allowing cross-candidate
+    // data access within the same company.
+    const candidateId = auth.role === 'CANDIDATO' ? auth.userId : candidateIdParam
+
+    // If a CANDIDATO tried to pass a different candidateId, log as unauthorized attempt
+    if (auth.role === 'CANDIDATO' && candidateIdParam && candidateIdParam !== auth.userId) {
+      await logUnauthorizedAccess(req, {
+        actorId: auth.userId,
+        action: 'ACCESS',
+        resource: 'EvaluationResult',
+        resourceId: candidateIdParam,
+        companyId: auth.companyId,
+        reason: 'CANDIDATO attempted to access another candidate\'s results',
+      })
+      return NextResponse.json(
+        { error: 'Forbidden: you can only access your own results' },
+        { status: 403 }
+      )
+    }
 
     // Compare multiple candidates
     if (compareIds) {
@@ -234,8 +257,36 @@ export async function GET(req: NextRequest) {
       if (result) {
         // Defense-in-depth: RLS already filtered, but keep the check as extra safety
         if (auth.role !== 'SUPER_ADMIN' && result.companyId !== auth.companyId) {
+          await logUnauthorizedAccess(req, {
+            actorId: auth.userId,
+            resource: 'EvaluationResult',
+            resourceId: resultId,
+            companyId: auth.companyId,
+            reason: 'Cross-tenant access attempt to EvaluationResult',
+          })
           return NextResponse.json({ error: 'Forbidden: result belongs to another company' }, { status: 403 })
         }
+
+        // SECURITY FIX (Phase 1.2): CANDIDATO can only view their own results
+        if (auth.role === 'CANDIDATO' && result.candidateId !== auth.userId) {
+          await logUnauthorizedAccess(req, {
+            actorId: auth.userId,
+            resource: 'EvaluationResult',
+            resourceId: resultId,
+            companyId: auth.companyId,
+            reason: 'CANDIDATO attempted to access another candidate\'s result by ID',
+          })
+          return NextResponse.json({ error: 'Forbidden: you can only access your own results' }, { status: 403 })
+        }
+
+        await logAuditEvent(req, {
+          actorId: auth.userId,
+          action: 'ACCESS',
+          resource: 'EvaluationResult',
+          resourceId: result.id,
+          companyId: auth.companyId,
+          details: { source: 'evaluation' },
+        })
 
         return NextResponse.json({ result })
       }
@@ -257,8 +308,12 @@ export async function GET(req: NextRequest) {
         }
 
         // Find the candidate user for contact info
-        const candidateUser = await getUnscopedClient().user.findFirst({
-          where: { email: vacancyApp.candidateEmail },
+        // SECURITY FIX (Phase 1.2): Use RLS-scoped client instead of unscoped
+        // to prevent cross-tenant email collision leaks.
+        // We query with companyId filter to ensure we only find users within
+        // the same tenant as the VacancyApplication.
+        const candidateUser = await rlsDb.user.findFirst({
+          where: { email: vacancyApp.candidateEmail, companyId: vacancyApp.companyId },
           select: { id: true, name: true, email: true, phone: true, consentGiven: true, consentDate: true },
         })
 

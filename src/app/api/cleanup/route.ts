@@ -1,12 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUnscopedClient } from '@/lib/rls'
 import { getAuthFromHeaders } from '@/lib/auth'
+import { logAuditEvent } from '@/lib/audit'
 
 /**
  * POST /api/cleanup
  * SUPER_ADMIN only — one-time cleanup endpoint.
  * Keeps only the specified company, deletes everything else.
  * Cleans the kept company's operational data (positions, candidates, invitations, etc.)
+ *
+ * SECURITY FIX (Phase 1.3):
+ * - dryRun now defaults to TRUE (previously false — dangerous default)
+ * - Requires explicit `confirm: true` in body to proceed with actual deletion
+ * - Logs all cleanup operations to AuditLog
+ * - This endpoint is marked as TEMPORARY in the worklog and should be removed
+ *   once no longer needed.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -17,7 +25,25 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json()
     const keepCompanyName = (body.keepCompany || 'Café DeChiapas').trim()
-    const dryRun = body.dryRun === true
+    // SECURITY FIX: dryRun defaults to TRUE — must be explicitly set to false
+    // AND confirm: true must be provided to proceed with actual destruction
+    const dryRun = body.dryRun !== false  // true unless explicitly false
+    const confirmed = body.confirm === true
+
+    if (!dryRun && !confirmed) {
+      return NextResponse.json({
+        error: 'Confirmation required',
+        message: 'Para ejecutar la limpieza real, envía { dryRun: false, confirm: true } en el body.',
+      }, { status: 400 })
+    }
+
+    await logAuditEvent(req, {
+      actorId: auth.userId,
+      action: 'ADMIN_ACCESS',
+      resource: 'Cleanup',
+      companyId: auth.companyId,
+      details: { keepCompany: keepCompanyName, dryRun, confirmed },
+    })
 
     const db = getUnscopedClient()
     const report: Record<string, number> = {}

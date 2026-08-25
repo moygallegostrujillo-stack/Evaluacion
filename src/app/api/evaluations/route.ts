@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createRLSClient, getUnscopedClient } from '@/lib/rls'
 import { getAuthFromHeaders } from '@/lib/auth'
 import { generateTemplatesForPosition } from '@/lib/generate-templates'
+import { logUnauthorizedAccess } from '@/lib/audit'
 
 // ============================================
 // SCORING ALGORITHM
@@ -742,6 +743,102 @@ export async function POST(req: NextRequest) {
     }
 
     // ============================================
+    // CONSENT GATE (Phase 2.3 + 2.4) — Server-side enforcement
+    // ============================================
+    // A candidate CANNOT start, answer, or complete an evaluation session
+    // unless they have valid consent. Additionally, if they chose Option B
+    // (KNOWLEDGE_ONLY), they can ONLY answer knowledge questions — any
+    // attempt to submit answers to sensitive categories (PSICOMETRICA,
+    // PSICOLOGICA, INTEGRIDAD) is rejected by the server.
+    //
+    // This is defense-in-depth: the client also filters templates, but
+    // the server is the source of truth. A direct API call cannot bypass this.
+    const consentUser = await unscopedDb.user.findUnique({
+      where: { id: session.candidateId },
+      select: {
+        id: true,
+        consentGiven: true,
+        consentOption: true,
+        consentWithdrawnAt: true,
+      },
+    })
+
+    // For CANDIDATO role, verify consent is valid before any evaluation action
+    if (auth.role === 'CANDIDATO' && action !== 'create-session') {
+      if (!consentUser || !consentUser.consentGiven) {
+        return NextResponse.json(
+          {
+            error: 'Consentimiento requerido',
+            code: 'CONSENT_REQUIRED',
+            message: 'Debe otorgar consentimiento antes de realizar cualquier evaluación.',
+          },
+          { status: 403 }
+        )
+      }
+
+      // If consent was revoked (consentWithdrawnAt set and option is KNOWLEDGE_ONLY),
+      // the candidate can only continue with knowledge questions.
+      const isRevoked = consentUser.consentWithdrawnAt !== null && consentUser.consentOption === 'KNOWLEDGE_ONLY'
+
+      // Check for Option B: only knowledge questions allowed
+      if (consentUser.consentOption === 'KNOWLEDGE_ONLY' || isRevoked) {
+        // For 'answer' action, verify the question is a knowledge question
+        if (action === 'answer') {
+          const { questionId } = body
+          if (questionId) {
+            const question = await unscopedDb.question.findUnique({
+              where: { id: questionId },
+              select: { category: true, evaluationTemplate: { select: { type: true } } },
+            })
+            if (question) {
+              const isSensitive = isSensitiveQuestion(question.category, question.evaluationTemplate?.type)
+              if (isSensitive) {
+                // Log unauthorized attempt
+                await logUnauthorizedAccess(req, {
+                  actorId: auth.userId,
+                  action: 'ACCESS',
+                  resource: 'EvaluationResponse',
+                  resourceId: questionId,
+                  companyId: auth.companyId,
+                  reason: `KNOWLEDGE_ONLY consent user attempted to answer sensitive question (${question.category})`,
+                })
+                return NextResponse.json(
+                  {
+                    error: 'No autorizado',
+                    code: 'CONSENT_OPTION_B_VIOLATION',
+                    message: 'Su opción de consentimiento (Solo Conocimientos) no autoriza el procesamiento de pruebas psicométricas, psicológicas o de integridad.',
+                  },
+                  { status: 403 }
+                )
+              }
+            }
+          }
+        }
+
+        // For 'start' and 'next-step' actions, filter templates to CONOCIMIENTOS only
+        // (The fetch logic below will use this flag)
+        if (action === 'start' || action === 'next-step') {
+          // We'll filter in the template fetch below
+        }
+      }
+    }
+
+    // Helper: determine if a question category is sensitive
+    function isSensitiveQuestion(category: string, templateType?: string): boolean {
+      // Knowledge questions are NOT sensitive
+      if (category === 'KNOWLEDGE') return false
+      // Big Five
+      if (['OPENNESS', 'CONSCIENTIOUSNESS', 'EXTRAVERSION', 'AGREEABLENESS', 'NEUROTICISM'].includes(category)) return true
+      // Psicológica
+      if (['STRESS', 'EMPATHY', 'ADAPTABILITY', 'LEADERSHIP', 'TEAMWORK'].includes(category)) return true
+      // Integridad
+      if (category.startsWith('INTEGRITY_')) return true
+      // Template type fallback
+      if (templateType && ['PSICOMETRICA', 'PSICOLOGICA', 'INTEGRIDAD'].includes(templateType)) return true
+      return false
+    }
+
+    // ============================================
     // START: Set session to IN_PROGRESS
     // ============================================
     if (action === 'start') {
@@ -927,6 +1024,18 @@ export async function POST(req: NextRequest) {
               },
             },
           })
+        }
+      }
+
+      // PHASE 2.4: Server-side Option B enforcement — filter templates
+      // If the candidate's consentOption is KNOWLEDGE_ONLY, only return
+      // CONOCIMIENTOS templates. Defense-in-depth: client also filters, but
+      // server is source of truth — direct API call cannot bypass this.
+      if (auth.role === 'CANDIDATO' && consentUser) {
+        const isOptionB = consentUser.consentOption === 'KNOWLEDGE_ONLY'
+        const isRevoked = consentUser.consentWithdrawnAt !== null && consentUser.consentOption === 'KNOWLEDGE_ONLY'
+        if (isOptionB || isRevoked) {
+          templates = templates.filter(t => t.type === 'CONOCIMIENTOS')
         }
       }
 

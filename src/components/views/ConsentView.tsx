@@ -19,7 +19,6 @@ import {
   FileText,
   AlertCircle,
   Scale,
-  BarChart3,
   Brain,
   BookOpen,
 } from 'lucide-react'
@@ -47,8 +46,8 @@ export default function ConsentView() {
 
   // 'FULL' (Option A) | 'KNOWLEDGE_ONLY' (Option B) | null
   const [selectedOption, setSelectedOption] = useState<string | null>(null)
-  // Option C — independent checkbox
-  const [anonymousStats, setAnonymousStats] = useState(false)
+  // Option C deprecated — always false (kept for API backward compatibility)
+  const anonymousStats = false // Option C deprecated — always false
   // Confirmation checkbox (must be checked to enable Continue)
   const [confirmedReading, setConfirmedReading] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -85,7 +84,8 @@ export default function ConsentView() {
         body: JSON.stringify({
           userId: user.id,
           consentOption: selectedOption,
-          anonymousStats,
+          // Option C deprecated — always false for backward compat with API
+          anonymousStats: false,
           confirmedReading: true,
         }),
       })
@@ -339,44 +339,6 @@ export default function ConsentView() {
                 </div>
               </div>
             </button>
-
-            {/* Option C — anonymous stats (independent checkbox) */}
-            <div
-              className={`p-4 rounded-xl border-2 transition-all ${
-                anonymousStats
-                  ? 'border-teal-500 bg-teal-50'
-                  : 'border-gray-200 bg-white'
-              }`}
-            >
-              <label
-                htmlFor="anonymous-stats"
-                className="flex items-start gap-3 cursor-pointer"
-              >
-                <Checkbox
-                  id="anonymous-stats"
-                  checked={anonymousStats}
-                  onCheckedChange={(checked) => {
-                    setAnonymousStats(checked === true)
-                    setError(null)
-                  }}
-                  className="mt-0.5"
-                />
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <BarChart3 className="w-4 h-4 text-teal-600" />
-                    <span className="font-semibold text-gray-900 text-sm">
-                      Opción C — Estadísticas Anónimas (opcional)
-                    </span>
-                  </div>
-                  <p className="text-sm text-gray-600 leading-relaxed">
-                    Acepto que mis datos sean utilizados de forma{' '}
-                    <strong>anónima y agregada</strong> para fines estadísticos
-                    internos. En ningún caso se asociará mi identidad con los
-                    resultados estadísticos agregados.
-                  </p>
-                </div>
-              </label>
-            </div>
           </CardContent>
         </Card>
 
@@ -510,9 +472,9 @@ export default function ConsentView() {
               className="mt-0.5"
             />
             <span className="text-sm text-gray-700 leading-relaxed">
-              He leído y comprendo las <strong>3 opciones de participación</strong>{' '}
-              (A: Evaluación Completa, B: Solo Conocimientos, C: Estadísticas
-              Anónimas) y mis derechos <strong>ARCO</strong>. Autorizo el
+              He leído y comprendo las <strong>2 opciones de participación</strong>{' '}
+              (A: Evaluación Completa, B: Solo Conocimientos) y mis derechos{' '}
+              <strong>ARCO</strong>. Autorizo el
               tratamiento de mis datos personales de conformidad con la opción
               seleccionada arriba, de manera{' '}
               <strong>libre, informada y voluntaria</strong>. Entiendo que

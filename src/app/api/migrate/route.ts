@@ -260,6 +260,106 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // ============================================
+    // 7. Add retention columns to User (Phase 3.2)
+    // ============================================
+    for (const col of ['piiPurgeAt', 'sensitivePurgeAt']) {
+      try {
+        await db.$executeRawUnsafe(`SELECT "${col}" FROM "User" LIMIT 0;`)
+        results.push(`✓ Column "User.${col}" already exists`)
+      } catch {
+        try {
+          await db.$executeRawUnsafe(
+            `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "${col}" TIMESTAMP(3);`
+          )
+          results.push(`✓ Added column "User.${col}" (TIMESTAMP)`)
+        } catch (addErr) {
+          results.push(`✗ Failed to add column "User.${col}": ${addErr}`)
+        }
+      }
+    }
+
+    // ============================================
+    // 8. Add retention columns to EvaluationResult (Phase 3.2)
+    // ============================================
+    for (const col of ['retainedUntil', 'purgedAt']) {
+      try {
+        await db.$executeRawUnsafe(`SELECT "${col}" FROM "EvaluationResult" LIMIT 0;`)
+        results.push(`✓ Column "EvaluationResult.${col}" already exists`)
+      } catch {
+        try {
+          await db.$executeRawUnsafe(
+            `ALTER TABLE "EvaluationResult" ADD COLUMN IF NOT EXISTS "${col}" TIMESTAMP(3);`
+          )
+          results.push(`✓ Added column "EvaluationResult.${col}" (TIMESTAMP)`)
+        } catch (addErr) {
+          results.push(`✗ Failed to add column "EvaluationResult.${col}": ${addErr}`)
+        }
+      }
+    }
+
+    // ============================================
+    // 9. Add evidence columns to ConsentLog (Phase 2.2)
+    // ============================================
+    for (const col of ['userAgent', 'companyId', 'adminUserId', 'reason']) {
+      try {
+        await db.$executeRawUnsafe(`SELECT "${col}" FROM "ConsentLog" LIMIT 0;`)
+        results.push(`✓ Column "ConsentLog.${col}" already exists`)
+      } catch {
+        try {
+          const colType = col === 'companyId' || col === 'adminUserId' ? 'TEXT' : (col === 'reason' ? 'TEXT' : 'TEXT')
+          await db.$executeRawUnsafe(
+            `ALTER TABLE "ConsentLog" ADD COLUMN IF NOT EXISTS "${col}" ${colType};`
+          )
+          results.push(`✓ Added column "ConsentLog.${col}" (${colType})`)
+        } catch (addErr) {
+          results.push(`✗ Failed to add column "ConsentLog.${col}": ${addErr}`)
+        }
+      }
+    }
+
+    // ============================================
+    // 10. Create AuditLog table (Phase 1.7)
+    // ============================================
+    try {
+      await db.$executeRawUnsafe(`SELECT "id" FROM "AuditLog" LIMIT 0;`)
+      results.push('✓ Table "AuditLog" already exists')
+    } catch {
+      try {
+        await db.$executeRawUnsafe(`
+          CREATE TABLE IF NOT EXISTS "AuditLog" (
+            "id" TEXT NOT NULL,
+            "actorId" TEXT,
+            "action" TEXT NOT NULL,
+            "resource" TEXT,
+            "resourceId" TEXT,
+            "companyId" TEXT,
+            "details" TEXT,
+            "ipAddress" TEXT,
+            "userAgent" TEXT,
+            "success" BOOLEAN NOT NULL DEFAULT true,
+            "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            CONSTRAINT "AuditLog_pkey" PRIMARY KEY ("id")
+          );
+        `)
+        await db.$executeRawUnsafe(
+          `CREATE INDEX IF NOT EXISTS "AuditLog_actorId_idx" ON "AuditLog"("actorId");`
+        )
+        await db.$executeRawUnsafe(
+          `CREATE INDEX IF NOT EXISTS "AuditLog_companyId_idx" ON "AuditLog"("companyId");`
+        )
+        await db.$executeRawUnsafe(
+          `CREATE INDEX IF NOT EXISTS "AuditLog_action_idx" ON "AuditLog"("action");`
+        )
+        await db.$executeRawUnsafe(
+          `CREATE INDEX IF NOT EXISTS "AuditLog_createdAt_idx" ON "AuditLog"("createdAt");`
+        )
+        results.push('✓ Created table "AuditLog" with indexes')
+      } catch (createErr) {
+        results.push(`✗ Failed to create table "AuditLog": ${createErr}`)
+      }
+    }
+
     // Verify by checking the columns
     let verification
     try {

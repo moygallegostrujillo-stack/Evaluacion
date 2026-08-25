@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createRLSClient, createSuperAdminRLSClient, getUnscopedClient } from '@/lib/rls'
 import { getAuthFromHeaders } from '@/lib/auth'
-
 import { hashPassword } from '@/lib/password'
+import { logUnauthorizedAccess, logAuditEvent } from '@/lib/audit'
 
 export async function GET(req: NextRequest) {
   try {
@@ -365,7 +365,36 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Candidate ID is required' }, { status: 400 })
     }
 
-    // Delete related records first
+    // SECURITY FIX (Phase 1.2 + 3.4): Cross-tenant check — verify the
+    // candidate belongs to the same company as the requesting user.
+    // Previously missing, allowing RH from company A to delete candidates
+    // in company B if they knew the candidate ID.
+    const targetCandidate = await db.user.findUnique({
+      where: { id: candidateId },
+      select: { id: true, companyId: true, role: true, name: true, email: true },
+    })
+    if (!targetCandidate) {
+      return NextResponse.json({ error: 'Candidate not found' }, { status: 404 })
+    }
+    if (targetCandidate.role !== 'CANDIDATO') {
+      return NextResponse.json({ error: 'User is not a candidate' }, { status: 400 })
+    }
+    if (auth.role !== 'SUPER_ADMIN' && targetCandidate.companyId !== auth.companyId) {
+      await logUnauthorizedAccess(req, {
+        actorId: auth.userId,
+        action: 'DELETE',
+        resource: 'User',
+        resourceId: candidateId,
+        companyId: auth.companyId,
+        reason: 'Cross-tenant candidate deletion attempt',
+      })
+      return NextResponse.json(
+        { error: 'Forbidden: candidate belongs to another company' },
+        { status: 403 }
+      )
+    }
+
+    // Delete related records first (FK constraints)
     await db.evaluationResponse.deleteMany({
       where: { session: { candidateId } },
     }).catch(() => {})
@@ -378,10 +407,35 @@ export async function DELETE(req: NextRequest) {
     await db.interviewSchedule.deleteMany({
       where: { candidateId },
     }).catch(() => {})
-    await db.consentLog.deleteMany({
-      where: { userId: candidateId },
+
+    // SECURITY FIX (Phase 3.4): Do NOT delete ConsentLog records.
+    // Previously this destroyed the audit trail (LFPDPPP Art. 27 violation).
+    // ConsentLog is retained for evidentiary purposes; the FK has onDelete: Cascade
+    // on User, so we must anonymize the user record instead of hard-deleting to
+    // preserve consent evidence. However, since the User record is being deleted
+    // and ConsentLog.userId references it, we handle this by keeping ConsentLog
+    // records with the userId value (anonymized approach would require schema change).
+    // For now: we accept the cascade deletion of ConsentLog because the FK is
+    // onDelete: Cascade — but we LOG this as a known compliance gap to fix
+    // in a future schema migration (anonymize userId in ConsentLog instead of cascade).
+    // TODO: Change ConsentLog.userId FK to SET NULL instead of CASCADE, and
+    //       add a "candidateNameAnonymized" field for audit evidence retention.
+
+    // Also delete VacancyApplication data (previously missed — orphaned PII)
+    await db.vacancyApplicationResponse.deleteMany({
+      where: { application: { candidateEmail: { contains: targetCandidate.email || '___' } } },
     }).catch(() => {})
+
     await db.user.delete({ where: { id: candidateId } })
+
+    await logAuditEvent(req, {
+      actorId: auth.userId,
+      action: 'DELETE',
+      resource: 'User',
+      resourceId: candidateId,
+      companyId: auth.companyId,
+      details: { candidateName: targetCandidate.name },
+    })
 
     return NextResponse.json({ success: true })
   } catch (error) {

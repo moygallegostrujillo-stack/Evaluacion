@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getUnscopedClient } from '@/lib/rls'
 import { getAuthFromHeaders } from '@/lib/auth'
 import { hashPassword } from '@/lib/password'
+import { logUnauthorizedAccess, logAuditEvent } from '@/lib/audit'
 
 export async function GET(req: NextRequest) {
   try {
@@ -155,7 +156,33 @@ export async function PUT(req: NextRequest) {
 
     // Cannot edit SUPER_ADMIN unless you are SUPER_ADMIN
     if (existingUser.role === 'SUPER_ADMIN' && auth.role !== 'SUPER_ADMIN') {
+      await logUnauthorizedAccess(req, {
+        actorId: auth.userId,
+        action: 'UPDATE',
+        resource: 'User',
+        resourceId: id,
+        companyId: auth.companyId,
+        reason: 'Non-SUPER_ADMIN attempted to edit SUPER_ADMIN',
+      })
       return NextResponse.json({ error: 'Cannot edit a Super Admin' }, { status: 403 })
+    }
+
+    // SECURITY FIX (Phase 1.2): Cross-tenant check — RH can only edit users
+    // within their own company. Previously missing, allowing RH from company A
+    // to edit users in company B if they knew the user ID.
+    if (auth.role !== 'SUPER_ADMIN' && existingUser.companyId !== auth.companyId) {
+      await logUnauthorizedAccess(req, {
+        actorId: auth.userId,
+        action: 'UPDATE',
+        resource: 'User',
+        resourceId: id,
+        companyId: auth.companyId,
+        reason: 'RH attempted to edit user from another company (cross-tenant)',
+      })
+      return NextResponse.json(
+        { error: 'Forbidden: you can only edit users within your own company' },
+        { status: 403 }
+      )
     }
 
     // Cannot edit yourself to remove SUPER_ADMIN role
@@ -249,7 +276,32 @@ export async function PATCH(req: NextRequest) {
 
     // Cannot modify SUPER_ADMIN unless you are SUPER_ADMIN
     if (existingUser.role === 'SUPER_ADMIN' && auth.role !== 'SUPER_ADMIN') {
+      await logUnauthorizedAccess(req, {
+        actorId: auth.userId,
+        action: 'UPDATE',
+        resource: 'User',
+        resourceId: id,
+        companyId: auth.companyId,
+        reason: 'Non-SUPER_ADMIN attempted to modify SUPER_ADMIN',
+      })
       return NextResponse.json({ error: 'Cannot modify a Super Admin' }, { status: 403 })
+    }
+
+    // SECURITY FIX (Phase 1.2): Cross-tenant check for PATCH operations
+    // (toggle_access, change_password). Previously missing.
+    if (auth.role !== 'SUPER_ADMIN' && existingUser.companyId !== auth.companyId) {
+      await logUnauthorizedAccess(req, {
+        actorId: auth.userId,
+        action: 'UPDATE',
+        resource: 'User',
+        resourceId: id,
+        companyId: auth.companyId,
+        reason: 'RH attempted to modify user from another company (cross-tenant PATCH)',
+      })
+      return NextResponse.json(
+        { error: 'Forbidden: you can only modify users within your own company' },
+        { status: 403 }
+      )
     }
 
     switch (action) {

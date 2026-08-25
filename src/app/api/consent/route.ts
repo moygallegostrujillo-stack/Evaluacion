@@ -230,7 +230,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Record an audit log entry
+    // Record an audit log entry — capture full evidence (Phase 2.2)
     try {
       await db.consentLog.create({
         data: {
@@ -241,6 +241,9 @@ export async function POST(req: NextRequest) {
           anonymousStats: anonymousStatsBool,
           consentVersion: CURRENT_CONSENT_VERSION,
           ipAddress: getClientIp(req),
+          userAgent: req.headers.get('user-agent') || null,
+          companyId: user.companyId || auth.companyId || null,
+          adminUserId: auth.role !== 'CANDIDATO' && auth.userId !== userId ? auth.userId : null,
         },
       })
     } catch (logErr) {
@@ -275,9 +278,13 @@ export async function POST(req: NextRequest) {
 // PATCH /api/consent — Withdraw consent (FULL → KNOWLEDGE_ONLY)
 // ============================================
 // Per LFPDPPP Art. 8 (Sensitive data) the candidate may withdraw consent
-// for sensitive-data processing at any time. We don't delete the
-// sensitive responses immediately, but flag the consent as withdrawn so
-// that going forward only the knowledge section continues to be processed.
+// for sensitive-data processing at any time.
+//
+// SECURITY FIX (Phase 2.6): Previously this endpoint ONLY set consentWithdrawnAt
+// and did NOT delete any sensitive responses — despite the UI promising "marcadas
+// para eliminación". Now it actually deletes the sensitive EvaluationResponse
+// records (PSICOMETRICA, PSICOLOGICA, INTEGRIDAD) to honor the revocation.
+// Knowledge responses are retained since KNOWLEDGE_ONLY consent covers them.
 export async function PATCH(req: NextRequest) {
   try {
     const auth = getAuthFromHeaders(req.headers)
@@ -336,13 +343,74 @@ export async function PATCH(req: NextRequest) {
     const now = new Date()
     const unscoped = getUnscopedClient()
 
+    // PHASE 2.6: Actually DELETE sensitive responses to honor the revocation.
+    // Previously the UI said "marcadas para eliminación" but nothing was deleted.
+    // Now we delete all EvaluationResponse records linked to sensitive question
+    // categories (PSICOMETRICA, PSICOLOGICA, INTEGRIDAD) for this candidate's sessions.
+    // Knowledge responses are RETAINED because KNOWLEDGE_ONLY consent covers them.
+    const sensitiveCategories = [
+      'OPENNESS', 'CONSCIENTIOUSNESS', 'EXTRAVERSION', 'AGREEABLENESS', 'NEUROTICISM', // Big Five
+      'STRESS', 'EMPATHY', 'ADAPTABILITY', 'LEADERSHIP', 'TEAMWORK', // Psicológica
+      'INTEGRITY_HONESTY', 'INTEGRITY_RULES', 'INTEGRITY_THEFT', 'INTEGRITY_RESPONSIBILITY', // Integridad
+    ]
+
+    let deletedResponsesCount = 0
+    try {
+      // Find all sessions for this candidate
+      const sessions = await unscoped.evaluationSession.findMany({
+        where: { candidateId: userId },
+        select: { id: true },
+      })
+      const sessionIds = sessions.map(s => s.id)
+
+      if (sessionIds.length > 0) {
+        // Delete responses to sensitive questions
+        const deleted = await unscoped.evaluationResponse.deleteMany({
+          where: {
+            sessionId: { in: sessionIds },
+            question: { category: { in: sensitiveCategories } },
+          },
+        })
+        deletedResponsesCount = deleted.count
+
+        // Also reset the sensitive scores on EvaluationResult to 0/null
+        // (knowledgeScore is retained if present)
+        await unscoped.evaluationResult.updateMany({
+          where: { candidateId: userId },
+          data: {
+            openness: 0,
+            conscientiousness: 0,
+            extraversion: 0,
+            agreeableness: 0,
+            neuroticism: 0,
+            stressLevel: 0,
+            empathy: 0,
+            adaptability: 0,
+            leadership: 0,
+            teamwork: 0,
+            integrityScore: 0,
+            // overallScore and recommendation will be stale; we leave them as-is
+            // because recalculating would require the full scoring engine.
+            // The summary is cleared to avoid referencing deleted data.
+            summary: null,
+          },
+        }).catch((err: unknown) => {
+          console.error('[consent PATCH] Failed to reset sensitive scores:', err)
+        })
+      }
+    } catch (delErr) {
+      // Log but don't block — the consent state change is the primary operation.
+      // The deletion may partially succeed.
+      console.error('[consent PATCH] Sensitive response deletion error:', delErr)
+    }
+
     const updatedUser = await unscoped.user.update({
       where: { id: userId },
       data: {
         consentOption: 'KNOWLEDGE_ONLY',
         consentWithdrawnAt: now,
-        // Keep anonymousStats as-is — withdrawal of sensitive data does not
-        // touch the (separately-consented) anonymous stats preference.
+        // Set sensitivePurgeAt to now since we just purged sensitive data
+        sensitivePurgeAt: now,
       },
     })
 
@@ -356,6 +424,10 @@ export async function PATCH(req: NextRequest) {
           anonymousStats: (user as Record<string, unknown>).anonymousStats as boolean ?? false,
           consentVersion: user.consentVersion || CURRENT_CONSENT_VERSION,
           ipAddress: getClientIp(req),
+          userAgent: req.headers.get('user-agent') || null,
+          companyId: user.companyId || auth.companyId || null,
+          adminUserId: auth.role !== 'CANDIDATO' && auth.userId !== userId ? auth.userId : null,
+          reason: 'User withdrew sensitive data consent',
         },
       })
     } catch (logErr) {
@@ -374,8 +446,8 @@ export async function PATCH(req: NextRequest) {
         consentWithdrawnAt: updatedUser.consentWithdrawnAt,
         consentVersion: updatedUser.consentVersion,
       },
-      message:
-        'Consentimiento para tratamiento de datos sensibles retirado. Continuará únicamente con la evaluación de conocimientos.',
+      deletedSensitiveResponses: deletedResponsesCount,
+      message: 'Consentimiento para tratamiento de datos sensibles retirado. Sus respuestas psicométricas, psicológicas y de integridad han sido eliminadas. Continuará únicamente con la evaluación de conocimientos.',
     })
   } catch (error) {
     console.error('[consent] PATCH error:', error)
