@@ -2,9 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getUnscopedClient } from '@/lib/rls'
 import { getAuthFromHeaders } from '@/lib/auth'
 import { db } from '@/lib/db'
-
-// Current consent document version (bumped whenever the privacy notice is materially updated)
-const CURRENT_CONSENT_VERSION = '2026-01-v1'
+import { CURRENT_CONSENT_VERSION } from '@/lib/consent-version'
 
 // Valid participation options
 const VALID_OPTIONS = ['FULL', 'KNOWLEDGE_ONLY'] as const
@@ -230,8 +228,25 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Record an audit log entry — capture full evidence (Phase 2.2)
+    // Record an audit log entry — capture full evidence (Phase 2.2 + 3.5)
+    // PII snapshots + noticeHash ensure the consent evidence survives
+    // even if the User record is later deleted/anonymized.
     try {
+      // Compute hash of the current privacy notice text for cryptographic binding
+      let noticeHash: string | null = null
+      try {
+        const notice = await db.companyPrivacyNotice.findUnique({
+          where: { companyId: user.companyId || auth.companyId || '' },
+          select: { contentHtml: true, version: true },
+        })
+        if (notice) {
+          const crypto = await import('crypto')
+          noticeHash = crypto.createHash('sha256').update(notice.contentHtml).digest('hex')
+        }
+      } catch (hashErr) {
+        console.error('[consent] noticeHash computation failed (non-fatal):', hashErr)
+      }
+
       await db.consentLog.create({
         data: {
           userId,
@@ -244,6 +259,12 @@ export async function POST(req: NextRequest) {
           userAgent: req.headers.get('user-agent') || null,
           companyId: user.companyId || auth.companyId || null,
           adminUserId: auth.role !== 'CANDIDATO' && auth.userId !== userId ? auth.userId : null,
+          // PII snapshots — captured at consent time, immutable
+          candidateNameSnapshot: user.name || null,
+          candidateEmailSnapshot: user.email || null,
+          candidatePhoneSnapshot: user.phone || null,
+          // Cryptographic binding to the exact notice text
+          noticeHash,
         },
       })
     } catch (logErr) {
@@ -428,6 +449,10 @@ export async function PATCH(req: NextRequest) {
           companyId: user.companyId || auth.companyId || null,
           adminUserId: auth.role !== 'CANDIDATO' && auth.userId !== userId ? auth.userId : null,
           reason: 'User withdrew sensitive data consent',
+          // PII snapshots for evidence retention
+          candidateNameSnapshot: user.name || null,
+          candidateEmailSnapshot: user.email || null,
+          candidatePhoneSnapshot: user.phone || null,
         },
       })
     } catch (logErr) {

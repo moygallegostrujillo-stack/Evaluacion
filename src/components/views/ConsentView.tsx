@@ -111,7 +111,8 @@ export default function ConsentView() {
             consentOption: selectedOption,
             anonymousStats,
             consentConfirmed: true,
-            consentVersion: '2026-01-v1',
+            // PHASE 3.5 (B6): Use the version returned by the server, not hardcoded.
+            consentVersion: data.user?.consentVersion || '2026-01-v2',
           },
           token
         )

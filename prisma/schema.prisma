@@ -31,6 +31,7 @@ model Company {
   vacancies   Vacancy[]
   vacancyApplications VacancyApplication[]
   privacyNotice CompanyPrivacyNotice?
+  arcoRequests ArcoRequest[]
 }
 
 model User {
@@ -62,6 +63,8 @@ model User {
   interviews       InterviewSchedule[]   @relation("InterviewCandidate")
   consentLogs      ConsentLog[]
   auditLogs        AuditLog[]             @relation("AuditActor")
+  arcoRequests     ArcoRequest[]          @relation("ArcoRequestSubject")
+  arcoAssignments  ArcoRequest[]          @relation("ArcoRequestAssignee")
 }
 
 model CompanyPrivacyNotice {
@@ -80,8 +83,9 @@ model CompanyPrivacyNotice {
 
 model ConsentLog {
   id              String   @id @default(cuid())
-  userId          String
-  action          String   // GIVEN, WITHDRAWN, MODIFIED, REVOKED
+  userId          String?  // NULLABLE — when User is deleted, this becomes NULL (SET NULL)
+                          // but the consent evidence (snapshots below) is preserved.
+  action          String   // GIVEN, WITHDRAWN, MODIFIED, REVOKED, RE_CONSENTED
   previousOption  String?
   newOption       String?
   anonymousStats  Boolean  @default(false)
@@ -91,9 +95,18 @@ model ConsentLog {
   companyId       String?  // Tenant context at time of consent
   adminUserId     String?  // If action was performed by an admin (e.g., system override)
   reason          String?  // Optional reason for withdrawal/modification
+  // PII snapshots — captured at consent time so evidence survives user deletion.
+  // These are IMMUTABLE after creation (no UPDATE path exists).
+  // Allows reconstructing WHO consented, even after the User row is deleted/anonymized.
+  candidateNameSnapshot    String?  // Snapshot of User.name at consent time
+  candidateEmailSnapshot   String?  // Snapshot of User.email at consent time
+  candidatePhoneSnapshot   String?  // Snapshot of User.phone at consent time
+  // Hash of the privacy notice text at consent time — cryptographic binding
+  // between the consent record and the exact text the candidate saw.
+  noticeHash     String?
   createdAt       DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull) // CHANGED: CASCADE → SetNull
 }
 
 model Position {
@@ -386,4 +399,47 @@ model AuditLog {
   @@index([companyId])
   @@index([action])
   @@index([createdAt])
+}
+
+// ArcoRequest — LFPDPPP ARCO rights workflow (Phase 3.5 - B4)
+// Records requests from data subjects to exercise their rights:
+// Access, Rectification, Cancellation, Opposition.
+// Managed by RH/SUPER_ADMIN with SLA tracking.
+model ArcoRequest {
+  id              String   @id @default(cuid())
+  // The data subject — may be a registered User, or an external requester
+  // (e.g., someone who never registered but wants their data deleted)
+  userId          String?  // FK to User if they have an account (nullable for external requesters)
+  requesterName   String   // Name of the person making the request
+  requesterEmail  String   // Contact email for response
+  requesterPhone  String?  // Optional phone
+  // What right they're exercising
+  rightType       String   // ACCESS, RECTIFICATION, CANCELLATION, OPPOSITION
+  // Details of the request
+  description     String   // Free-text description of what they want
+  // Tenant context
+  companyId       String   // Which company is the data controller
+  // Workflow tracking
+  status          String   @default("PENDING") // PENDING, IN_REVIEW, IDENTIFICATION_REQUIRED, APPROVED, REJECTED, COMPLETED, CANCELLED
+  assignedTo      String?  // User ID of the RH/SUPER_ADMIN handling the request
+  // SLA tracking
+  requestedAt     DateTime @default(now())
+  legalDeadline   DateTime // 20 business days per LFPDPPP Art. 32 Reglamento
+  resolvedAt      DateTime?
+  resolutionNotes String? // What was done, by whom, when
+  // Evidence
+  responseDocumentUrl String? // URL to any document delivered to the requester
+  // Audit
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user         User?    @relation("ArcoRequestSubject", fields: [userId], references: [id], onDelete: SetNull)
+  assignee     User?    @relation("ArcoRequestAssignee", fields: [assignedTo], references: [id], onDelete: SetNull)
+  company      Company  @relation(fields: [companyId], references: [id])
+
+  @@index([userId])
+  @@index([companyId])
+  @@index([status])
+  @@index([rightType])
+  @@index([legalDeadline])
 }

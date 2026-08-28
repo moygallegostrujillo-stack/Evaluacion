@@ -1,12 +1,29 @@
 /**
  * Seed Supabase: Clean all data, then create tenant-free SUPER_ADMIN
  * Uses Supabase REST API with service_role key (bypasses RLS)
+ *
+ * SECURITY FIX (Phase 3.5): Removed hardcoded SERVICE_ROLE_KEY and SUPABASE_URL.
+ * Now reads from environment variables. The service_role key must NEVER be
+ * committed to the repository.
+ *
+ * Required env vars:
+ *   SUPABASE_URL — e.g., https://<project-ref>.supabase.co
+ *   SUPABASE_SERVICE_ROLE_KEY — the service_role JWT (server-only, never expose to client)
+ *
+ * Usage:
+ *   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... node scripts/seed-supabase-clean.mjs
  */
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 
-const SUPABASE_URL = 'https://ulgrgxjryezkedruvhdb.supabase.co';
-const SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVsZ3JneGpyeWV6a2VkcnV2aGRiIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4Mzk4MDQ2MCwiZXhwIjoyMDk5NTU2NDYwfQ.c4uO50RNnDdY271mK-sSLBHbu17rH1wOQp3B5TxBapg';
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
+  console.error('FATAL: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables are required.');
+  console.error('Set them before running this script. NEVER commit the service_role key to git.');
+  process.exit(1);
+}
 
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 

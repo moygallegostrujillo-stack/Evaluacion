@@ -325,11 +325,15 @@ export async function DELETE(req: NextRequest) {
       // Delete related records first
       const candidates = await db.user.findMany({
         where,
-        select: { id: true },
+        select: { id: true, email: true },
       })
       const candidateIds = candidates.map(c => c.id)
 
       if (candidateIds.length > 0) {
+        // PHASE 3.5 (B3): Fetch emails before deleting Users, so we can clean
+        // up VacancyApplication orphaned PII afterwards.
+        const candidateEmails = candidates.map(c => c.email).filter(Boolean) as string[]
+
         await db.evaluationResponse.deleteMany({
           where: { session: { candidateId: { in: candidateIds } } },
         }).catch(() => {})
@@ -342,12 +346,33 @@ export async function DELETE(req: NextRequest) {
         await db.interviewSchedule.deleteMany({
           where: { candidateId: { in: candidateIds } },
         }).catch(() => {})
-        await db.consentLog.deleteMany({
-          where: { userId: { in: candidateIds } },
-        }).catch(() => {})
+        // PHASE 3.5 (B2): ConsentLog no longer explicitly deleted.
+        // FK is now onDelete: SetNull — ConsentLog rows survive with userId=NULL.
         const result = await db.user.deleteMany({
           where,
         })
+
+        // PHASE 3.5 (B3): Clean up VacancyApplication orphaned PII
+        if (candidateEmails.length > 0) {
+          try {
+            const userApps = await db.vacancyApplication.findMany({
+              where: { candidateEmail: { in: candidateEmails } },
+              select: { id: true },
+            })
+            if (userApps.length > 0) {
+              const appIds = userApps.map(a => a.id)
+              await db.vacancyApplicationResponse.deleteMany({
+                where: { applicationId: { in: appIds } },
+              })
+              await db.vacancyApplication.deleteMany({
+                where: { id: { in: appIds } },
+              })
+            }
+          } catch (vacErr) {
+            console.error('[candidates DELETE bulk] VacancyApplication cleanup error:', vacErr)
+          }
+        }
+
         return NextResponse.json({
           success: true,
           deleted: result.count,
@@ -408,24 +433,36 @@ export async function DELETE(req: NextRequest) {
       where: { candidateId },
     }).catch(() => {})
 
-    // SECURITY FIX (Phase 3.4): Do NOT delete ConsentLog records.
-    // Previously this destroyed the audit trail (LFPDPPP Art. 27 violation).
-    // ConsentLog is retained for evidentiary purposes; the FK has onDelete: Cascade
-    // on User, so we must anonymize the user record instead of hard-deleting to
-    // preserve consent evidence. However, since the User record is being deleted
-    // and ConsentLog.userId references it, we handle this by keeping ConsentLog
-    // records with the userId value (anonymized approach would require schema change).
-    // For now: we accept the cascade deletion of ConsentLog because the FK is
-    // onDelete: Cascade — but we LOG this as a known compliance gap to fix
-    // in a future schema migration (anonymize userId in ConsentLog instead of cascade).
-    // TODO: Change ConsentLog.userId FK to SET NULL instead of CASCADE, and
-    //       add a "candidateNameAnonymized" field for audit evidence retention.
+    // PHASE 3.5 (B2): ConsentLog is now preserved via FK onDelete: SetNull.
+    // When the User is deleted, ConsentLog.userId becomes NULL but the record
+    // (with PII snapshots + noticeHash) is retained as audit evidence.
+    // No explicit ConsentLog.deleteMany here.
 
-    // Also delete VacancyApplication data (previously missed — orphaned PII)
-    await db.vacancyApplicationResponse.deleteMany({
-      where: { application: { candidateEmail: { contains: targetCandidate.email || '___' } } },
-    }).catch(() => {})
+    // PHASE 3.5 (B3): Fix VacancyApplication orphaned PII.
+    // Previously used `contains` (wrong — matches substrings) and only deleted
+    // VacancyApplicationResponse, leaving the parent VacancyApplication with full PII.
+    // Now: find by exact email match, delete responses + parent applications.
+    if (targetCandidate.email) {
+      try {
+        const userApps = await db.vacancyApplication.findMany({
+          where: { candidateEmail: targetCandidate.email },
+          select: { id: true },
+        })
+        if (userApps.length > 0) {
+          const appIds = userApps.map(a => a.id)
+          await db.vacancyApplicationResponse.deleteMany({
+            where: { applicationId: { in: appIds } },
+          })
+          await db.vacancyApplication.deleteMany({
+            where: { id: { in: appIds } },
+          })
+        }
+      } catch (vacErr) {
+        console.error('[candidates DELETE] VacancyApplication cleanup error:', vacErr)
+      }
+    }
 
+    // Now delete the User — ConsentLog rows will have userId SET TO NULL (not deleted)
     await db.user.delete({ where: { id: candidateId } })
 
     await logAuditEvent(req, {

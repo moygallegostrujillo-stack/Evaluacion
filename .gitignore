@@ -62,3 +62,9 @@ prompt
 /mini-services/
 /worklog.md
 Caddyfile
+
+# Scripts containing credentials — NEVER commit
+# These scripts read from env vars now; the scripts themselves can be tracked
+# but any local credential files (.env.local, secrets.json) must be ignored
+/scripts/.env.local
+/scripts/secrets.*

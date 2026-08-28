@@ -45,12 +45,15 @@ function useAuthRestore() {
     const params = new URLSearchParams(window.location.search)
     if (params.get('token')) return
 
-    const token = localStorage.getItem('evaluhr_token')
+    // PHASE 3.5 (B7): Token is no longer in localStorage — only the user object.
+    // We restore the user object from localStorage for fast hydration (no loading flash),
+    // but the actual auth is validated server-side via the httpOnly cookie on every API call.
+    // If the cookie is expired/missing, the first apiFetch will return 401 and clearAuth() will run.
     const userStr = localStorage.getItem('evaluhr_user')
-    if (token && userStr) {
+    if (userStr) {
       try {
         const userData = JSON.parse(userStr)
-        setAuth(userData, token)
+        setAuth(userData, null) // token is null — comes from httpOnly cookie
         // Only set view on initial load (when still on 'login')
         if (currentView === 'login') {
           if (userData.role === 'CANDIDATO') {

@@ -120,9 +120,15 @@ export async function PUT(req: NextRequest) {
       )
     }
 
+    // PHASE 3.5 (B8): Sanitize HTML to prevent Stored XSS.
+    // Strip all script tags, event handlers, javascript: URIs, iframes, etc.
+    // Only safe formatting tags are allowed (see lib/sanitize.ts).
+    const { sanitizeHtml } = await import('@/lib/sanitize')
+    const sanitizedHtml = sanitizeHtml(contentHtml)
+
     const updated = await client.companyPrivacyNotice.update({
       where: { companyId: auth.companyId },
-      data: { contentHtml, isCustom: true },
+      data: { contentHtml: sanitizedHtml, isCustom: true },
     })
 
     return NextResponse.json({

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getUnscopedClient } from '@/lib/rls'
 import { hashPassword, verifyPassword, isLegacyHash } from '@/lib/password'
 import { generateToken } from '@/lib/auth'
+import { needsReconsent } from '@/lib/consent-version'
 import crypto from 'crypto'
 
 const db = getUnscopedClient()
@@ -74,6 +75,13 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'login') {
+      // PHASE 3.5 (B9): Rate limiting on login to prevent brute-force
+      const { rateLimit, RATE_LIMITS, rateLimitResponse } = await import('@/lib/rate-limit')
+      const rl = await rateLimit(req, RATE_LIMITS.LOGIN)
+      if (!rl.allowed) {
+        return rateLimitResponse(rl, 'Demasiados intentos de inicio de sesión. Inténtelo en 15 minutos.')
+      }
+
       const { email, password } = body
       // Use safeFindUser — resilient to missing consent columns in prod DB
       const user = await safeFindUser({ email })
@@ -114,9 +122,15 @@ export async function POST(req: NextRequest) {
       })
 
       // Set token as httpOnly cookie for extra security
+      const userResponse = buildUserResponse(user as Record<string, unknown>)
+
+      // PHASE 3.5 (B6): Check if candidate needs re-consent due to version change
+      const reconsentCheck = needsReconsent(userResponse.consentVersion)
+
       const response = NextResponse.json({
-        user: buildUserResponse(user as Record<string, unknown>),
+        user: userResponse,
         token,
+        needsReconsent: userResponse.role === 'CANDIDATO' && userResponse.consentGiven && reconsentCheck.needsReconsent,
       })
 
       response.cookies.set('evaluhr_token', token, {
@@ -133,6 +147,13 @@ export async function POST(req: NextRequest) {
     // Auto-login via invitation token — NO registration required
     // The token IS the auth. RH already provided name + phone.
     if (action === 'auto-login') {
+      // PHASE 3.5 (B9): Rate limiting on auto-login to prevent token enumeration
+      const { rateLimit, RATE_LIMITS, rateLimitResponse } = await import('@/lib/rate-limit')
+      const rlAuto = await rateLimit(req, RATE_LIMITS.AUTO_LOGIN)
+      if (!rlAuto.allowed) {
+        return rateLimitResponse(rlAuto, 'Demasiados intentos. Inténtelo más tarde.')
+      }
+
       const { token: invitationToken } = body
 
       if (!invitationToken) {
@@ -303,9 +324,14 @@ export async function POST(req: NextRequest) {
         companySector: fullUser.company?.sector || undefined,
       })
 
+      // PHASE 3.5 (B6): Check if candidate needs re-consent due to version change
+      const autoUserResponse = buildUserResponse(fullUser as Record<string, unknown>)
+      const autoReconsentCheck = needsReconsent(autoUserResponse.consentVersion)
+
       const response = NextResponse.json({
-        user: buildUserResponse(fullUser as Record<string, unknown>),
+        user: autoUserResponse,
         token: jwtToken,
+        needsReconsent: autoUserResponse.role === 'CANDIDATO' && autoUserResponse.consentGiven && autoReconsentCheck.needsReconsent,
       })
 
       response.cookies.set('evaluhr_token', jwtToken, {

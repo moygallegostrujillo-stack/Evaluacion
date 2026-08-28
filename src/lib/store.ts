@@ -158,14 +158,26 @@ export const useAppStore = create<AppState>((set) => ({
   token: null,
   setAuth: (user, token) => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem('evaluhr_token', token)
+      // PHASE 3.5 (B7): JWT token is NO LONGER stored in localStorage.
+      // The token is set as an httpOnly cookie by the server on login/auto-login.
+      // localStorage is only used for the user object (non-sensitive: name, email, role).
+      // This prevents XSS-based token theft — the token is unreadable by JavaScript.
+      //
+      // The `token` parameter is kept in the store for backward compatibility
+      // (some code may reference it), but it is NOT persisted to localStorage.
+      if (token) {
+        // Token stays in memory only — used by apiFetch for Authorization header
+        // as a fallback if the cookie isn't present (e.g., cross-origin requests).
+        // The httpOnly cookie is the primary auth mechanism.
+      }
       localStorage.setItem('evaluhr_user', JSON.stringify(user))
     }
     set({ user, token })
   },
   clearAuth: () => {
     if (typeof window !== 'undefined') {
-      localStorage.removeItem('evaluhr_token')
+      // PHASE 3.5 (B7): Only clear the user object from localStorage.
+      // The httpOnly cookie is cleared by the server's /api/auth logout endpoint.
       localStorage.removeItem('evaluhr_user')
       // Also clear the httpOnly auth cookie by making a request to the logout endpoint
       fetch('/api/auth', {

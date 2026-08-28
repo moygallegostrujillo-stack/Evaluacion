@@ -170,7 +170,7 @@ export async function POST(req: NextRequest) {
         select: { id: true },
       })
       for (const u of remainingUsers) {
-        await db.consentLog.deleteMany({ where: { userId: u.id } })
+        // PHASE 3.5 (B2): ConsentLog preserved — FK is onDelete: SetNull now
       }
       report.users_other = (report.users_other || 0)
         + (await db.user.deleteMany({ where: { companyId: otherId } })).count
@@ -247,7 +247,7 @@ export async function POST(req: NextRequest) {
       select: { id: true },
     })
     for (const c of kCandidates) {
-      await db.consentLog.deleteMany({ where: { userId: c.id } })
+      // PHASE 3.5 (B2): ConsentLog preserved — FK is onDelete: SetNull now
     }
     report.candidates_keep = (await db.user.deleteMany({ where: { companyId: keepCompanyId, role: 'CANDIDATO' } })).count
 

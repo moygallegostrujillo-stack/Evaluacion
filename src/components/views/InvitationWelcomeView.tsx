@@ -70,7 +70,8 @@ export default function InvitationWelcomeView() {
       // Clear the invitation-active flag — auth is now valid
       sessionStorage.removeItem('evaluhr_invitation_active')
       // Navigate based on consent status
-      if (result.user.consentGiven) {
+      // PHASE 3.5 (B6): Also redirect to consent if re-consent is needed (version change)
+      if (result.user.consentGiven && !result.needsReconsent) {
         setCurrentView('take-evaluation')
       } else {
         setCurrentView('consent')

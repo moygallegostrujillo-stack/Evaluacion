@@ -1,13 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUnscopedClient } from '@/lib/rls'
+import { rateLimit, RATE_LIMITS, rateLimitResponse } from '@/lib/rate-limit'
 
 /**
  * GET /api/public/invitation?token=xxx
  * Public endpoint to validate an invitation token and return details.
  * Used by the candidate landing page to show company/position info.
+ *
+ * PHASE 3.5 (B9): Rate limited to prevent token enumeration attacks.
  */
 export async function GET(req: NextRequest) {
   try {
+    // Rate limit: 30 requests per hour per IP
+    const rl = await rateLimit(req, RATE_LIMITS.PUBLIC_INVITATION)
+    if (!rl.allowed) {
+      return rateLimitResponse(rl, 'Demasiadas solicitudes. Inténtelo más tarde.')
+    }
+
     const { searchParams } = new URL(req.url)
     const token = searchParams.get('token')
 

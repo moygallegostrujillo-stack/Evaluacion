@@ -1,25 +1,21 @@
 /**
  * Authenticated fetch wrapper for API requests.
- * 
- * Automatically includes the JWT token via:
- * 1. Authorization: Bearer <token> header (from localStorage)
- * 2. Cookie: evaluhr_token (httpOnly, set by server on login)
- * 
- * The middleware checks both sources.
+ *
+ * PHASE 3.5 (B7): JWT token is now primarily sent via httpOnly cookie.
+ * The Authorization header fallback (from localStorage) has been REMOVED
+ * to prevent XSS-based token theft. The browser automatically sends the
+ * httpOnly cookie with `credentials: 'include'`.
+ *
+ * The middleware reads the cookie (or Authorization header if present).
+ * Since we no longer store the token in localStorage, the cookie is the
+ * sole auth mechanism for browser requests.
+ *
  * Handles 401 (expired/invalid token) by clearing auth and redirecting to login.
  */
 
 interface ApiFetchOptions extends RequestInit {
   /** Skip auth header (for public endpoints) */
   skipAuth?: boolean
-}
-
-/**
- * Get the stored JWT token
- */
-function getStoredToken(): string | null {
-  if (typeof window === 'undefined') return null
-  return localStorage.getItem('evaluhr_token')
 }
 
 /**
@@ -38,15 +34,13 @@ function handleUnauthorized() {
     || sessionStorage.getItem('evaluhr_invitation_active') === 'true'
 
   if (hasInvitationToken) {
-    // Just clear the stale token — don't reload the page.
-    // The invitation flow's auto-login will set the correct token.
-    localStorage.removeItem('evaluhr_token')
+    // Just clear the stale user object — don't reload the page.
+    // The invitation flow's auto-login will set the correct cookie.
     localStorage.removeItem('evaluhr_user')
     return
   }
 
-  // Clear stored auth data
-  localStorage.removeItem('evaluhr_token')
+  // Clear stored user object (token is in httpOnly cookie, cleared by server)
   localStorage.removeItem('evaluhr_user')
 
   // Force page reload to reset app state (goes to login)
@@ -58,7 +52,7 @@ function handleUnauthorized() {
 
 /**
  * Authenticated fetch wrapper
- * Drop-in replacement for fetch() that adds JWT auth
+ * Drop-in replacement for fetch() that adds JWT auth via httpOnly cookie
  */
 export async function apiFetch(
   url: string,
@@ -68,13 +62,8 @@ export async function apiFetch(
 
   const headers = new Headers(customHeaders)
 
-  // Add Authorization header if not skipped and token exists
-  if (!skipAuth) {
-    const token = getStoredToken()
-    if (token && !headers.has('Authorization')) {
-      headers.set('Authorization', `Bearer ${token}`)
-    }
-  }
+  // PHASE 3.5 (B7): No longer reads token from localStorage.
+  // Auth is via httpOnly cookie only — sent automatically with credentials: 'include'.
 
   // Set Content-Type for JSON bodies if not already set
   if (restOptions.body && !headers.has('Content-Type')) {
@@ -87,6 +76,7 @@ export async function apiFetch(
   const response = await fetch(url, {
     ...restOptions,
     headers,
+    credentials: 'include', // PHASE 3.5 (B7): Send httpOnly cookie
   })
 
   // Handle 401 - token expired or invalid

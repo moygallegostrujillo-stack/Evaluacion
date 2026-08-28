@@ -217,10 +217,8 @@ export async function DELETE(req: NextRequest) {
               where: { candidateId: { in: userIds } },
             }).catch(() => {})
 
-            // Delete consent logs
-            await db.consentLog.deleteMany({
-              where: { userId: { in: userIds } },
-            }).catch(() => {})
+            // PHASE 3.5 (B2): ConsentLog no longer explicitly deleted.
+            // FK is now onDelete: SetNull — consent evidence is preserved.
 
             // Delete the candidate users
             const userDeleteResult = await db.user.deleteMany({

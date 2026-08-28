@@ -34,7 +34,8 @@ export default function LoginView() {
       }
       setAuth(data.user, data.token)
       if (data.user.role === 'CANDIDATO') {
-        if (!data.user.consentGiven) {
+        // PHASE 3.5 (B6): Check if candidate needs re-consent due to version change
+        if (!data.user.consentGiven || data.needsReconsent) {
           setCurrentView('consent')
         } else {
           setCurrentView('take-evaluation')
