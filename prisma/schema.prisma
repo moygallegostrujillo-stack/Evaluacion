@@ -65,6 +65,7 @@ model User {
   auditLogs        AuditLog[]             @relation("AuditActor")
   arcoRequests     ArcoRequest[]          @relation("ArcoRequestSubject")
   arcoAssignments  ArcoRequest[]          @relation("ArcoRequestAssignee")
+  vacancyApplications VacancyApplication[] @relation("VacancyApplicant")
 }
 
 model CompanyPrivacyNotice {
@@ -333,6 +334,13 @@ model VacancyApplication {
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
+  // PHASE 3.5-A.1 (B2): FK to User for reliable cleanup on deletion.
+  // Nullable because some vacancy applications may come from unregistered
+  // users. When the linked User is deleted, this FK is set to NULL
+  // (onDelete: SetNull) — the VacancyApplication record is preserved for
+  // audit but the PII fields are anonymized by the DELETE handler.
+  candidateUserId    String?
+
   // Big Five scores (0-100)
   openness           Float     @default(0)
   conscientiousness  Float     @default(0)
@@ -360,6 +368,7 @@ model VacancyApplication {
 
   vacancy    Vacancy                      @relation(fields: [vacancyId], references: [id])
   company    Company                      @relation(fields: [companyId], references: [id])
+  candidateUser User?                     @relation("VacancyApplicant", fields: [candidateUserId], references: [id], onDelete: SetNull)
   responses  VacancyApplicationResponse[]
 }
 

@@ -13,7 +13,7 @@ async function main() {
   if (admin) {
     await db.user.update({
       where: { id: admin.id },
-      data: { role: 'SUPER_ADMIN', password: await hashPassword('admin123') },
+      data: { role: 'SUPER_ADMIN', password: await hashPassword(require('crypto').randomBytes(16).toString('hex')) },
     })
     console.log('✅ Admin role fixed to SUPER_ADMIN')
   } else {
@@ -27,7 +27,7 @@ async function main() {
       data: {
         email: 'admin@evaluhr.com',
         name: 'Administrador EvaluHR',
-        password: await hashPassword('admin123'),
+        password: await hashPassword(require('crypto').randomBytes(16).toString('hex')),
         role: 'SUPER_ADMIN',
         phone: '+52 961 000 0000',
         companyId: company.id,

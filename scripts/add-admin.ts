@@ -22,7 +22,7 @@ async function main() {
     await db.user.update({
       where: { id: existing.id },
       data: { 
-        password: await hashPassword('admin123'),
+        password: await hashPassword(require('crypto').randomBytes(16).toString('hex')),
         role: 'ADMIN',
         active: true,
         companyId: company.id 
@@ -34,7 +34,7 @@ async function main() {
       data: {
         email: 'admin@evaluhr.com',
         name: 'Administrador EvaluHR',
-        password: await hashPassword('admin123'),
+        password: await hashPassword(require('crypto').randomBytes(16).toString('hex')),
         role: 'ADMIN',
         phone: '+52 961 000 0000',
         companyId: company.id,
@@ -46,10 +46,10 @@ async function main() {
 
   // Also fix the passwords for existing users to match the login UI
   const userUpdates = [
-    { email: 'rh@cafedechiapas.com', password: 'rh1234' },
-    { email: 'gerente@cafedechiapas.com', password: 'gerente1234' },
-    { email: 'rh@marlui.com', password: 'rh1234' },
-    { email: 'juan.perez@email.com', password: 'candidato1234' },
+    { email: 'rh@cafedechiapas.com', password: require('crypto').randomBytes(8).toString('hex') },
+    { email: 'gerente@cafedechiapas.com', password: require('crypto').randomBytes(8).toString('hex') },
+    { email: 'rh@marlui.com', password: require('crypto').randomBytes(8).toString('hex') },
+    { email: 'juan.perez@email.com', password: require('crypto').randomBytes(8).toString('hex') },
   ]
 
   for (const update of userUpdates) {

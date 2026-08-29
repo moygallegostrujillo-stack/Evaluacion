@@ -177,7 +177,7 @@ export async function GET(req: NextRequest) {
         },
       })
 
-      const rh2Password = await hashPassword('rh123')
+      const rh2Password = await hashPassword(generatePassword())
       await db.user.create({
         data: {
           email: 'rh@marlui.com',

@@ -3,6 +3,7 @@ import { createRLSClient, getUnscopedClient } from '@/lib/rls'
 import { getAuthFromHeaders } from '@/lib/auth'
 import { generateTemplatesForPosition } from '@/lib/generate-templates'
 import { logUnauthorizedAccess } from '@/lib/audit'
+import { needsReconsent } from '@/lib/consent-version'
 
 // ============================================
 // SCORING ALGORITHM
@@ -760,6 +761,7 @@ export async function POST(req: NextRequest) {
         consentGiven: true,
         consentOption: true,
         consentWithdrawnAt: true,
+        consentVersion: true,
       },
     })
 
@@ -771,6 +773,34 @@ export async function POST(req: NextRequest) {
             error: 'Consentimiento requerido',
             code: 'CONSENT_REQUIRED',
             message: 'Debe otorgar consentimiento antes de realizar cualquier evaluación.',
+          },
+          { status: 403 }
+        )
+      }
+
+      // PHASE 3.5-A.1 (B3): Backend re-consent enforcement.
+      // If the candidate's stored consentVersion is outdated AND a material
+      // change exists between their version and the current version, the
+      // evaluation is BLOCKED until they re-consent. This is enforced
+      // SERVER-SIDE — a direct API call cannot bypass it.
+      const reconsentCheck = needsReconsent(consentUser.consentVersion)
+      if (reconsentCheck.needsReconsent) {
+        await logUnauthorizedAccess(req, {
+          actorId: auth.userId,
+          action: 'ACCESS',
+          resource: 'EvaluationSession',
+          resourceId: sessionId,
+          companyId: auth.companyId,
+          reason: `Re-consent required: ${reconsentCheck.reason}`,
+        })
+        return NextResponse.json(
+          {
+            error: 'Consentimiento actualizado requerido',
+            code: 'RECONSENT_REQUIRED',
+            message: 'El aviso de privacidad ha sido actualizado. Debe aceptar la nueva versión antes de continuar.',
+            reason: reconsentCheck.reason,
+            currentVersion: consentUser.consentVersion,
+            requiredVersion: '2026-01-v2',
           },
           { status: 403 }
         )

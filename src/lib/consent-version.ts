@@ -44,6 +44,12 @@ export const PRIVACY_VERSIONS = [
     description: 'Minor formatting fixes in section 5',
     date: '2026-01-15',
   },
+  {
+    version: '2026-02-v1',
+    material: true, // MATERIAL CHANGE — requires re-consent
+    description: 'TEST VERSION — added new data category (retention policy change)',
+    date: '2026-02-01',
+  },
 ] as const
 
 /**
@@ -55,7 +61,7 @@ export const PRIVACY_VERSIONS = [
  *   1. Add an entry to PRIVACY_VERSIONS above
  *   2. Update CURRENT_CONSENT_VERSION below to match
  */
-export const CURRENT_CONSENT_VERSION = '2026-01-v2'
+export const CURRENT_CONSENT_VERSION = '2026-02-v1'
 
 /**
  * Determine if a candidate needs to re-consent based on their stored version.

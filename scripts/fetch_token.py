@@ -1,8 +1,10 @@
 import urllib.request
 import json
+import os
+import sys
 
 url = 'https://evaluacion-murex.vercel.app/api/auth'
-data = json.dumps({'action': 'login', 'email': 'admin@evaluhr.com', 'password': 'admin123'})
+data = json.dumps({'action': 'login', 'email': 'admin@evaluhr.com', 'password': os.environ.get('ADMIN_PASSWORD', '')})
 req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json'}, timeout=120)
 try:
     resp = req.read()

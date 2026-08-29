@@ -88,11 +88,12 @@ async function main() {
 
   console.log('\n✅ Database is clean!\n');
 
-  // Create tenant-free SUPER_ADMIN
+  // Create tenant-free SUPER_ADMIN with GENERATED password (never hardcoded)
   console.log('👤 Creating tenant-free SUPER_ADMIN...');
   
   const adminId = crypto.randomUUID();
-  const hashedPassword = await hashPassword('admin123');
+  const adminPasswordPlain = crypto.randomBytes(16).toString('hex');
+  const hashedPassword = await hashPassword(adminPasswordPlain);
   const now = new Date().toISOString();
 
   const { data: admin, error: adminError } = await supabase
@@ -137,7 +138,8 @@ async function main() {
   console.log(`   SUPER_ADMIN is tenant-free: ${allUsers?.[0]?.companyId === null ? '✅ YES' : '❌ NO'}`);
 
   console.log('\n🎉 Seed complete! Supabase is ready with:');
-  console.log('   - 1 SUPER_ADMIN user (admin@evaluhr.com / admin123)');
+  console.log('   - 1 SUPER_ADMIN user (admin@evaluhr.com)');
+  console.log(`   - Password (SAVE NOW, shown once): ${adminPasswordPlain}`);
   console.log('   - 0 companies (clean tenant-free state)');
 }
 

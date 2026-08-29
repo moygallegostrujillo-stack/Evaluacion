@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client'
+import crypto from 'crypto'
 import bcrypt from 'bcryptjs'
 
 const db = new PrismaClient()
@@ -84,7 +85,7 @@ async function main() {
     data: {
       email: 'admin@evaluhr.com',
       name: 'Administrador EvaluHR',
-      password: await hashPassword('admin123'),
+      password: await hashPassword(crypto.randomBytes(16).toString('hex')),
       role: 'SUPER_ADMIN',
       phone: '+52 961 000 0000',
       companyId: null, // Tenant-free: SUPER_ADMIN has no company
@@ -95,7 +96,7 @@ async function main() {
     data: {
       email: 'rh@cafedechiapas.com',
       name: 'Carolina Rivera',
-      password: await hashPassword('rh1234'),
+      password: await hashPassword(crypto.randomBytes(16).toString('hex')),
       role: 'RH',
       phone: '+52 961 111 2222',
       companyId: restaurantCompany.id,
@@ -106,7 +107,7 @@ async function main() {
     data: {
       email: 'gerente@cafedechiapas.com',
       name: 'Roberto Mendoza',
-      password: await hashPassword('gerente1234'),
+      password: await hashPassword(crypto.randomBytes(16).toString('hex')),
       role: 'GERENTE',
       phone: '+52 961 333 4444',
       companyId: restaurantCompany.id,
@@ -117,7 +118,7 @@ async function main() {
     data: {
       email: 'rh@marlui.com',
       name: 'Ana López',
-      password: await hashPassword('rh1234'),
+      password: await hashPassword(crypto.randomBytes(16).toString('hex')),
       role: 'RH',
       phone: '+52 961 555 6666',
       companyId: retailCompany.id,
@@ -129,7 +130,7 @@ async function main() {
     data: {
       email: 'juan.perez@email.com',
       name: 'Juan Pérez Hernández',
-      password: await hashPassword('candidato1234'),
+      password: await hashPassword(crypto.randomBytes(16).toString('hex')),
       role: 'CANDIDATO',
       phone: '+52 961 234 5678',
       companyId: restaurantCompany.id,
@@ -140,7 +141,7 @@ async function main() {
     data: {
       email: 'lucia.martinez@email.com',
       name: 'Lucía Martínez Torres',
-      password: await hashPassword('candidato1234'),
+      password: await hashPassword(crypto.randomBytes(16).toString('hex')),
       role: 'CANDIDATO',
       phone: '+52 961 345 6789',
       companyId: restaurantCompany.id,
@@ -151,7 +152,7 @@ async function main() {
     data: {
       email: 'pedro.sanchez@email.com',
       name: 'Pedro Sánchez Gómez',
-      password: await hashPassword('candidato1234'),
+      password: await hashPassword(crypto.randomBytes(16).toString('hex')),
       role: 'CANDIDATO',
       phone: '+52 961 456 7890',
       companyId: restaurantCompany.id,
@@ -162,7 +163,7 @@ async function main() {
     data: {
       email: 'maria.garcia@email.com',
       name: 'María García Ruiz',
-      password: await hashPassword('candidato1234'),
+      password: await hashPassword(crypto.randomBytes(16).toString('hex')),
       role: 'CANDIDATO',
       phone: '+52 961 567 8901',
       companyId: restaurantCompany.id,
@@ -173,7 +174,7 @@ async function main() {
     data: {
       email: 'carlos.lopez@email.com',
       name: 'Carlos López Díaz',
-      password: await hashPassword('candidato1234'),
+      password: await hashPassword(crypto.randomBytes(16).toString('hex')),
       role: 'CANDIDATO',
       phone: '+52 961 678 9012',
       companyId: restaurantCompany.id,
@@ -185,7 +186,7 @@ async function main() {
     data: {
       email: 'rosa.torres@email.com',
       name: 'Rosa Torres Vázquez',
-      password: await hashPassword('candidato1234'),
+      password: await hashPassword(crypto.randomBytes(16).toString('hex')),
       role: 'CANDIDATO',
       phone: '+52 961 789 0123',
       companyId: retailCompany.id,
@@ -196,7 +197,7 @@ async function main() {
     data: {
       email: 'miguel.hernandez@email.com',
       name: 'Miguel Hernández Flores',
-      password: await hashPassword('candidato1234'),
+      password: await hashPassword(crypto.randomBytes(16).toString('hex')),
       role: 'CANDIDATO',
       phone: '+52 961 890 1234',
       companyId: retailCompany.id,
@@ -518,12 +519,12 @@ async function main() {
   // ============================================
   console.log('\n🎉 Seed completed successfully!')
   console.log('===================================')
-  console.log(`SUPER_ADMIN: ${adminUser.email} / admin123 (tenant-free)`)
+  console.log(`SUPER_ADMIN: ${adminUser.email} / [generated at seed time]`)
   console.log(`Company: ${restaurantCompany.name} (${restaurantCompany.id})`)
   console.log(`Company: ${retailCompany.name} (${retailCompany.id})`)
-  console.log(`RH User: ${rhUser.email} / rh1234`)
-  console.log(`RH User: ${rhRetail.email} / rh1234`)
-  console.log(`Gerente: ${gerenteUser.email} / gerente1234`)
+  console.log(`RH User: ${rhUser.email} / [generated at seed time]`)
+  console.log(`RH User: ${rhRetail.email} / [generated at seed time]`)
+  console.log(`Gerente: ${gerenteUser.email} / [generated at seed time]`)
   console.log('===================================')
 
   await db.$disconnect()

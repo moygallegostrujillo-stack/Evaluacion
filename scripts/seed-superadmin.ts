@@ -54,7 +54,7 @@ async function main() {
     data: {
       email: 'admin@evaluhr.com',
       name: 'Administrador',
-      password: await hashPassword('admin123'),
+      password: await hashPassword(require('crypto').randomBytes(16).toString('hex')),
       role: 'SUPER_ADMIN',
       companyId: null,
       active: true,
@@ -70,7 +70,7 @@ async function main() {
   console.log('===================================')
   console.log('  SUPER_ADMIN Credentials:')
   console.log(`  Email:    ${admin.email}`)
-  console.log('  Password: admin123')
+  console.log('  Password: [generated at seed time]')
   console.log(`  Role:     ${admin.role}`)
   console.log('  Company:  None (tenant-free)')
   console.log('===================================')
