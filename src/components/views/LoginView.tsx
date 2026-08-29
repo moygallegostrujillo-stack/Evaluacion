@@ -108,13 +108,10 @@ export default function LoginView() {
 
               {process.env.NODE_ENV === 'development' && (
               <div className="mt-6 p-4 bg-amber-50 rounded-lg border border-amber-200">
-                <p className="text-xs font-semibold text-amber-800 mb-2">🔑 Credenciales de demo:</p>
+                <p className="text-xs font-semibold text-amber-800 mb-2">🔑 Desarrollo:</p>
                 <div className="space-y-1 text-xs text-amber-700">
-                  <p><strong>Admin:</strong> admin@evaluhr.com / admin123</p>
-                  <p><strong>RH Restaurante:</strong> rh@cafedechiapas.com / rh1234</p>
-                  <p><strong>Gerente:</strong> gerente@cafedechiapas.com / gerente1234</p>
-                  <p><strong>RH Retail:</strong> rh@marlui.com / rh1234</p>
-                  <p><strong>Candidato:</strong> juan.perez@email.com / candidato1234</p>
+                  <p>Las credenciales de prueba se generan aleatoriamente al ejecutar el seed.</p>
+                  <p>Use <code className="bg-amber-100 px-1 rounded">bun run db:seed</code> para crear usuarios de prueba.</p>
                 </div>
               </div>
               )}

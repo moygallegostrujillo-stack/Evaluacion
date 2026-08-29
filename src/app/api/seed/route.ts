@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUnscopedClient } from '@/lib/rls'
 import { hashPassword } from '@/lib/password'
+import crypto from 'crypto'
 
 const db = getUnscopedClient()
+
+/** Generate a strong random password for seeded users (never hardcoded) */
+function generatePassword(): string {
+  return crypto.randomBytes(16).toString('hex')
+}
 
 export async function GET(req: NextRequest) {
   // SECURITY: This endpoint requires a valid EVALUHR_SEED_RESET secret
@@ -57,8 +63,9 @@ export async function GET(req: NextRequest) {
       await db.company.deleteMany()
       console.log('All data deleted')
 
-      // Create SUPER_ADMIN
-      const hashedPassword = await hashPassword('admin123')
+      // Create SUPER_ADMIN with a GENERATED password (never hardcoded)
+      const superAdminPasswordPlain = generatePassword()
+      const hashedPassword = await hashPassword(superAdminPasswordPlain)
       const superAdmin = await db.user.create({
         data: {
           email: 'admin@evaluhr.com',
@@ -75,10 +82,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({
         success: true,
         mode: 'superadmin',
-        message: 'Database reset. Only SUPER_ADMIN user exists.',
+        message: 'Database reset. Only SUPER_ADMIN user exists. Password is shown below ONCE — save it now.',
         credentials: {
           email: 'admin@evaluhr.com',
-          password: 'admin123',
+          password: superAdminPasswordPlain, // shown once, never stored in plaintext
           role: 'SUPER_ADMIN',
         },
         user: {
@@ -146,8 +153,8 @@ export async function GET(req: NextRequest) {
         },
       })
 
-      // CREATE USERS
-      const superAdminPassword = await hashPassword('admin123')
+      // CREATE USERS with generated passwords (never hardcoded)
+      const superAdminPassword = await hashPassword(generatePassword())
       await db.user.create({
         data: {
           email: 'admin@evaluhr.com',
@@ -158,7 +165,7 @@ export async function GET(req: NextRequest) {
         },
       })
 
-      const rhPassword = await hashPassword('rh123')
+      const rhPassword = await hashPassword(generatePassword())
       await db.user.create({
         data: {
           email: 'rh@cafedechiapas.com',
