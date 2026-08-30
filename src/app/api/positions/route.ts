@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createRLSClient, createSuperAdminRLSClient, getUnscopedClient } from '@/lib/rls'
 import { getAuthFromHeaders } from '@/lib/auth'
 import { generateTemplatesForPosition } from '@/lib/generate-templates'
+import { logUnauthorizedAccess } from '@/lib/audit'
 
 export async function GET(req: NextRequest) {
   try {
@@ -225,6 +226,24 @@ export async function PATCH(req: NextRequest) {
 
     if (!position) {
       return NextResponse.json({ error: 'Position not found' }, { status: 404 })
+    }
+
+    // PHASE 3.5-B.2 (B1): Cross-tenant ownership check.
+    // A non-SUPER_ADMIN user can ONLY generate templates for positions
+    // belonging to their own company. This prevents cross-tenant writes.
+    if (auth.role !== 'SUPER_ADMIN' && position.companyId !== auth.companyId) {
+      await logUnauthorizedAccess(req, {
+        actorId: auth.userId,
+        action: 'UPDATE',
+        resource: 'Position',
+        resourceId: positionId,
+        companyId: auth.companyId,
+        reason: 'Cross-tenant template generation attempt',
+      })
+      return NextResponse.json(
+        { error: 'Forbidden: you can only modify positions within your own company' },
+        { status: 403 }
+      )
     }
 
     const result = await generateTemplatesForPosition(

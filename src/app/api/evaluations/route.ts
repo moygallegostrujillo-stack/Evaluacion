@@ -1171,7 +1171,19 @@ async function completeEvaluation(
     position.hasKnowledgeTest
   )
 
-  // Get candidate info — use unscoped to avoid RLS issues
+  // PHASE 3.5-B.2 (B7): Defense-in-depth check.
+  // The caller (POST handler) MUST verify ownership before calling this function
+  // (session.companyId === auth.companyId for non-SA, checked at lines 738-742).
+  // This is a secondary check — if session has no companyId, something is wrong.
+  if (!session!.companyId) {
+    console.error('[SECURITY] completeEvaluation called with session that has no companyId')
+    return NextResponse.json({ error: 'Session has no company context' }, { status: 500 })
+  }
+
+  // Get candidate info — use unscoped to avoid RLS issues with unique constraints
+  // SECURITY: session.companyId was verified by the caller to match auth.companyId.
+  // The unscoped writes below use session.companyId (from DB, not from client),
+  // which was already verified to belong to the authorized tenant.
   const unscopedDb = getUnscopedClient()
   const candidate = await unscopedDb.user.findUnique({
     where: { id: session!.candidateId },

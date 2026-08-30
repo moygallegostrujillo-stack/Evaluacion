@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUnscopedClient } from '@/lib/rls'
 import { hashPassword } from '@/lib/password'
+import { verifyPublicToken } from '@/lib/public-token'
 
 // ============================================
 // POST - Mark video step complete via WhatsApp (no file storage)
 // Also creates EvaluationResult bridge records for HR/Admin visibility
+//
+// PHASE 3.5-B.2 (B3): Token is now REQUIRED (not optional).
+// The token must be a signed HMAC that binds the applicationId to the
+// server secret. This prevents cross-tenant access — an attacker who
+// knows an applicationId from another company cannot use it without
+// the signed token.
 // ============================================
 
 export async function POST(req: NextRequest) {
@@ -17,6 +24,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: 'applicationId is required' },
         { status: 400 }
+      )
+    }
+
+    // PHASE 3.5-B.2 (B3): Token is REQUIRED for all requests.
+    // Previously token was optional — anyone with applicationId could
+    // mark the video step complete. Now requires a signed token.
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Token de verificación requerido', code: 'TOKEN_REQUIRED' },
+        { status: 403 }
       )
     }
 
@@ -36,16 +53,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Application not found' }, { status: 404 })
     }
 
-    // Application ownership verification: require token matching vacancy slug
-    // This is a lightweight verification for public endpoints (no auth context)
-    if (token && token !== application.vacancy.slug) {
-      console.warn(`[RLS] Public video endpoint: token mismatch for application ${applicationId}. Provided: "${token}", Expected: "${application.vacancy.slug}"`)
-      return NextResponse.json({ error: 'Invalid verification token' }, { status: 403 })
+    // PHASE 3.5-B.2 (B3): Verify the signed token.
+    // The token must be a valid HMAC for this specific applicationId.
+    // This prevents an attacker from using applicationId of another company.
+    if (!verifyPublicToken(token, applicationId)) {
+      console.warn(`[SECURITY] Public video endpoint: token verification FAILED for application ${applicationId}`)
+      return NextResponse.json(
+        { error: 'Token de verificación inválido', code: 'TOKEN_INVALID' },
+        { status: 403 }
+      )
     }
 
     // If candidateEmail is available, log the access for audit
     if (application.candidateEmail) {
-      console.log(`[RLS] Public video endpoint: application ${applicationId} accessed by ${application.candidateEmail}`)
+      console.log(`[SECURITY] Public video endpoint: application ${applicationId} accessed by ${application.candidateEmail}`)
     }
 
     // Update application - mark step as complete

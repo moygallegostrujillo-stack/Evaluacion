@@ -109,13 +109,34 @@ export async function POST(req: NextRequest) {
       requesterEmailFinal = requesterEmail as string
       requesterPhoneFinal = (requesterPhone as string) || null
 
-      // Company: from body or from admin's company
-      companyId = (bodyCompanyId as string) || auth.companyId || ''
+      // PHASE 3.5-B.2 (B2): Cross-tenant companyId spoofing prevention.
+      // For non-SUPER_ADMIN: ALWAYS use auth.companyId — ignore body.companyId.
+      // For SUPER_ADMIN: allow body.companyId (impersonation), but log it.
+      if (auth.role === 'SUPER_ADMIN') {
+        // SUPER_ADMIN can specify a target company (impersonation)
+        companyId = (bodyCompanyId as string) || auth.companyId || ''
+      } else {
+        // Non-SUPER_ADMIN: ignore body.companyId, use auth.companyId
+        if (bodyCompanyId && bodyCompanyId !== auth.companyId) {
+          await logUnauthorizedAccess(req, {
+            actorId: auth.userId,
+            action: 'CREATE',
+            resource: 'ArcoRequest',
+            companyId: auth.companyId,
+            reason: 'Non-SUPER_ADMIN attempted to create ARCO request for another company (body.companyId spoofing)',
+          })
+          return NextResponse.json(
+            { error: 'Forbidden: you can only create ARCO requests for your own company' },
+            { status: 403 }
+          )
+        }
+        companyId = auth.companyId || ''
+      }
       if (!companyId) {
         return NextResponse.json({ error: 'companyId is required' }, { status: 400 })
       }
 
-      // Optional: link to existing User if email matches
+      // Optional: link to existing User if email matches (within the authorized company)
       const linkedUser = await getUnscopedClient().user.findFirst({
         where: { email: requesterEmailFinal, companyId },
         select: { id: true },

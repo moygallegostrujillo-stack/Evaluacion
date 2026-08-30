@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUnscopedClient } from '@/lib/rls'
+import { generatePublicToken } from '@/lib/public-token'
 
 const db = getUnscopedClient()
 
@@ -803,6 +804,7 @@ export async function GET(req: NextRequest) {
         step: 0,
         stepName: 'data',
         applicationId: application.id,
+        token: generatePublicToken(application.id),
         candidateName: application.candidateName,
         candidateEmail: application.candidateEmail,
         candidatePhone: application.candidatePhone,
@@ -818,6 +820,7 @@ export async function GET(req: NextRequest) {
           step: 1,
           stepName: 'psicometrica',
           applicationId: application.id,
+        token: generatePublicToken(application.id),
           questions: systemQuestions.bigFiveQuestions.map((q) => ({
             id: q.id,
             questionId: q.id,  // Include questionId so frontend can pass it back for proper upsert
@@ -841,6 +844,7 @@ export async function GET(req: NextRequest) {
         step: 1,
         stepName: 'psicometrica',
         applicationId: application.id,
+        token: generatePublicToken(application.id),
         questions: [],
       })
     }
@@ -853,6 +857,7 @@ export async function GET(req: NextRequest) {
           step: 2,
           stepName: 'psicologica',
           applicationId: application.id,
+        token: generatePublicToken(application.id),
           questions: systemQuestions.psychologicalQuestions.map((q) => ({
             id: q.id,
             questionId: q.id,  // Include questionId so frontend can pass it back for proper upsert
@@ -876,6 +881,7 @@ export async function GET(req: NextRequest) {
         step: 2,
         stepName: 'psicologica',
         applicationId: application.id,
+        token: generatePublicToken(application.id),
         questions: [],
       })
     }
@@ -888,6 +894,7 @@ export async function GET(req: NextRequest) {
           step: 3,
           stepName: 'integridad',
           applicationId: application.id,
+        token: generatePublicToken(application.id),
           questions: systemQuestions.integrityQuestions.map((q) => ({
             id: q.id,
             questionId: q.id,
@@ -911,6 +918,7 @@ export async function GET(req: NextRequest) {
         step: 3,
         stepName: 'integridad',
         applicationId: application.id,
+        token: generatePublicToken(application.id),
         questions: [],
       })
     }
@@ -951,6 +959,7 @@ export async function GET(req: NextRequest) {
         step: 4,
         stepName: 'conocimientos',
         applicationId: application.id,
+        token: generatePublicToken(application.id),
         questions: allQuestions,
       })
     }
@@ -961,6 +970,7 @@ export async function GET(req: NextRequest) {
         step: 5,
         stepName: 'done',
         applicationId: application.id,
+        token: generatePublicToken(application.id),
         status: application.status,
       })
     }
@@ -970,6 +980,7 @@ export async function GET(req: NextRequest) {
       step: application.currentStep,
       stepName: 'done',
       applicationId: application.id,
+        token: generatePublicToken(application.id),
       status: application.status,
     })
   } catch (error) {
@@ -1073,6 +1084,7 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({
         applicationId: application.id,
+        token: generatePublicToken(application.id),
         step: 0,
         resumed: false,
       })
