@@ -395,9 +395,24 @@ export function verifyTenantOwnership(
 
 /**
  * Get the unscoped (raw) Prisma client.
+ *
+ * PHASE 3.5-B.3 WARNING: Once DB-level RLS is activated in production,
+ * this client will be subject to RLS policies. If no SET LOCAL
+ * app.current_company_id is executed, the fail-closed function
+ * evalhr_current_tenant() returns '__DENIED__' and ALL tenant-scoped
+ * rows will be invisible.
+ *
+ * This means getUnscopedClient() is SAFE to use for:
+ *   - Login/auth (User lookup by email — User table allows NULL companyId)
+ *   - SUPER_ADMIN aggregate operations (with app.is_super_admin = 'true')
+ *   - Migration/seed scripts (run as postgres superuser, not evalhr_app)
+ *
+ * But UNSAFE for regular tenant operations without SET LOCAL context.
+ * Use createRLSClient() instead, which sets the app-level extension.
+ *
  * Use ONLY in:
- *   - SUPER_ADMIN operations that need cross-tenant access
  *   - Authentication/login flows (no tenant context yet)
+ *   - SUPER_ADMIN operations that need cross-tenant access
  *   - Seed/migration scripts
  *   - Public endpoints (derive companyId from data, not from auth)
  *

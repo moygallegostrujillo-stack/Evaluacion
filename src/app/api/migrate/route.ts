@@ -360,6 +360,33 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // ============================================
+    // 11. Apply RLS policies (Phase 3.5-B.3)
+    // ============================================
+    // NOTE: This step only works on PostgreSQL (production).
+    // On SQLite (dev), it will silently fail — that's expected.
+    try {
+      const fs = await import('fs')
+      const path = await import('path')
+      const rlsSqlPath = path.join(process.cwd(), 'prisma', 'rls-policies.sql')
+      if (fs.existsSync(rlsSqlPath)) {
+        const rlsSql = fs.readFileSync(rlsSqlPath, 'utf8')
+        // Execute the RLS policies SQL
+        await db.$executeRawUnsafe(rlsSql)
+        results.push('✓ RLS policies applied (ENABLE + FORCE + policies)')
+      } else {
+        results.push('⊘ RLS policies file not found — skipping')
+      }
+    } catch (rlsErr) {
+      // Expected on SQLite — RLS is PostgreSQL-only
+      const errMsg = String(rlsErr)
+      if (errMsg.includes('SQLite') || errMsg.includes('sqlite') || errMsg.includes('near "FORCE"') || errMsg.includes('no such function')) {
+        results.push('⊘ RLS policies skipped (SQLite dev — PostgreSQL only)')
+      } else {
+        results.push(`✗ RLS policies failed: ${errMsg.substring(0, 200)}`)
+      }
+    }
+
     // Verify by checking the columns
     let verification
     try {
