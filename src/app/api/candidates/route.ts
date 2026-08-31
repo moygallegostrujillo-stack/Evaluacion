@@ -3,6 +3,7 @@ import { createRLSClient, createSuperAdminRLSClient, getUnscopedClient } from '@
 import { getAuthFromHeaders } from '@/lib/auth'
 import { hashPassword } from '@/lib/password'
 import { logUnauthorizedAccess, logAuditEvent } from '@/lib/audit'
+import { resolveTargetCompanyId } from '@/lib/impersonation'
 
 export async function GET(req: NextRequest) {
   try {
@@ -61,13 +62,11 @@ export async function GET(req: NextRequest) {
     }
 
     // ── SA impersonation mode (scoped to ?companyId=xxx) ──
-    const targetCompanyId = auth.role === 'SUPER_ADMIN'
-      ? req.nextUrl.searchParams.get('companyId')
-      : null
-
-    if (auth.role === 'SUPER_ADMIN' && targetCompanyId) {
-      console.log('[AUDIT] SA impersonating company', targetCompanyId, 'by', auth.userId)
-    }
+    // PHASE 3.5-B.2.1 (B1): Centralized impersonation resolution + logging
+    const { targetCompanyId } = await resolveTargetCompanyId(auth, req, {
+      action: 'ACCESS',
+      resource: 'Candidate',
+    })
 
     const { client: rlsDb } = targetCompanyId
       ? createSuperAdminRLSClient(targetCompanyId)

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createRLSClient, createSuperAdminRLSClient, getUnscopedClient } from '@/lib/rls'
 import { getAuthFromHeaders } from '@/lib/auth'
 import { logAuditEvent, logUnauthorizedAccess } from '@/lib/audit'
+import { resolveTargetCompanyId } from '@/lib/impersonation'
 
 export async function GET(req: NextRequest) {
   try {
@@ -65,14 +66,11 @@ export async function GET(req: NextRequest) {
     }
 
     // ── SA impersonation mode (scoped to ?companyId=xxx) ──
-    // For SUPER_ADMIN with a specific target companyId from query param, scope to that company
-    const targetCompanyId = auth.role === 'SUPER_ADMIN'
-      ? req.nextUrl.searchParams.get('companyId')
-      : null
-
-    if (auth.role === 'SUPER_ADMIN' && targetCompanyId) {
-      console.log('[AUDIT] SA impersonating company', targetCompanyId, 'by', auth.userId)
-    }
+    // PHASE 3.5-B.2.1 (B1): Centralized impersonation resolution + logging
+    const { targetCompanyId } = await resolveTargetCompanyId(auth, req, {
+      action: 'ACCESS',
+      resource: 'EvaluationResult',
+    })
 
     const { client: rlsDb } = targetCompanyId
       ? createSuperAdminRLSClient(targetCompanyId)

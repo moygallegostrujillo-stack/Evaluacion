@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createRLSClient, createSuperAdminRLSClient, getUnscopedClient } from '@/lib/rls'
 import { getAuthFromHeaders, canAccessCompany } from '@/lib/auth'
+import { logAuditEvent } from '@/lib/audit'
+import { resolveTargetCompanyId } from '@/lib/impersonation'
 
 // GET: List questions for a position, optionally filtered by company
 export async function GET(req: NextRequest) {
@@ -12,13 +14,13 @@ export async function GET(req: NextRequest) {
     }
 
     const positionId = req.nextUrl.searchParams.get('positionId')
-    const companyIdParam = req.nextUrl.searchParams.get('companyId')
     const templateId = req.nextUrl.searchParams.get('templateId')
 
     // For SUPER_ADMIN with a specific target companyId from query param, scope to that company
-    const targetCompanyId = auth.role === 'SUPER_ADMIN' && companyIdParam
-      ? companyIdParam
-      : null
+    const { targetCompanyId } = await resolveTargetCompanyId(auth, req, {
+      action: 'ACCESS',
+      resource: 'Question',
+    })
     const { client: rlsDb } = targetCompanyId
       ? createSuperAdminRLSClient(targetCompanyId)
       : createRLSClient(auth)
@@ -121,6 +123,21 @@ export async function POST(req: NextRequest) {
     const targetCompanyId = auth.role === 'SUPER_ADMIN' && bodyCompanyId
       ? bodyCompanyId
       : null
+    // Log SA impersonation for body-based companyId (helper only reads query params)
+    if (auth.role === 'SUPER_ADMIN' && targetCompanyId && targetCompanyId !== auth.companyId) {
+      await logAuditEvent(req, {
+        actorId: auth.userId,
+        action: 'CREATE',
+        resource: 'Question',
+        companyId: auth.companyId,
+        details: {
+          impersonation: true,
+          targetCompanyId,
+          actorRole: auth.role,
+          action: 'CREATE',
+        },
+      })
+    }
     const { client: rlsDb } = targetCompanyId
       ? createSuperAdminRLSClient(targetCompanyId)
       : createRLSClient(auth)
@@ -204,6 +221,22 @@ export async function PUT(req: NextRequest) {
     const targetCompanyId = auth.role === 'SUPER_ADMIN' && bodyCompanyId
       ? bodyCompanyId
       : null
+    // Log SA impersonation for body-based companyId (helper only reads query params)
+    if (auth.role === 'SUPER_ADMIN' && targetCompanyId && targetCompanyId !== auth.companyId) {
+      await logAuditEvent(req, {
+        actorId: auth.userId,
+        action: 'UPDATE',
+        resource: 'Question',
+        resourceId: questionId,
+        companyId: auth.companyId,
+        details: {
+          impersonation: true,
+          targetCompanyId,
+          actorRole: auth.role,
+          action: 'UPDATE',
+        },
+      })
+    }
     const { client: rlsDb } = targetCompanyId
       ? createSuperAdminRLSClient(targetCompanyId)
       : createRLSClient(auth)
@@ -274,12 +307,13 @@ export async function DELETE(req: NextRequest) {
     }
 
     const questionId = req.nextUrl.searchParams.get('questionId')
-    const companyIdParam = req.nextUrl.searchParams.get('companyId')
 
     // For SUPER_ADMIN with a specific target companyId from query param, scope to that company
-    const targetCompanyId = auth.role === 'SUPER_ADMIN' && companyIdParam
-      ? companyIdParam
-      : null
+    const { targetCompanyId } = await resolveTargetCompanyId(auth, req, {
+      action: 'DELETE',
+      resource: 'Question',
+      resourceId: questionId || undefined,
+    })
     const { client: rlsDb } = targetCompanyId
       ? createSuperAdminRLSClient(targetCompanyId)
       : createRLSClient(auth)

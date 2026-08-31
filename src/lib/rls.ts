@@ -73,6 +73,7 @@ const TENANT_SCOPED_MODELS: Record<string, { required: boolean }> = {
   InterviewSchedule:   { required: true },
   Vacancy:             { required: true },
   VacancyApplication:  { required: true },
+  ArcoRequest:         { required: true }, // PHASE 3.5-B.2.1 (B2): tenant-scoped ARCO requests
 }
 
 /** Models that are tenant-scoped */

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createRLSClient, createSuperAdminRLSClient, getUnscopedClient } from '@/lib/rls'
 import { getAuthFromHeaders } from '@/lib/auth'
+import { logAuditEvent } from '@/lib/audit'
+import { resolveTargetCompanyId } from '@/lib/impersonation'
 
 import crypto from 'crypto'
 
@@ -11,10 +13,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { searchParams } = new URL(req.url)
-    const targetCompanyId = auth.role === 'SUPER_ADMIN'
-      ? searchParams.get('companyId')
-      : null
+    const { targetCompanyId } = await resolveTargetCompanyId(auth, req, {
+      action: 'ACCESS',
+      resource: 'CandidateInvitation',
+    })
     const companyId = targetCompanyId || auth.companyId
 
     if (!companyId) {
@@ -69,6 +71,21 @@ export async function POST(req: NextRequest) {
     const targetCompanyId = auth.role === 'SUPER_ADMIN'
       ? body.companyId
       : null
+    // Log SA impersonation for body-based companyId (helper only reads query params)
+    if (auth.role === 'SUPER_ADMIN' && targetCompanyId && targetCompanyId !== auth.companyId) {
+      await logAuditEvent(req, {
+        actorId: auth.userId,
+        action: 'CREATE',
+        resource: 'CandidateInvitation',
+        companyId: auth.companyId,
+        details: {
+          impersonation: true,
+          targetCompanyId,
+          actorRole: auth.role,
+          action: 'CREATE',
+        },
+      })
+    }
     const { client: rlsDb } = targetCompanyId
       ? createSuperAdminRLSClient(targetCompanyId)
       : createRLSClient(auth)

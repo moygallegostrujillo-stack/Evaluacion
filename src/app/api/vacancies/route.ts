@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createRLSClient, createSuperAdminRLSClient, getUnscopedClient } from '@/lib/rls'
 import { getAuthFromHeaders } from '@/lib/auth'
+import { logAuditEvent } from '@/lib/audit'
+import { resolveTargetCompanyId } from '@/lib/impersonation'
 
 // ============================================
 // SLUG GENERATION
@@ -45,9 +47,10 @@ export async function GET(req: NextRequest) {
     }
 
     // For SUPER_ADMIN with a specific target companyId from query param, scope to that company
-    const targetCompanyId = auth.role === 'SUPER_ADMIN'
-      ? req.nextUrl.searchParams.get('companyId')
-      : null
+    const { targetCompanyId } = await resolveTargetCompanyId(auth, req, {
+      action: 'ACCESS',
+      resource: 'Vacancy',
+    })
     const { client: rlsDb } = targetCompanyId
       ? createSuperAdminRLSClient(targetCompanyId)
       : createRLSClient(auth)
@@ -129,6 +132,21 @@ export async function POST(req: NextRequest) {
     const targetCompanyId = auth.role === 'SUPER_ADMIN'
       ? body.companyId
       : null
+    // Log SA impersonation for body-based companyId (helper only reads query params)
+    if (auth.role === 'SUPER_ADMIN' && targetCompanyId && targetCompanyId !== auth.companyId) {
+      await logAuditEvent(req, {
+        actorId: auth.userId,
+        action: 'CREATE',
+        resource: 'Vacancy',
+        companyId: auth.companyId,
+        details: {
+          impersonation: true,
+          targetCompanyId,
+          actorRole: auth.role,
+          action: 'CREATE',
+        },
+      })
+    }
     const { client: rlsDb } = targetCompanyId
       ? createSuperAdminRLSClient(targetCompanyId)
       : createRLSClient(auth)
