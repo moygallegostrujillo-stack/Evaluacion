@@ -106,9 +106,17 @@ export async function GET(req: NextRequest) {
     if (compareIds) {
       const ids = compareIds.split(',').filter(Boolean)
 
+      // SECURITY FIX (Phase 3.5-D.2.6, VUL-02): CANDIDATO may only compare
+      // their own results. Previously a candidate could pass any same-company
+      // result IDs to compareIds and receive the other candidates' full
+      // psychometric scores. Tenant scoping itself (companyId) remains
+      // enforced by the RLS client — this is an additional ownership filter.
+      const candidateOwnScope =
+        auth.role === 'CANDIDATO' ? { candidateId: auth.userId } : {}
+
       // Fetch from EvaluationResult first
       const evalResults = await rlsDb.evaluationResult.findMany({
-        where: { id: { in: ids } },
+        where: { id: { in: ids }, ...candidateOwnScope },
         include: {
           candidate: {
             select: { id: true, name: true, email: true },
@@ -172,7 +180,12 @@ export async function GET(req: NextRequest) {
 
       if (missingIds.length > 0) {
         const vacancyApps = await rlsDb.vacancyApplication.findMany({
-          where: { id: { in: missingIds } },
+          where: {
+            id: { in: missingIds },
+            // Phase 3.5-D.2.6 (VUL-02): candidates can only compare their own
+            // vacancy applications (candidateUserId FK, Phase 3.5-A.1)
+            ...(auth.role === 'CANDIDATO' ? { candidateUserId: auth.userId } : {}),
+          },
           include: {
             vacancy: {
               select: { id: true, title: true },
@@ -253,7 +266,10 @@ export async function GET(req: NextRequest) {
       })
 
       if (result) {
-        // Defense-in-depth: RLS already filtered, but keep the check as extra safety
+        // Defense-in-depth: RLS already filtered, but keep the check as extra safety.
+        // Phase 3.5-D.2.6: cross-tenant denials return 404 (not 403) so the
+        // response never confirms the existence of another company's result
+        // (FASE 14 — preferir 404, sin filtrar existencia).
         if (auth.role !== 'SUPER_ADMIN' && result.companyId !== auth.companyId) {
           await logUnauthorizedAccess(req, {
             actorId: auth.userId,
@@ -262,7 +278,7 @@ export async function GET(req: NextRequest) {
             companyId: auth.companyId,
             reason: 'Cross-tenant access attempt to EvaluationResult',
           })
-          return NextResponse.json({ error: 'Forbidden: result belongs to another company' }, { status: 403 })
+          return NextResponse.json({ error: 'Result not found' }, { status: 404 })
         }
 
         // SECURITY FIX (Phase 1.2): CANDIDATO can only view their own results
@@ -300,9 +316,19 @@ export async function GET(req: NextRequest) {
       })
 
       if (vacancyApp) {
-        // Defense-in-depth check
+        // Defense-in-depth check.
+        // Phase 3.5-D.2.6: cross-tenant denials return 404 (never 403) so the
+        // response cannot confirm the existence of another company's result,
+        // and the attempt is audit-logged (this site previously did not log).
         if (auth.role !== 'SUPER_ADMIN' && vacancyApp.companyId !== auth.companyId) {
-          return NextResponse.json({ error: 'Forbidden: result belongs to another company' }, { status: 403 })
+          await logUnauthorizedAccess(req, {
+            actorId: auth.userId,
+            resource: 'EvaluationResult',
+            resourceId: resultId,
+            companyId: auth.companyId,
+            reason: 'Cross-tenant access attempt to VacancyApplication result',
+          })
+          return NextResponse.json({ error: 'Result not found' }, { status: 404 })
         }
 
         // Find the candidate user for contact info
@@ -314,6 +340,29 @@ export async function GET(req: NextRequest) {
           where: { email: vacancyApp.candidateEmail, companyId: vacancyApp.companyId },
           select: { id: true, name: true, email: true, phone: true, consentGiven: true, consentDate: true },
         })
+
+        // SECURITY FIX (Phase 3.5-D.2.6, VUL-01): CANDIDATO can only view their
+        // own vacancy-application results. The EvaluationResult branch already
+        // enforced this (Phase 1.2), but this branch did not — a candidate who
+        // knew another candidate's VacancyApplication ID (same company) could
+        // read that candidate's full psychometric scores. Ownership is checked
+        // against BOTH the candidateUserId FK (authoritative, Phase 3.5-A.1)
+        // and the email-resolved candidate user (legacy applications).
+        const isOwnVacancyResult =
+          vacancyApp.candidateUserId === auth.userId || candidateUser?.id === auth.userId
+        if (auth.role === 'CANDIDATO' && !isOwnVacancyResult) {
+          await logUnauthorizedAccess(req, {
+            actorId: auth.userId,
+            resource: 'EvaluationResult',
+            resourceId: resultId,
+            companyId: auth.companyId,
+            reason: 'CANDIDATO attempted to access another candidate\'s vacancy application result by ID',
+          })
+          return NextResponse.json(
+            { error: 'Forbidden: you can only access your own results' },
+            { status: 403 }
+          )
+        }
 
         // Map VacancyApplication to the same shape as EvaluationResult
         const mappedResult = {
