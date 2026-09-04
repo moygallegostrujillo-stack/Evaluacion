@@ -4,6 +4,7 @@ import { getAuthFromHeaders } from '@/lib/auth'
 import { hashPassword } from '@/lib/password'
 import { logUnauthorizedAccess, logAuditEvent } from '@/lib/audit'
 import { resolveTargetCompanyId } from '@/lib/impersonation'
+import { getAggregateCandidateMetrics } from '@/lib/admin-db'
 
 export async function GET(req: NextRequest) {
   try {
@@ -13,59 +14,16 @@ export async function GET(req: NextRequest) {
     }
 
     // ── SA aggregated mode (no personal data, counts only) ──
-    // D.2.7 (FASE 13): aggregate access persisted to AuditLog, clearly
-    // differentiated from impersonation (details.mode = 'AGGREGATE').
+    // D.2.8: aggregate queries AND the AuditLog entry (details.mode=
+    // 'AGGREGATE', differentiated from impersonation) live inside the
+    // isolated ADMIN DB module (src/lib/admin-db.ts) — the route no longer
+    // touches a raw unscoped client for aggregate reads.
     if (auth.role === 'SUPER_ADMIN' && !auth.companyId && !req.nextUrl.searchParams.get('companyId')) {
-      await logAuditEvent(req, {
+      const { aggregated } = await getAggregateCandidateMetrics({
+        req,
         actorId: auth.userId,
-        action: 'ADMIN_ACCESS',
-        resource: 'Candidate',
-        companyId: null,
-        details: { mode: 'AGGREGATE', aggregate: true },
+        role: auth.role,
       })
-      const db = getUnscopedClient()
-
-      // Count candidates per company
-      const candidateGroups = await db.user.groupBy({
-        by: ['companyId'],
-        where: { role: 'CANDIDATO', active: true },
-        _count: true,
-      })
-
-      // Count completed sessions per company
-      const completedGroups = await db.evaluationSession.groupBy({
-        by: ['companyId'],
-        where: { status: 'COMPLETED' },
-        _count: true,
-      })
-      const completedMap = new Map(completedGroups.map(g => [g.companyId, g._count]))
-
-      // Count active positions per company
-      const positionGroups = await db.position.groupBy({
-        by: ['companyId'],
-        where: { active: true },
-        _count: true,
-      })
-      const positionMap = new Map(positionGroups.map(g => [g.companyId, g._count]))
-
-      // Resolve company names
-      const companyIds = candidateGroups.map(g => g.companyId)
-      const companies = companyIds.length > 0
-        ? await db.company.findMany({
-            where: { id: { in: companyIds } },
-            select: { id: true, name: true },
-          })
-        : []
-      const companyMap = new Map(companies.map(c => [c.id, c.name]))
-
-      const aggregated = candidateGroups.map(g => ({
-        companyId: g.companyId,
-        companyName: companyMap.get(g.companyId) || 'Unknown',
-        candidateCount: g._count,
-        completedCount: completedMap.get(g.companyId) || 0,
-        vacancyCount: positionMap.get(g.companyId) || 0,
-      }))
-
       return NextResponse.json({ aggregated, mode: 'aggregated' })
     }
 

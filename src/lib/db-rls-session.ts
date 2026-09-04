@@ -12,17 +12,17 @@
  * 1. Uses SET LOCAL (transaction-scoped) — no connection contamination
  * 2. Fail-closed: if app.current_company_id is not set, policies deny ALL rows
  *    (the evalhr_current_tenant() function returns '__DENIED__')
- * 3. D.2.7 DECISION — SA AGGREGATE does NOT use a GUC bypass:
+ * 3. D.2.7 DECISION (closed in D.2.8) — SA AGGREGATE does NOT use a GUC
+ *    bypass:
  *      TENANT            → evalhr_app → RLS → app.current_company_id
  *      SA IMPERSONATION  → evalhr_app → RLS → app.current_company_id = target
- *      SA AGGREGATE      → separate administrative mechanism (app-layer
- *                          explicit paths today; dedicated administrative
- *                          connection when DB RLS activates) — NEVER a
- *                          super-admin GUC.
+ *      SA AGGREGATE      → isolated ADMIN DB mechanism (src/lib/admin-db.ts)
+ *                          with a dedicated evalhr_sa connection when DB RLS
+ *                          activates — NEVER a super-admin GUC.
  *    The only session variable this module sets is app.current_company_id.
- *    NOTE: prisma/rls-policies.sql still contains an app.is_super_admin
- *    bypass in its dormant policies — it MUST be rewritten before DB RLS
- *    activation (see FASE 3.5-D.2.7 report, sección "Estado RLS").
+ *    prisma/rls-policies.sql (definitive, D.2.8) contains ZERO
+ *    app.is_super_admin references — function, policies and rollback are
+ *    pure-tenant and fail-closed.
  *
  * Usage in API routes:
  * ```ts
@@ -65,8 +65,8 @@ export async function setRLSSession(
   config: RLSSessionConfig
 ): Promise<void> {
   // Set the company ID (used by evalhr_current_tenant() function).
-  // D.2.7: NO app.is_super_admin GUC — the fail-closed policies must never
-  // be bypassed through a session flag.
+  // D.2.7/D.2.8: NO app.is_super_admin GUC exists anywhere — the
+  // fail-closed policies can never be bypassed through a session flag.
   await tx.$executeRaw`SET LOCAL app.current_company_id = ${config.companyId}`
 }
 

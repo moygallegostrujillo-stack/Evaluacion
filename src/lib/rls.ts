@@ -402,24 +402,27 @@ export function verifyTenantOwnership(
  * evalhr_current_tenant() returns '__DENIED__' and ALL tenant-scoped
  * rows will be invisible.
  *
+ * D.2.8 — SA AGGREGATE NO LONGER USES THIS HELPER. Global aggregate
+ * reads (dashboard/results/candidates metrics) live in the isolated
+ * ADMIN DB module: src/lib/admin-db.ts (server-only, function-only
+ * exports, SA assertion, AuditLog mode='AGGREGATE'). Do NOT add new
+ * aggregate branches here.
+ *
  * This means getUnscopedClient() is SAFE to use for:
  *   - Login/auth (User lookup by email — User table allows NULL companyId)
- *   - Explicit SUPER_ADMIN aggregate paths (counts/metrics only, role-gated,
- *     AuditLog-logged — D.2.7: NO app.is_super_admin GUC; when DB RLS is
- *     activated these paths MUST migrate to a dedicated administrative
- *     mechanism/connection, see FASE 3.5-D.2.7 report)
+ *   - Public token flows (public/apply, consent bootstrap) that derive
+ *     tenant context from data, not from auth
+ *   - Infrastructure endpoints (migrate, seed, cleanup, rls-audit,
+ *     health diagnostics) — all role-gated to SUPER_ADMIN/cron
+ *   - Tenant-internal helpers that derive their scope from
+ *     DB-verified rows (e.g. session.companyId), never from client input
  *   - Migration/seed scripts (run as postgres superuser, not evalhr_app)
  *
  * But UNSAFE for regular tenant operations without SET LOCAL context.
  * Use createRLSClient() instead, which sets the app-level extension.
  *
- * Use ONLY in:
- *   - Authentication/login flows (no tenant context yet)
- *   - SUPER_ADMIN operations that need cross-tenant access
- *   - Seed/migration scripts
- *   - Public endpoints (derive companyId from data, not from auth)
- *
  * ⚠️ DO NOT use this for regular API operations — use createRLSClient() instead.
+ * ⚠️ DO NOT use this for SA aggregate reads — use src/lib/admin-db.ts instead.
  */
 export function getUnscopedClient() {
   return db

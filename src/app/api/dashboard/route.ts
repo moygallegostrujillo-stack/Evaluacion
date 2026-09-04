@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createRLSClient, createSuperAdminRLSClient, getUnscopedClient } from '@/lib/rls'
+import { createRLSClient, createSuperAdminRLSClient } from '@/lib/rls'
 import { getAuthFromHeaders } from '@/lib/auth'
-import { logAuditEvent, logUnauthorizedAccess } from '@/lib/audit'
+import { logUnauthorizedAccess } from '@/lib/audit'
 import { resolveTargetCompanyId } from '@/lib/impersonation'
+import { getAggregateDashboardMetrics } from '@/lib/admin-db'
 
 /**
  * PHASE 3.5-D.2.7 — Dashboard migration to the Tenant DB Access layer.
@@ -27,8 +28,9 @@ import { resolveTargetCompanyId } from '@/lib/impersonation'
  * company-level HR metrics and recent results including candidate PII —
  * candidates must never read other candidates' data through it.
  *
- * app.is_super_admin is NOT used anywhere (D.2.7 decision: the SA aggregate
- * mode is an explicit app-layer administrative path, never a DB GUC bypass).
+ * app.is_super_admin is NOT used anywhere (D.2.7/D.2.8 decision: the SA
+ * aggregate mode is the ISOLATED ADMIN DB mechanism (src/lib/admin-db.ts) —
+ * never a DB GUC bypass, never a generic unscoped client).
  */
 export async function GET(req: NextRequest) {
   try {
@@ -48,79 +50,25 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    // ── MODE 1: SA AGGREGATE (explicit administrative path) ──
+    // ── MODE 1: SA AGGREGATE (isolated ADMIN DB mechanism) ──
     // SUPER_ADMIN without own companyId and without a target → global
     // metrics ONLY. Minimum-information principle: no candidate PII.
+    // D.2.8: the queries AND the AuditLog entry (details.mode='AGGREGATE')
+    // now live inside admin-db — the route can no longer touch a raw
+    // unscoped client, and every aggregate access is audited exactly once.
     if (auth.role === 'SUPER_ADMIN' && !auth.companyId && !req.nextUrl.searchParams.get('companyId')) {
-      await logAuditEvent(req, {
+      const metrics = await getAggregateDashboardMetrics({
+        req,
         actorId: auth.userId,
-        action: 'ADMIN_ACCESS',
-        resource: 'Dashboard',
-        companyId: null,
-        details: { mode: 'AGGREGATE', aggregate: true },
+        role: auth.role,
       })
-
-      // Explicit administrative client — unscoped ON PURPOSE, isolated in
-      // this branch. This is the app-layer aggregate path (D.2.7); it does
-      // NOT depend on app.is_super_admin or any DB GUC.
-      const db = getUnscopedClient()
-
-      // Total candidates (global count)
-      const totalCandidates = await db.user.count({
-        where: { role: 'CANDIDATO', active: true },
-      })
-
-      // Completed evaluations (global count)
-      const completedEvaluations = await db.evaluationSession.count({
-        where: { status: 'COMPLETED' },
-      })
-
-      // Pending evaluations (NOT_STARTED + IN_PROGRESS, global count)
-      const pendingEvaluations = await db.evaluationSession.count({
-        where: { status: { in: ['NOT_STARTED', 'IN_PROGRESS'] } },
-      })
-
-      // Guidance level counts (NOT hiring decisions — orientation only)
-      const perfilCompletoCount = await db.evaluationResult.count({
-        where: { recommendation: 'PERFIL_COMPLETO' },
-      })
-
-      const perfilParcialCount = await db.evaluationResult.count({
-        where: { recommendation: 'PERFIL_PARCIAL' },
-      })
-
-      const pendienteCount = await db.evaluationResult.count({
-        where: { recommendation: 'PENDIENTE' },
-      })
-
-      // Position metrics — titles + counts only (no candidate data)
-      const sessions = await db.evaluationSession.findMany({
-        select: { positionId: true, position: { select: { id: true, title: true } } },
-      })
-
-      const positionMap = new Map<string, { id: string; title: string; count: number }>()
-      for (const s of sessions) {
-        const key = s.positionId
-        if (positionMap.has(key)) {
-          positionMap.get(key)!.count++
-        } else {
-          positionMap.set(key, { id: s.position.id, title: s.position.title, count: 1 })
-        }
-      }
-      const positionStats = Array.from(positionMap.values())
 
       return NextResponse.json({
-        totalCandidates,
-        completedEvaluations,
-        pendingEvaluations,
-        perfilCompletoCount,
-        perfilParcialCount,
-        pendienteCount,
+        ...metrics,
         // FASE 8 (minimum information): aggregate mode returns NO recent
         // results — candidate names/emails/phones/individual scores are
         // unnecessary for a global metrics view.
         recentResults: [],
-        positionStats,
         mode: 'aggregated',
       })
     }

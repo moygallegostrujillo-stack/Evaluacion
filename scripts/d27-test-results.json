@@ -108,28 +108,28 @@
     "id": "AUDIT-1",
     "desc": "Dashboard impersonation logged (impersonation=true)",
     "expected": ">=1",
-    "got": "9",
+    "got": "11",
     "pass": true
   },
   {
     "id": "AUDIT-2",
     "desc": "Dashboard aggregate logged (mode=AGGREGATE)",
     "expected": ">=1",
-    "got": "5",
+    "got": "6",
     "pass": true
   },
   {
     "id": "AUDIT-3",
     "desc": "Results aggregate logged (mode=AGGREGATE)",
     "expected": ">=1",
-    "got": "2",
+    "got": "4",
     "pass": true
   },
   {
     "id": "AUDIT-4",
     "desc": "Candidates aggregate logged (mode=AGGREGATE)",
     "expected": ">=1",
-    "got": "2",
+    "got": "4",
     "pass": true
   },
   {

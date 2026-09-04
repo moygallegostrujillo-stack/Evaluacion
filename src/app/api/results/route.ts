@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createRLSClient, createSuperAdminRLSClient, getUnscopedClient } from '@/lib/rls'
+import { createRLSClient, createSuperAdminRLSClient } from '@/lib/rls'
 import { getAuthFromHeaders } from '@/lib/auth'
 import { logAuditEvent, logUnauthorizedAccess } from '@/lib/audit'
 import { resolveTargetCompanyId } from '@/lib/impersonation'
+import { getAggregateResultMetrics } from '@/lib/admin-db'
 
 export async function GET(req: NextRequest) {
   try {
@@ -12,64 +13,16 @@ export async function GET(req: NextRequest) {
     }
 
     // ── SA aggregated mode (no personal data, counts only) ──
-    // D.2.7 (FASE 13): aggregate access persisted to AuditLog, clearly
-    // differentiated from impersonation (details.mode = 'AGGREGATE').
+    // D.2.8: aggregate queries AND the AuditLog entry (details.mode=
+    // 'AGGREGATE', differentiated from impersonation) live inside the
+    // isolated ADMIN DB module (src/lib/admin-db.ts) — the route no longer
+    // touches a raw unscoped client.
     if (auth.role === 'SUPER_ADMIN' && !auth.companyId && !req.nextUrl.searchParams.get('companyId')) {
-      await logAuditEvent(req, {
+      const { aggregated } = await getAggregateResultMetrics({
+        req,
         actorId: auth.userId,
-        action: 'ADMIN_ACCESS',
-        resource: 'EvaluationResult',
-        companyId: null,
-        details: { mode: 'AGGREGATE', aggregate: true },
+        role: auth.role,
       })
-      const db = getUnscopedClient()
-
-      // Count results per company (both EvaluationResult and VacancyApplication)
-      const resultGroups = await db.evaluationResult.groupBy({
-        by: ['companyId'],
-        _count: true,
-      })
-
-      // Count completed vacancy applications per company
-      const vacancyGroups = await db.vacancyApplication.groupBy({
-        by: ['companyId'],
-        where: { status: 'COMPLETED' },
-        _count: true,
-      })
-      const vacancyMap = new Map(vacancyGroups.map(g => [g.companyId, g._count]))
-
-      // Resolve company names
-      const companyIds = Array.from(new Set([...resultGroups.map(g => g.companyId), ...vacancyGroups.map(g => g.companyId)]))
-      const companies = companyIds.length > 0
-        ? await db.company.findMany({
-            where: { id: { in: companyIds } },
-            select: { id: true, name: true },
-          })
-        : []
-      const companyMap = new Map(companies.map(c => [c.id, c.name]))
-
-      const aggregated = resultGroups.map(g => ({
-        companyId: g.companyId,
-        companyName: companyMap.get(g.companyId) || 'Unknown',
-        evaluationResultCount: g._count,
-        vacancyResultCount: vacancyMap.get(g.companyId) || 0,
-        totalResultCount: g._count + (vacancyMap.get(g.companyId) || 0),
-      }))
-
-      // Include companies that only have vacancy results (no evaluation results)
-      const existingIds = new Set(resultGroups.map(g => g.companyId))
-      for (const vg of vacancyGroups) {
-        if (!existingIds.has(vg.companyId)) {
-          aggregated.push({
-            companyId: vg.companyId,
-            companyName: companyMap.get(vg.companyId) || 'Unknown',
-            evaluationResultCount: 0,
-            vacancyResultCount: vg._count,
-            totalResultCount: vg._count,
-          })
-        }
-      }
-
       return NextResponse.json({ aggregated, mode: 'aggregated' })
     }
 

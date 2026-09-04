@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUnscopedClient } from '@/lib/rls'
 import { getAuthFromHeaders } from '@/lib/auth'
+import { logAuditEvent } from '@/lib/audit'
 
 /**
  * POST /api/migrate
@@ -26,6 +27,19 @@ import { getAuthFromHeaders } from '@/lib/auth'
  *   - VacancyApplication.integrityScore (Float, default 0)
  *   - Vacancy.includeIntegridad (Boolean, default true)
  *   - CompanyPrivacyNotice table
+ *
+ * FASE 3.5-D.2.8 — SECURITY HARDENING:
+ *   1. The former STEP 11 (executing prisma/rls-policies.sql through
+ *      $executeRawUnsafe) has been REMOVED. A runtime HTTP endpoint must
+ *      NEVER be able to ENABLE/FORCE Row Level Security (or execute any
+ *      policy SQL) — that is now only possible through a controlled,
+ *      manual, DBA-run migration. This also removes the last execution
+ *      path of the dormant app.is_super_admin bypass SQL.
+ *   2. Every invocation is now persisted to AuditLog (actor, action,
+ *      timestamp) — previously this endpoint was not audited.
+ *   3. Role gate remains: only SUPER_ADMIN (JWT role from middleware —
+ *      never client input). No client-supplied SQL is executed anywhere:
+ *      every statement is a fixed literal in this file.
  */
 
 export async function POST(req: NextRequest) {
@@ -36,8 +50,25 @@ export async function POST(req: NextRequest) {
     }
 
     if (auth.role !== 'SUPER_ADMIN') {
+      await logAuditEvent(req, {
+        actorId: auth.userId,
+        action: 'UNAUTHORIZED_ATTEMPT',
+        resource: 'Migration',
+        companyId: auth.companyId,
+        success: false,
+        details: { reason: 'Non-SUPER_ADMIN attempted to run migrations' },
+      })
       return NextResponse.json({ error: 'Forbidden: only SUPER_ADMIN can run migrations' }, { status: 403 })
     }
+
+    // Audit the administrative migration invocation (FASE 3.5-D.2.8).
+    await logAuditEvent(req, {
+      actorId: auth.userId,
+      action: 'ADMIN_ACCESS',
+      resource: 'Migration',
+      companyId: auth.companyId ?? null,
+      details: { mode: 'MIGRATION', operation: 'SCHEMA_SYNC' },
+    })
 
     const db = getUnscopedClient()
     const results: string[] = []
@@ -361,31 +392,21 @@ export async function POST(req: NextRequest) {
     }
 
     // ============================================
-    // 11. Apply RLS policies (Phase 3.5-B.3)
+    // 11. RLS POLICIES — NOT EXECUTED HERE (FASE 3.5-D.2.8)
     // ============================================
-    // NOTE: This step only works on PostgreSQL (production).
-    // On SQLite (dev), it will silently fail — that's expected.
-    try {
-      const fs = await import('fs')
-      const path = await import('path')
-      const rlsSqlPath = path.join(process.cwd(), 'prisma', 'rls-policies.sql')
-      if (fs.existsSync(rlsSqlPath)) {
-        const rlsSql = fs.readFileSync(rlsSqlPath, 'utf8')
-        // Execute the RLS policies SQL
-        await db.$executeRawUnsafe(rlsSql)
-        results.push('✓ RLS policies applied (ENABLE + FORCE + policies)')
-      } else {
-        results.push('⊘ RLS policies file not found — skipping')
-      }
-    } catch (rlsErr) {
-      // Expected on SQLite — RLS is PostgreSQL-only
-      const errMsg = String(rlsErr)
-      if (errMsg.includes('SQLite') || errMsg.includes('sqlite') || errMsg.includes('near "FORCE"') || errMsg.includes('no such function')) {
-        results.push('⊘ RLS policies skipped (SQLite dev — PostgreSQL only)')
-      } else {
-        results.push(`✗ RLS policies failed: ${errMsg.substring(0, 200)}`)
-      }
-    }
+    // The former step executed prisma/rls-policies.sql via
+    // $executeRawUnsafe, which meant a single SUPER_ADMIN HTTP call could
+    // ENABLE + FORCE Row Level Security in production (with the old
+    // app.is_super_admin bypass SQL). That is architecturally forbidden:
+    //
+    //   - RLS activation must be a controlled, manual, DBA-run migration.
+    //   - No runtime HTTP endpoint may execute policy/DDL security SQL.
+    //
+    // See prisma/rls-policies.sql (definitive, D.2.8) and
+    // prisma/create-rls-role.sql / prisma/create-evalhr-sa-role.sql.
+    results.push(
+      '⊘ RLS policies intentionally NOT applied via HTTP endpoint (D.2.8) — run the controlled migration manually when the activation phase is approved'
+    )
 
     // Verify by checking the columns
     let verification

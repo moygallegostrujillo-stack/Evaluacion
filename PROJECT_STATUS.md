@@ -413,13 +413,14 @@ const candidates = await rlsDb.user.findMany({ where: { role: 'CANDIDATO' } })
 
 - Habilita RLS en todas las tablas tenant-scoped
 - Crea policies SELECT/INSERT/UPDATE/DELETE para cada tabla
-- Usa session variables: `app.current_company_id` y `app.is_super_admin`
-- SUPER_ADMIN bypass: `current_setting('app.is_super_admin', true) = 'true'`
-- User/Question con companyId opcional: permiten ver registros con `companyId IS NULL` (globales)
-- **Estado:** No activado por defecto en producción (requiere ejecutar el SQL manualmente)
+- Usa session variable: `app.current_company_id` (D.2.8: `app.is_super_admin` ELIMINADO — 0 referencias en función, policies y rollback)
+- Fail-closed: `evalhr_current_tenant()` (SECURITY INVOKER, search_path bloqueado) devuelve `__DENIED__` si no hay contexto
+- User/Question: GLOBAL READ (`companyId IS NULL`) solo en SELECT; escritura SIEMPRE tenant-scoped (D.2.8)
+- SA Aggregate: mecanismo aislado `src/lib/admin-db.ts` + rol `evalhr_sa` (BYPASSRLS por atributo de rol, no por GUC) — ver `prisma/create-evalhr-sa-role.sql`
+- **Estado:** No activado por defecto en producción (requiere ejecutar el SQL manualmente; /api/migrate ya NO puede activarlo — D.2.8)
 
 **Helper para sesiones DB:** `src/lib/db-rls-session.ts`
-- `setRLSSession(tx, { companyId, isSuperAdmin })` — establece variables dentro de una transacción
+- `setRLSSession(tx, { companyId })` — establece `app.current_company_id` dentro de una transacción
 - `withRLSTransaction(config, callback)` — wrapper conveniente
 
 ### Patrón SUPER_ADMIN con scoping
