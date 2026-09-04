@@ -62,6 +62,14 @@ export interface RLSClientResult {
 /**
  * Models that have a DIRECT `companyId` field and should be auto-filtered.
  * Maps model name → whether companyId is required or optional.
+ *
+ * PHASE 3.5-D.2.9 (PARTE 9/10): the four former "indirect" models now have
+ * a direct, NOT NULL companyId (backfilled from their parent) and are
+ * registered here so the app-layer RLS extension filters/stamps them too:
+ *   EvaluationResponse.companyId         == EvaluationSession.companyId
+ *   EvaluationTemplate.companyId         == Position.companyId
+ *   VacancyQuestion.companyId            == Vacancy.companyId
+ *   VacancyApplicationResponse.companyId == VacancyApplication.companyId
  */
 const TENANT_SCOPED_MODELS: Record<string, { required: boolean }> = {
   User:                { required: false }, // companyId is optional
@@ -69,10 +77,14 @@ const TENANT_SCOPED_MODELS: Record<string, { required: boolean }> = {
   Question:            { required: false }, // companyId is optional (null = global)
   CandidateInvitation: { required: true },
   EvaluationSession:   { required: true },
+  EvaluationResponse:  { required: true },
+  EvaluationTemplate:  { required: true },
   EvaluationResult:    { required: true },
   InterviewSchedule:   { required: true },
   Vacancy:             { required: true },
+  VacancyQuestion:     { required: true },
   VacancyApplication:  { required: true },
+  VacancyApplicationResponse: { required: true },
   ArcoRequest:         { required: true }, // PHASE 3.5-B.2.1 (B2): tenant-scoped ARCO requests
 }
 

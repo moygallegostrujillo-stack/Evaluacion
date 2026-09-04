@@ -120,6 +120,20 @@ ALTER TABLE "User" FORCE ROW LEVEL SECURITY;
 ALTER TABLE "Question" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "Question" FORCE ROW LEVEL SECURITY;
 
+-- Tables that WERE indirect (scoped via parent) and got a direct NOT NULL
+-- companyId in PHASE 3.5-D.2.9 (PARTE 9): policies below are pure-tenant.
+ALTER TABLE "EvaluationResponse" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "EvaluationResponse" FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE "EvaluationTemplate" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "EvaluationTemplate" FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE "VacancyQuestion" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "VacancyQuestion" FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE "VacancyApplicationResponse" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "VacancyApplicationResponse" FORCE ROW LEVEL SECURITY;
+
 -- ════════════════════════════════════════════════════════════
 -- STEP 2: Create RLS Policies
 -- ════════════════════════════════════════════════════════════
@@ -380,6 +394,98 @@ CREATE POLICY "rls_question_delete" ON "Question" FOR DELETE USING (
   "companyId" = evalhr_current_tenant()
 );
 
+-- ────────────────────────────────────────────────────────────
+-- EvaluationResponse (D.2.9: direct companyId == session.companyId)
+-- ────────────────────────────────────────────────────────────
+DROP POLICY IF EXISTS "rls_evalresponse_select" ON "EvaluationResponse";
+DROP POLICY IF EXISTS "rls_evalresponse_insert" ON "EvaluationResponse";
+DROP POLICY IF EXISTS "rls_evalresponse_update" ON "EvaluationResponse";
+DROP POLICY IF EXISTS "rls_evalresponse_delete" ON "EvaluationResponse";
+
+CREATE POLICY "rls_evalresponse_select" ON "EvaluationResponse" FOR SELECT USING (
+  "companyId" = evalhr_current_tenant()
+);
+CREATE POLICY "rls_evalresponse_insert" ON "EvaluationResponse" FOR INSERT WITH CHECK (
+  "companyId" = evalhr_current_tenant()
+);
+CREATE POLICY "rls_evalresponse_update" ON "EvaluationResponse" FOR UPDATE USING (
+  "companyId" = evalhr_current_tenant()
+) WITH CHECK (
+  "companyId" = evalhr_current_tenant()
+);
+CREATE POLICY "rls_evalresponse_delete" ON "EvaluationResponse" FOR DELETE USING (
+  "companyId" = evalhr_current_tenant()
+);
+
+-- ────────────────────────────────────────────────────────────
+-- EvaluationTemplate (D.2.9: direct companyId == position.companyId)
+-- ────────────────────────────────────────────────────────────
+DROP POLICY IF EXISTS "rls_evaltemplate_select" ON "EvaluationTemplate";
+DROP POLICY IF EXISTS "rls_evaltemplate_insert" ON "EvaluationTemplate";
+DROP POLICY IF EXISTS "rls_evaltemplate_update" ON "EvaluationTemplate";
+DROP POLICY IF EXISTS "rls_evaltemplate_delete" ON "EvaluationTemplate";
+
+CREATE POLICY "rls_evaltemplate_select" ON "EvaluationTemplate" FOR SELECT USING (
+  "companyId" = evalhr_current_tenant()
+);
+CREATE POLICY "rls_evaltemplate_insert" ON "EvaluationTemplate" FOR INSERT WITH CHECK (
+  "companyId" = evalhr_current_tenant()
+);
+CREATE POLICY "rls_evaltemplate_update" ON "EvaluationTemplate" FOR UPDATE USING (
+  "companyId" = evalhr_current_tenant()
+) WITH CHECK (
+  "companyId" = evalhr_current_tenant()
+);
+CREATE POLICY "rls_evaltemplate_delete" ON "EvaluationTemplate" FOR DELETE USING (
+  "companyId" = evalhr_current_tenant()
+);
+
+-- ────────────────────────────────────────────────────────────
+-- VacancyQuestion (D.2.9: direct companyId == vacancy.companyId)
+-- ────────────────────────────────────────────────────────────
+DROP POLICY IF EXISTS "rls_vacquestion_select" ON "VacancyQuestion";
+DROP POLICY IF EXISTS "rls_vacquestion_insert" ON "VacancyQuestion";
+DROP POLICY IF EXISTS "rls_vacquestion_update" ON "VacancyQuestion";
+DROP POLICY IF EXISTS "rls_vacquestion_delete" ON "VacancyQuestion";
+
+CREATE POLICY "rls_vacquestion_select" ON "VacancyQuestion" FOR SELECT USING (
+  "companyId" = evalhr_current_tenant()
+);
+CREATE POLICY "rls_vacquestion_insert" ON "VacancyQuestion" FOR INSERT WITH CHECK (
+  "companyId" = evalhr_current_tenant()
+);
+CREATE POLICY "rls_vacquestion_update" ON "VacancyQuestion" FOR UPDATE USING (
+  "companyId" = evalhr_current_tenant()
+) WITH CHECK (
+  "companyId" = evalhr_current_tenant()
+);
+CREATE POLICY "rls_vacquestion_delete" ON "VacancyQuestion" FOR DELETE USING (
+  "companyId" = evalhr_current_tenant()
+);
+
+-- ────────────────────────────────────────────────────────────
+-- VacancyApplicationResponse (D.2.9: direct companyId == application.companyId)
+-- ────────────────────────────────────────────────────────────
+DROP POLICY IF EXISTS "rls_vacappresponse_select" ON "VacancyApplicationResponse";
+DROP POLICY IF EXISTS "rls_vacappresponse_insert" ON "VacancyApplicationResponse";
+DROP POLICY IF EXISTS "rls_vacappresponse_update" ON "VacancyApplicationResponse";
+DROP POLICY IF EXISTS "rls_vacappresponse_delete" ON "VacancyApplicationResponse";
+
+CREATE POLICY "rls_vacappresponse_select" ON "VacancyApplicationResponse" FOR SELECT USING (
+  "companyId" = evalhr_current_tenant()
+);
+CREATE POLICY "rls_vacappresponse_insert" ON "VacancyApplicationResponse" FOR INSERT WITH CHECK (
+  "companyId" = evalhr_current_tenant()
+);
+CREATE POLICY "rls_vacappresponse_update" ON "VacancyApplicationResponse" FOR UPDATE USING (
+  "companyId" = evalhr_current_tenant()
+) WITH CHECK (
+  "companyId" = evalhr_current_tenant()
+);
+CREATE POLICY "rls_vacappresponse_delete" ON "VacancyApplicationResponse" FOR DELETE USING (
+  "companyId" = evalhr_current_tenant()
+);
+
 -- ════════════════════════════════════════════════════════════
 -- STEP 3: Row counts that must remain GLOBAL (not tenant-scoped)
 -- ════════════════════════════════════════════════════════════
@@ -406,7 +512,9 @@ CREATE POLICY "rls_question_delete" ON "Question" FOR DELETE USING (
 --   AND c.relname IN (
 --     'Position', 'CandidateInvitation', 'EvaluationSession',
 --     'EvaluationResult', 'InterviewSchedule', 'Vacancy',
---     'VacancyApplication', 'ArcoRequest', 'User', 'Question'
+--     'VacancyApplication', 'ArcoRequest', 'User', 'Question',
+--     'EvaluationResponse', 'EvaluationTemplate', 'VacancyQuestion',
+--     'VacancyApplicationResponse'
 --   )
 -- ORDER BY c.relname;
 --

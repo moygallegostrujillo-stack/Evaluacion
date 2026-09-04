@@ -27,18 +27,21 @@
  *      titles). No candidate PII, no emails, no phones, no individual
  *      scores.
  *
- * CONNECTION STRATEGY:
- *   - Today (pre-RLS): the aggregate functions run on the shared
- *     application connection (`@/lib/db`) — exactly the same behaviour the
- *     former `getUnscopedClient()` aggregate branches had. Zero functional
- *     change.
- *   - When DB-level RLS is ACTIVATED (future phase): set
- *     `ADMIN_DATABASE_URL` to a dedicated `evalhr_sa` connection string
- *     (see prisma/create-evalhr-sa-role.sql). This module will then
- *     lazily create an isolated singleton PrismaClient on that URL.
- *     `evalhr_app` keeps NOBYPASSRLS and can never reach this module.
- *     The env var is read ONLY here, server-side, and is never logged or
+ * CONNECTION STRATEGY (D.2.9 — FAIL CLOSED):
+ *   - `ADMIN_DATABASE_URL` is MANDATORY for every SA AGGREGATE operation.
+ *     If it is not configured, the aggregate functions THROW
+ *     (AggregateAccessError) — there is NO silent fallback to the shared
+ *     tenant connection. A missing administrative connection must never
+ *     silently change behaviour to tenant-connection access in
+ *     staging/production: aggregate either runs on its own audited
+ *     connection or it fails closed.
+ *   - The env var is read ONLY here, server-side, and is never logged or
  *     returned in any API response.
+ *   - Dev/staging value: the same database the app uses (e.g.
+ *     file:./prisma/db/custom.db) — the isolation boundary is still the
+ *     explicit admin-db mechanism; at RLS activation the URL becomes the
+ *     evalhr_sa role, which is what makes global reads possible under
+ *     FORCE RLS.
  *
  * DO NOT add generic model accessors to this module. Any new aggregate
  * operation must be an explicit, audited, metrics-only function.
@@ -48,7 +51,6 @@ import 'server-only'
 
 import { PrismaClient } from '@prisma/client'
 import type { NextRequest } from 'next/server'
-import { db } from '@/lib/db'
 import { logAuditEvent } from '@/lib/audit'
 
 // ============================================
@@ -151,27 +153,32 @@ async function auditAggregateAccess(
 }
 
 /**
- * Resolve the administrative connection.
+ * Resolve the administrative connection — FAIL CLOSED.
  *
  * PRIVATE on purpose — this module never hands a client to callers.
- * - ADMIN_DATABASE_URL set  → isolated singleton PrismaClient (evalhr_sa,
- *   future state, only at RLS activation time).
- * - otherwise               → the shared application connection (current
- *   behaviour of the former getUnscopedClient() aggregate branches).
+ *
+ * D.2.9 (PARTE 12): ADMIN_DATABASE_URL is REQUIRED. If it is missing the
+ * aggregate operation MUST fail (AggregateAccessError). There is NO
+ * fallback to the shared tenant connection: silent degradation would let
+ * staging/production change behaviour without anyone noticing.
  *
  * The admin URL is never logged, never returned, never sent to the client.
  */
 function resolveAdminClient() {
   const adminUrl = process.env.ADMIN_DATABASE_URL
-  if (adminUrl) {
-    const g = globalThis as unknown as { evalhrAdminPrisma?: ReturnType<typeof createAdminClient> }
-    if (!g.evalhrAdminPrisma) {
-      g.evalhrAdminPrisma = createAdminClient(adminUrl)
-    }
-    return g.evalhrAdminPrisma
+  if (!adminUrl) {
+    throw new AggregateAccessError(
+      'ADMIN DB fail-closed: ADMIN_DATABASE_URL is not configured. ' +
+        'SA AGGREGATE requires a dedicated administrative connection ' +
+        '(see prisma/create-evalhr-sa-role.sql). Refusing to fall back to ' +
+        'the tenant connection.'
+    )
   }
-  // Pre-RLS fallback: shared connection (same behaviour as before D.2.8).
-  return db
+  const g = globalThis as unknown as { evalhrAdminPrisma?: ReturnType<typeof createAdminClient> }
+  if (!g.evalhrAdminPrisma) {
+    g.evalhrAdminPrisma = createAdminClient(adminUrl)
+  }
+  return g.evalhrAdminPrisma
 }
 
 function createAdminClient(url: string) {

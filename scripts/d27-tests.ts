@@ -114,8 +114,11 @@ console.log(`\n═══ FASE 11 — CROSS-TENANT TESTS ═══`)
 {
   const r = await apiGet(tSa, '/api/dashboard')
   const b = r.body
-  // fixture global counts: 3 candidates (2 A + 1 B), 3 results, positions 2
-  const okMetrics = r.status === 200 && b.mode === 'aggregated' && b.totalCandidates === 3
+  // D.2.9: expected count computed from DB (fixture-independent) — the
+  // invariant under test is "aggregate returns the true global count", not a
+  // hardcoded fixture snapshot.
+  const expectedCandidates = await auditDb.user.count({ where: { role: 'CANDIDATO', active: true } })
+  const okMetrics = r.status === 200 && b.mode === 'aggregated' && b.totalCandidates === expectedCandidates
   const noPII = Array.isArray(b.recentResults) && b.recentResults.length === 0 &&
     !JSON.stringify(b).includes('@test.local') && !JSON.stringify(b).includes('D26 Candidato')
   const log = await auditDb.auditLog.findFirst({
@@ -123,7 +126,7 @@ console.log(`\n═══ FASE 11 — CROSS-TENANT TESTS ═══`)
     orderBy: { createdAt: 'desc' },
   })
   push('D-6', 'SA aggregate → global metrics A+B, no PII, audited', '200 + mode=aggregated + counts(A+B) + sin PII + AuditLog',
-    `HTTP ${r.status} cands=${b?.totalCandidates} PII-free=${noPII} AuditLog=${log ? 'FOUND' : 'MISSING'}`,
+    `HTTP ${r.status} cands=${b?.totalCandidates}/${expectedCandidates} PII-free=${noPII} AuditLog=${log ? 'FOUND' : 'MISSING'}`,
     okMetrics && noPII && !!log)
 }
 

@@ -993,6 +993,9 @@ export async function POST(req: NextRequest) {
           questionId,
           value: String(value),
           numericValue: numericValue || null,
+          // PARTE 9/10 (D.2.9): tenant invariant — derived from the verified
+          // session row (its companyId was checked against auth earlier).
+          companyId: session.companyId,
         },
       })
 

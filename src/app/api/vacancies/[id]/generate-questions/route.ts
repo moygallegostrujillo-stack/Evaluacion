@@ -366,6 +366,9 @@ IMPORTANTE: Las preguntas deben ser específicas para "${vacancy.title}", no pre
           correctAnswer: q.correctAnswer,
           order: maxOrder + i + 1,
           vacancyId: id,
+          // PARTE 9/10 (D.2.9): tenant invariant — derived from the verified
+          // parent vacancy, never from client or AI output.
+          companyId: vacancy.companyId,
         },
       })
       createdQuestions.push({

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUnscopedClient } from '@/lib/rls'
-import { generatePublicToken } from '@/lib/public-token'
+import { generatePublicToken, verifyPublicToken } from '@/lib/public-token'
 
 const db = getUnscopedClient()
 
@@ -799,16 +799,17 @@ export async function GET(req: NextRequest) {
     const vacancy = application.vacancy
 
     // Step 0: data entry (no questions needed)
+    // PHASE 3.5-D.2.9 (PARTE 5): data-minimization — the resume bootstrap
+    // response NO LONGER returns candidate PII (name/email/phone/age). The
+    // candidate entering their own data never needs it echoed back, and an
+    // applicationId holder must not be able to read the candidate's PII
+    // without the HMAC token flow. Steps 1+ never returned PII.
     if (currentStep === 0) {
       return NextResponse.json({
         step: 0,
         stepName: 'data',
         applicationId: application.id,
         token: generatePublicToken(application.id),
-        candidateName: application.candidateName,
-        candidateEmail: application.candidateEmail,
-        candidatePhone: application.candidatePhone,
-        candidateAge: application.candidateAge,
       })
     }
 
@@ -1092,13 +1093,31 @@ export async function POST(req: NextRequest) {
 
     // ---- step=answer: Save answer ----
     if (body.step === 'answer') {
-      const { applicationId, section, questionId, vacancyQuestionId, value, numericValue } =
-        body as ApplyAnswerBody
+      const { applicationId, section, questionId, vacancyQuestionId, value, numericValue, token } =
+        body as ApplyAnswerBody & { token?: string }
 
       if (!applicationId || !section || !value) {
         return NextResponse.json(
           { error: 'applicationId, section, and value are required' },
           { status: 400 }
+        )
+      }
+
+      // PHASE 3.5-D.2.9 (PARTE 5): HMAC token REQUIRED and verified BEFORE
+      // any lookup or write. The token is self-contained (HMAC of the
+      // applicationId), so validation is purely cryptographic — no DB access
+      // happens without it. This closes the bare-applicationId write path.
+      if (!token) {
+        return NextResponse.json(
+          { error: 'Token de verificación requerido', code: 'TOKEN_REQUIRED' },
+          { status: 403 }
+        )
+      }
+      if (!verifyPublicToken(token, applicationId)) {
+        console.warn(`[SECURITY] public/apply answer: token verification FAILED for application ${applicationId}`)
+        return NextResponse.json(
+          { error: 'Token de verificación inválido', code: 'TOKEN_INVALID' },
+          { status: 403 }
         )
       }
 
@@ -1137,6 +1156,9 @@ export async function POST(req: NextRequest) {
             section,
             value,
             numericValue: numericValue || null,
+            // PARTE 9/10 (D.2.9): tenant invariant — derived from the
+            // verified parent application, never from client input.
+            companyId: application.companyId,
           },
         })
       }
@@ -1146,12 +1168,28 @@ export async function POST(req: NextRequest) {
 
     // ---- step=advance: Complete step and move to next ----
     if (body.step === 'advance') {
-      const { applicationId, completedStep } = body as ApplyAdvanceBody
+      const { applicationId, completedStep, token } = body as ApplyAdvanceBody & { token?: string }
 
       if (!applicationId || completedStep === undefined) {
         return NextResponse.json(
           { error: 'applicationId and completedStep are required' },
           { status: 400 }
+        )
+      }
+
+      // PHASE 3.5-D.2.9 (PARTE 5): HMAC token REQUIRED and verified BEFORE
+      // any lookup or write (same rationale as the answer step).
+      if (!token) {
+        return NextResponse.json(
+          { error: 'Token de verificación requerido', code: 'TOKEN_REQUIRED' },
+          { status: 403 }
+        )
+      }
+      if (!verifyPublicToken(token, applicationId)) {
+        console.warn(`[SECURITY] public/apply advance: token verification FAILED for application ${applicationId}`)
+        return NextResponse.json(
+          { error: 'Token de verificación inválido', code: 'TOKEN_INVALID' },
+          { status: 403 }
         )
       }
 

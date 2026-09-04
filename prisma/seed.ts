@@ -207,6 +207,7 @@ async function main() {
       description: 'Test Big Five de personalidad para puesto de Mesero',
       order: 1,
       positionId: mesero.id,
+      companyId: restaurantCompany.id,
     },
   })
 
@@ -244,6 +245,7 @@ async function main() {
       description: 'Evaluación de competencias psicológicas para Mesero',
       order: 2,
       positionId: mesero.id,
+      companyId: restaurantCompany.id,
     },
   })
 
@@ -281,6 +283,7 @@ async function main() {
       description: 'Conocimientos técnicos para puesto de Mesero',
       order: 3,
       positionId: mesero.id,
+      companyId: restaurantCompany.id,
     },
   })
 
@@ -378,6 +381,7 @@ async function main() {
       description: 'Test Big Five de personalidad para puesto de Cocinero',
       order: 1,
       positionId: cocinero.id,
+      companyId: restaurantCompany.id,
     },
   })
 
@@ -402,6 +406,7 @@ async function main() {
       description: 'Evaluación de competencias psicológicas para Cocinero',
       order: 2,
       positionId: cocinero.id,
+      companyId: restaurantCompany.id,
     },
   })
 
@@ -426,6 +431,7 @@ async function main() {
       description: 'Conocimientos técnicos para puesto de Cocinero',
       order: 3,
       positionId: cocinero.id,
+      companyId: restaurantCompany.id,
     },
   })
 
@@ -503,6 +509,7 @@ async function main() {
       description: 'Test Big Five de personalidad para puesto de Bartender',
       order: 1,
       positionId: bartender.id,
+      companyId: restaurantCompany.id,
     },
   })
 
@@ -527,6 +534,7 @@ async function main() {
       description: 'Evaluación de competencias psicológicas para Bartender',
       order: 2,
       positionId: bartender.id,
+      companyId: restaurantCompany.id,
     },
   })
 
@@ -551,6 +559,7 @@ async function main() {
       description: 'Conocimientos técnicos para puesto de Bartender',
       order: 3,
       positionId: bartender.id,
+      companyId: restaurantCompany.id,
     },
   })
 
@@ -628,6 +637,7 @@ async function main() {
       description: 'Test Big Five de personalidad para Gerente de Piso',
       order: 1,
       positionId: gerentePiso.id,
+      companyId: restaurantCompany.id,
     },
   })
 
@@ -652,6 +662,7 @@ async function main() {
       description: 'Evaluación de competencias psicológicas para Gerente de Piso',
       order: 2,
       positionId: gerentePiso.id,
+      companyId: restaurantCompany.id,
     },
   })
 
@@ -676,6 +687,7 @@ async function main() {
       description: 'Conocimientos de gestión para Gerente de Piso',
       order: 3,
       positionId: gerentePiso.id,
+      companyId: restaurantCompany.id,
     },
   })
 
@@ -753,6 +765,7 @@ async function main() {
       description: 'Test Big Five de personalidad para Vendedor',
       order: 1,
       positionId: vendedor.id,
+      companyId: retailCompany.id,
     },
   })
 
@@ -777,6 +790,7 @@ async function main() {
       description: 'Evaluación de competencias psicológicas para Vendedor',
       order: 2,
       positionId: vendedor.id,
+      companyId: retailCompany.id,
     },
   })
 
@@ -801,6 +815,7 @@ async function main() {
       description: 'Conocimientos básicos de ventas para Vendedor',
       order: 3,
       positionId: vendedor.id,
+      companyId: retailCompany.id,
     },
   })
 

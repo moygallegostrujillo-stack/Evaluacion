@@ -32,6 +32,10 @@ model Company {
   vacancyApplications VacancyApplication[]
   privacyNotice CompanyPrivacyNotice?
   arcoRequests ArcoRequest[]
+  evaluationResponses EvaluationResponse[]
+  evaluationTemplates EvaluationTemplate[]
+  vacancyQuestions    VacancyQuestion[]
+  vacancyApplicationResponses VacancyApplicationResponse[]
 }
 
 model User {
@@ -139,11 +143,17 @@ model EvaluationTemplate {
   order       Int      @default(1)
   active      Boolean  @default(true)
   positionId  String
+  // PHASE 3.5-D.2.9 (PARTE 9): direct tenant column (RLS-ready, NOT NULL after backfill).
+  // Invariant: companyId == position.companyId.
+  companyId   String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   position  Position   @relation(fields: [positionId], references: [id])
+  company   Company    @relation(fields: [companyId], references: [id])
   questions Question[]
+
+  @@index([companyId])
 }
 
 model Question {
@@ -210,12 +220,17 @@ model EvaluationResponse {
   questionId   String
   value        String
   numericValue Int?
+  // PHASE 3.5-D.2.9 (PARTE 9): direct tenant column (RLS-ready, NOT NULL after backfill).
+  // Invariant: companyId == session.companyId (enforced on every write path).
+  companyId    String
   createdAt    DateTime @default(now())
 
   session  EvaluationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   question Question          @relation(fields: [questionId], references: [id])
+  company  Company           @relation(fields: [companyId], references: [id])
 
   @@unique([sessionId, questionId])
+  @@index([companyId])
 }
 
 model EvaluationResult {
@@ -310,10 +325,16 @@ model VacancyQuestion {
   correctAnswer  Int?     // 0-based index of correct answer
   order          Int
   vacancyId      String
+  // PHASE 3.5-D.2.9 (PARTE 9): direct tenant column (RLS-ready, NOT NULL after backfill).
+  // Invariant: companyId == vacancy.companyId.
+  companyId      String
   createdAt      DateTime @default(now())
 
   vacancy    Vacancy                       @relation(fields: [vacancyId], references: [id], onDelete: Cascade)
+  company    Company                       @relation(fields: [companyId], references: [id])
   responses  VacancyApplicationResponse[]
+
+  @@index([companyId])
 }
 
 model VacancyApplication {
@@ -380,10 +401,16 @@ model VacancyApplicationResponse {
   section          String   // PSICOMETRICA, PSICOLOGICA, CONOCIMIENTOS, INTEGRIDAD
   value            String
   numericValue     Int?
+  // PHASE 3.5-D.2.9 (PARTE 9): direct tenant column (RLS-ready, NOT NULL after backfill).
+  // Invariant: companyId == application.companyId (enforced on every write path).
+  companyId        String
   createdAt        DateTime @default(now())
 
   application     VacancyApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   vacancyQuestion VacancyQuestion?   @relation(fields: [vacancyQuestionId], references: [id])
+  company         Company            @relation(fields: [companyId], references: [id])
+
+  @@index([companyId])
 }
 
 // AuditLog — Security event log (Phase 1.7)

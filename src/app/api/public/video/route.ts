@@ -37,6 +37,20 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // PHASE 3.5-D.2.9 (PARTE 6): CORRECT ORDER — the HMAC token is
+    // self-contained (HMAC of the applicationId), so it is verified
+    // CRYPTOGRAPHICALLY BEFORE any database lookup. This removes the
+    // 404-vs-403 existence oracle: an unauthenticated caller can no longer
+    // use this endpoint to enumerate valid applicationIds. Lookup happens
+    // only after the token proves possession of the server secret.
+    if (!verifyPublicToken(token, applicationId)) {
+      console.warn(`[SECURITY] Public video endpoint: token verification FAILED for application ${applicationId}`)
+      return NextResponse.json(
+        { error: 'Token de verificación inválido', code: 'TOKEN_INVALID' },
+        { status: 403 }
+      )
+    }
+
     // Verify application exists with vacancy and company info
     const application = await db.vacancyApplication.findUnique({
       where: { id: applicationId },
@@ -51,17 +65,6 @@ export async function POST(req: NextRequest) {
 
     if (!application) {
       return NextResponse.json({ error: 'Application not found' }, { status: 404 })
-    }
-
-    // PHASE 3.5-B.2 (B3): Verify the signed token.
-    // The token must be a valid HMAC for this specific applicationId.
-    // This prevents an attacker from using applicationId of another company.
-    if (!verifyPublicToken(token, applicationId)) {
-      console.warn(`[SECURITY] Public video endpoint: token verification FAILED for application ${applicationId}`)
-      return NextResponse.json(
-        { error: 'Token de verificación inválido', code: 'TOKEN_INVALID' },
-        { status: 403 }
-      )
     }
 
     // If candidateEmail is available, log the access for audit

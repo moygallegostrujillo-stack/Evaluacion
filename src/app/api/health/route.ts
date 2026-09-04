@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { getUnscopedClient } from '@/lib/rls'
 
 /**
  * Health check endpoint — REQUIRES AUTHENTICATION (Phase 1.2 fix).
@@ -42,14 +43,16 @@ export async function GET(req: Request) {
   }
 
   // Test DB connection
+  // PHASE 3.5-D.2.9 (PARTE 18): use the shared infrastructure client
+  // (getUnscopedClient) instead of constructing a new PrismaClient per
+  // request — health is an infrastructure diagnostic, and per-request
+  // client construction wastes connections and bypasses the singleton
+  // pattern used everywhere else. Behaviour (counts returned) unchanged.
   try {
-    const { PrismaClient } = await import('@prisma/client')
-    const prisma = new PrismaClient()
+    const prisma = getUnscopedClient()
 
     const userCount = await prisma.user.count()
     const companyCount = await prisma.company.count()
-
-    await prisma.$disconnect()
 
     diagnostics.database = {
       status: 'connected',

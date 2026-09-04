@@ -92,6 +92,21 @@ export default function PublicEvaluationView() {
     } else {
       localStorage.removeItem('evaluhr_vacancy_app_id')
       localStorage.removeItem('evaluhr_vacancy_slug')
+      localStorage.removeItem('evaluhr_vacancy_app_token')
+    }
+  }
+
+  // PHASE 3.5-D.2.9 (PARTE 5): the server now REQUIRES the HMAC token on
+  // every write (answer/advance). The token is returned by the API on
+  // create and on every resume read — persist and attach it here.
+  const saveAppToken = (token?: string | null) => {
+    if (token) localStorage.setItem('evaluhr_vacancy_app_token', token)
+  }
+  const getAppToken = (): string | null => {
+    try {
+      return localStorage.getItem('evaluhr_vacancy_app_token')
+    } catch {
+      return null
     }
   }
   const answers = useAppStore((s) => s.vacancyAnswers)
@@ -122,6 +137,7 @@ export default function PublicEvaluationView() {
     if (step === 'complete') {
       localStorage.removeItem('evaluhr_vacancy_app_id')
       localStorage.removeItem('evaluhr_vacancy_slug')
+      localStorage.removeItem('evaluhr_vacancy_app_token')
     }
   }, [step])
 
@@ -172,6 +188,7 @@ export default function PublicEvaluationView() {
             step: 'advance',
             applicationId,
             completedStep,
+            token: getAppToken() || undefined,
           }),
         })
         const data = await res.json()
@@ -294,6 +311,9 @@ export default function PublicEvaluationView() {
         setStep('vacancy-info')
         return
       }
+      // D.2.9: every resume response carries a fresh HMAC token — persist it
+      // so subsequent answer/advance writes can present it.
+      saveAppToken(data.token)
       // Determine which step to resume to
       // API returns `step` not `currentStep`
       const currentStep = data.step ?? data.currentStep ?? 0
@@ -337,6 +357,8 @@ export default function PublicEvaluationView() {
       }
       const newAppId = data.applicationId
       setApplicationId(newAppId)
+      // D.2.9: persist the HMAC token issued at creation time.
+      saveAppToken(data.token)
       // Move to consent step first
       setStep('consent')
     } catch {
@@ -366,6 +388,7 @@ export default function PublicEvaluationView() {
           vacancyQuestionId: currentQuestion?.vacancyQuestionId,
           value: String(value),
           numericValue: numericValue,
+          token: getAppToken() || undefined,
         }),
       })
     }
@@ -410,6 +433,7 @@ export default function PublicEvaluationView() {
           step: 'advance',
           applicationId: appId,
           completedStep,
+          token: getAppToken() || undefined,
         }),
       })
       const data = await res.json()

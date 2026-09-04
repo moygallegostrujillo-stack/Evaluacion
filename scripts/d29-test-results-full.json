@@ -1,0 +1,149 @@
+[
+  {
+    "id": "I-1",
+    "desc": "Session A + EvaluationResponse A → permitido",
+    "expected": "created",
+    "got": "created",
+    "pass": true
+  },
+  {
+    "id": "I-2",
+    "desc": "Session A + EvaluationResponse companyId=B → falla",
+    "expected": "RLSViolationError",
+    "got": "RLSViolationError",
+    "pass": true
+  },
+  {
+    "id": "I-3",
+    "desc": "Position A + EvaluationTemplate companyId=B → falla",
+    "expected": "RLSViolationError",
+    "got": "RLSViolationError",
+    "pass": true
+  },
+  {
+    "id": "I-4",
+    "desc": "Vacancy A + VacancyQuestion companyId=B → falla",
+    "expected": "RLSViolationError",
+    "got": "RLSViolationError",
+    "pass": true
+  },
+  {
+    "id": "I-5",
+    "desc": "Application A + Response companyId=B → falla",
+    "expected": "RLSViolationError",
+    "got": "RLSViolationError",
+    "pass": true
+  },
+  {
+    "id": "I-6",
+    "desc": "Create sin companyId → auto-inyecta companyId del contexto (invariante)",
+    "expected": "== compA (cmtmh7fry0000o029l4lq93kd)",
+    "got": "cmtmh7fry0000o029l4lq93kd",
+    "pass": true
+  },
+  {
+    "id": "I-7",
+    "desc": "Invariante DB global: child.companyId == parent.companyId",
+    "expected": "0 violaciones",
+    "got": "0",
+    "pass": true
+  },
+  {
+    "id": "AGG-/api/dashboard",
+    "desc": "SA aggregate /api/dashboard → 200 exclusivamente vía admin-db",
+    "expected": "HTTP 200",
+    "got": "HTTP 200",
+    "pass": true
+  },
+  {
+    "id": "AGG-/api/results",
+    "desc": "SA aggregate /api/results → 200 exclusivamente vía admin-db",
+    "expected": "HTTP 200",
+    "got": "HTTP 200",
+    "pass": true
+  },
+  {
+    "id": "AGG-/api/candidates",
+    "desc": "SA aggregate /api/candidates → 200 exclusivamente vía admin-db",
+    "expected": "HTTP 200",
+    "got": "HTTP 200",
+    "pass": true
+  },
+  {
+    "id": "PUB-1",
+    "desc": "GET /api/public/vacancy → datos públicos sin datos privados",
+    "expected": "200 + público",
+    "got": "HTTP 200 privado=false",
+    "pass": true
+  },
+  {
+    "id": "PUB-2",
+    "desc": "POST apply step=data → crea aplicación + token HMAC",
+    "expected": "200 + token",
+    "got": "HTTP 200 token=yes",
+    "pass": true
+  },
+  {
+    "id": "PUB-3",
+    "desc": "GET resume step0 → sin PII del candidato (data-minimization)",
+    "expected": "0 campos PII",
+    "got": "leaked=[]",
+    "pass": true
+  },
+  {
+    "id": "PUB-4",
+    "desc": "POST answer SIN token → 403 TOKEN_REQUIRED",
+    "expected": "403",
+    "got": "HTTP 403 code=TOKEN_REQUIRED",
+    "pass": true
+  },
+  {
+    "id": "PUB-5",
+    "desc": "POST answer token inválido → 403 TOKEN_INVALID",
+    "expected": "403",
+    "got": "HTTP 403 code=TOKEN_INVALID",
+    "pass": true
+  },
+  {
+    "id": "PUB-6",
+    "desc": "POST answer token válido → guarda + companyId==application",
+    "expected": "success + invariante",
+    "got": "HTTP 200 row=stamped-A",
+    "pass": true
+  },
+  {
+    "id": "PUB-7",
+    "desc": "POST advance token válido → avanza",
+    "expected": "success/nextStep",
+    "got": "HTTP 200 nextStep=1",
+    "pass": true
+  },
+  {
+    "id": "PUB-8",
+    "desc": "POST video token inválido + id inexistente → 403 (token ANTES del lookup)",
+    "expected": "403 TOKEN_INVALID",
+    "got": "HTTP 403 code=TOKEN_INVALID",
+    "pass": true
+  },
+  {
+    "id": "PUB-9",
+    "desc": "POST video sin token → 403 TOKEN_REQUIRED",
+    "expected": "403",
+    "got": "HTTP 403 code=TOKEN_REQUIRED",
+    "pass": true
+  },
+  {
+    "id": "PUB-10",
+    "desc": "GET invitation token inválido → valid:false",
+    "expected": "valid:false",
+    "got": "HTTP 200 valid=false",
+    "pass": true
+  },
+  {
+    "id": "PUB-11",
+    "desc": "POST advance SIN token → 403 TOKEN_REQUIRED",
+    "expected": "403",
+    "got": "HTTP 403 code=TOKEN_REQUIRED",
+    "pass": true
+  }
+]

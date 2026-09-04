@@ -35,6 +35,11 @@ ALTER TABLE "VacancyApplication" NO FORCE ROW LEVEL SECURITY;
 ALTER TABLE "ArcoRequest" NO FORCE ROW LEVEL SECURITY;
 ALTER TABLE "User" NO FORCE ROW LEVEL SECURITY;
 ALTER TABLE "Question" NO FORCE ROW LEVEL SECURITY;
+-- D.2.9: models that received a direct companyId (formerly indirect)
+ALTER TABLE "EvaluationResponse" NO FORCE ROW LEVEL SECURITY;
+ALTER TABLE "EvaluationTemplate" NO FORCE ROW LEVEL SECURITY;
+ALTER TABLE "VacancyQuestion" NO FORCE ROW LEVEL SECURITY;
+ALTER TABLE "VacancyApplicationResponse" NO FORCE ROW LEVEL SECURITY;
 
 -- ────────────────────────────────────────────────────────────
 -- STEP 2: DROP all policies (idempotent)
@@ -89,6 +94,27 @@ DROP POLICY IF EXISTS "rls_question_insert" ON "Question";
 DROP POLICY IF EXISTS "rls_question_update" ON "Question";
 DROP POLICY IF EXISTS "rls_question_delete" ON "Question";
 
+-- D.2.9: formerly indirect models (now direct companyId)
+DROP POLICY IF EXISTS "rls_evalresponse_select" ON "EvaluationResponse";
+DROP POLICY IF EXISTS "rls_evalresponse_insert" ON "EvaluationResponse";
+DROP POLICY IF EXISTS "rls_evalresponse_update" ON "EvaluationResponse";
+DROP POLICY IF EXISTS "rls_evalresponse_delete" ON "EvaluationResponse";
+
+DROP POLICY IF EXISTS "rls_evaltemplate_select" ON "EvaluationTemplate";
+DROP POLICY IF EXISTS "rls_evaltemplate_insert" ON "EvaluationTemplate";
+DROP POLICY IF EXISTS "rls_evaltemplate_update" ON "EvaluationTemplate";
+DROP POLICY IF EXISTS "rls_evaltemplate_delete" ON "EvaluationTemplate";
+
+DROP POLICY IF EXISTS "rls_vacquestion_select" ON "VacancyQuestion";
+DROP POLICY IF EXISTS "rls_vacquestion_insert" ON "VacancyQuestion";
+DROP POLICY IF EXISTS "rls_vacquestion_update" ON "VacancyQuestion";
+DROP POLICY IF EXISTS "rls_vacquestion_delete" ON "VacancyQuestion";
+
+DROP POLICY IF EXISTS "rls_vacappresponse_select" ON "VacancyApplicationResponse";
+DROP POLICY IF EXISTS "rls_vacappresponse_insert" ON "VacancyApplicationResponse";
+DROP POLICY IF EXISTS "rls_vacappresponse_update" ON "VacancyApplicationResponse";
+DROP POLICY IF EXISTS "rls_vacappresponse_delete" ON "VacancyApplicationResponse";
+
 -- ────────────────────────────────────────────────────────────
 -- STEP 3: DISABLE ROW LEVEL SECURITY
 -- ────────────────────────────────────────────────────────────
@@ -102,6 +128,11 @@ ALTER TABLE "VacancyApplication" DISABLE ROW LEVEL SECURITY;
 ALTER TABLE "ArcoRequest" DISABLE ROW LEVEL SECURITY;
 ALTER TABLE "User" DISABLE ROW LEVEL SECURITY;
 ALTER TABLE "Question" DISABLE ROW LEVEL SECURITY;
+-- D.2.9: formerly indirect models
+ALTER TABLE "EvaluationResponse" DISABLE ROW LEVEL SECURITY;
+ALTER TABLE "EvaluationTemplate" DISABLE ROW LEVEL SECURITY;
+ALTER TABLE "VacancyQuestion" DISABLE ROW LEVEL SECURITY;
+ALTER TABLE "VacancyApplicationResponse" DISABLE ROW LEVEL SECURITY;
 
 -- ────────────────────────────────────────────────────────────
 -- STEP 4: Drop the tenant-context helper function
@@ -148,7 +179,8 @@ END $$;
 -- WHERE n.nspname = 'public' AND c.relkind = 'r'
 --   AND c.relname IN ('Position','CandidateInvitation','EvaluationSession',
 --     'EvaluationResult','InterviewSchedule','Vacancy','VacancyApplication',
---     'ArcoRequest','User','Question')
+--     'ArcoRequest','User','Question','EvaluationResponse',
+--     'EvaluationTemplate','VacancyQuestion','VacancyApplicationResponse')
 -- ORDER BY c.relname;
 --
 -- Expected: rls_enabled = false, rls_forced = false on every row.

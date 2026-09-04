@@ -32,6 +32,10 @@ model Company {
   vacancies   Vacancy[]
   vacancyApplications VacancyApplication[]
   privacyNotice CompanyPrivacyNotice?
+  evaluationResponses EvaluationResponse[]
+  evaluationTemplates EvaluationTemplate[]
+  vacancyQuestions    VacancyQuestion[]
+  vacancyApplicationResponses VacancyApplicationResponse[]
 }
 
 model User {
@@ -104,11 +108,16 @@ model EvaluationTemplate {
   order       Int      @default(1)
   active      Boolean  @default(true)
   positionId  String
+  // PHASE 3.5-D.2.9: direct tenant column (nullable until prod backfill).
+  companyId   String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   position  Position   @relation(fields: [positionId], references: [id])
+  company   Company?   @relation(fields: [companyId], references: [id])
   questions Question[]
+
+  @@index([companyId])
 }
 
 model Question {
@@ -175,12 +184,17 @@ model EvaluationResponse {
   questionId   String
   value        String
   numericValue Int?
+  // PHASE 3.5-D.2.9: direct tenant column. Nullable in the PROD schema until
+  // the backfill SQL runs; NOT NULL is applied at the RLS activation phase.
+  companyId    String?
   createdAt    DateTime @default(now())
 
   session  EvaluationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   question Question          @relation(fields: [questionId], references: [id])
+  company  Company?          @relation(fields: [companyId], references: [id])
 
   @@unique([sessionId, questionId])
+  @@index([companyId])
 }
 
 model EvaluationResult {
@@ -271,10 +285,15 @@ model VacancyQuestion {
   correctAnswer  Int?     // 0-based index of correct answer
   order          Int
   vacancyId      String
+  // PHASE 3.5-D.2.9: direct tenant column (nullable until prod backfill).
+  companyId      String?
   createdAt      DateTime @default(now())
 
   vacancy    Vacancy                       @relation(fields: [vacancyId], references: [id], onDelete: Cascade)
+  company    Company?                      @relation(fields: [companyId], references: [id])
   responses  VacancyApplicationResponse[]
+
+  @@index([companyId])
 }
 
 model VacancyApplication {
@@ -333,10 +352,15 @@ model VacancyApplicationResponse {
   section          String   // PSICOMETRICA, PSICOLOGICA, CONOCIMIENTOS
   value            String
   numericValue     Int?
+  // PHASE 3.5-D.2.9: direct tenant column (nullable until prod backfill).
+  companyId        String?
   createdAt        DateTime @default(now())
 
   application     VacancyApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   vacancyQuestion VacancyQuestion?   @relation(fields: [vacancyQuestionId], references: [id])
+  company         Company?           @relation(fields: [companyId], references: [id])
+
+  @@index([companyId])
 }
 
 model ConsentLog {

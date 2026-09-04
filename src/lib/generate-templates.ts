@@ -189,6 +189,19 @@ export async function generateTemplatesForPosition(
 ): Promise<{ templatesCreated: number; questionsCreated: number }> {
   const db = getUnscopedClient()
 
+  // PHASE 3.5-D.2.9 (PARTE 9/10): resolve the position's tenant and stamp it
+  // on every template. This is the single source of truth for the invariant
+  // EvaluationTemplate.companyId == Position.companyId — the value is always
+  // derived from the parent row, never from caller input.
+  const position = await db.position.findUnique({
+    where: { id: positionId },
+    select: { companyId: true },
+  })
+  if (!position) {
+    return { templatesCreated: 0, questionsCreated: 0 }
+  }
+  const positionCompanyId = position.companyId
+
   // Check if templates already exist for this position
   const existingTemplates = await db.evaluationTemplate.findMany({
     where: { positionId },
@@ -209,6 +222,7 @@ export async function generateTemplatesForPosition(
       description: `Test Big Five de personalidad para puesto de ${categoryName}`,
       order: 1,
       positionId,
+      companyId: positionCompanyId,
       active: true,
     },
   })
@@ -236,6 +250,7 @@ export async function generateTemplatesForPosition(
       description: `Evaluación de competencias psicológicas para ${categoryName}`,
       order: 2,
       positionId,
+      companyId: positionCompanyId,
       active: true,
     },
   })
@@ -266,6 +281,7 @@ export async function generateTemplatesForPosition(
         description: `Conocimientos técnicos para puesto de ${categoryName}`,
         order: 3,
         positionId,
+        companyId: positionCompanyId,
         active: true,
       },
     })
@@ -318,6 +334,7 @@ export async function generateTemplatesForPosition(
       description: `Evaluación de integridad y honradez para ${categoryName} (dato sensible, orientativo)`,
       order: hasKnowledgeTest ? 4 : 3,
       positionId,
+      companyId: positionCompanyId,
       active: true,
     },
   })

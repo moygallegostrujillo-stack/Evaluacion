@@ -106,6 +106,9 @@ export async function POST(
         correctAnswer,
         order: maxOrder + 1,
         vacancyId: id,
+        // PARTE 9/10 (D.2.9): tenant invariant — derived from the verified
+        // parent vacancy, never from client input.
+        companyId: vacancy.companyId,
       },
     })
 
