@@ -1,0 +1,142 @@
+[
+  {
+    "id": "SNAP-dashRhA",
+    "desc": "snapshot identical pre/post",
+    "expected": "byte-identical",
+    "got": "IDENTICAL",
+    "pass": true
+  },
+  {
+    "id": "SNAP-dashRhB",
+    "desc": "snapshot identical pre/post",
+    "expected": "byte-identical",
+    "got": "IDENTICAL",
+    "pass": true
+  },
+  {
+    "id": "SNAP-dashRhA_companyIdB",
+    "desc": "snapshot identical pre/post",
+    "expected": "byte-identical",
+    "got": "IDENTICAL",
+    "pass": true
+  },
+  {
+    "id": "SNAP-dashRhA_targetB",
+    "desc": "snapshot identical pre/post",
+    "expected": "byte-identical",
+    "got": "IDENTICAL",
+    "pass": true
+  },
+  {
+    "id": "SNAP-dashSaImpB",
+    "desc": "snapshot identical pre/post",
+    "expected": "byte-identical",
+    "got": "IDENTICAL",
+    "pass": true
+  },
+  {
+    "id": "SNAP-agg-changed",
+    "desc": "SA aggregate: PII removed (expected change)",
+    "expected": "recentResults=[] + no PII + mode=aggregated",
+    "got": "recentResults=0, mode=aggregated, PII-free=true",
+    "pass": true
+  },
+  {
+    "id": "SNAP-cand-changed",
+    "desc": "CANDIDATO denied (expected change, VUL-D2 fixed)",
+    "expected": "HTTP 403",
+    "got": "HTTP 403",
+    "pass": true
+  },
+  {
+    "id": "D-1",
+    "desc": "RH-A → dashboard",
+    "expected": "200 + only company A data (no mode field — shape unchanged)",
+    "got": "HTTP 200 mode=undefined cands=2",
+    "pass": true
+  },
+  {
+    "id": "D-2",
+    "desc": "RH-A → ?companyId=B (spoofed tenant authority)",
+    "expected": "ignored → only company A data",
+    "got": "HTTP 200 cands=2",
+    "pass": true
+  },
+  {
+    "id": "D-3",
+    "desc": "RH-A → ?targetCompanyId=B (impersonation attempt)",
+    "expected": "ignored → only company A data",
+    "got": "HTTP 200 cands=2",
+    "pass": true
+  },
+  {
+    "id": "D-4",
+    "desc": "SA → ?companyId=B (impersonation)",
+    "expected": "200 + B data + AuditLog impersonation=true (shape unchanged)",
+    "got": "HTTP 200 cands=1 AuditLog=FOUND impFlag=true",
+    "pass": true
+  },
+  {
+    "id": "D-5",
+    "desc": "SA impersonate B → no company A data in response",
+    "expected": "no A data leaked",
+    "got": "clean",
+    "pass": true
+  },
+  {
+    "id": "D-6",
+    "desc": "SA aggregate → global metrics A+B, no PII, audited",
+    "expected": "200 + mode=aggregated + counts(A+B) + sin PII + AuditLog",
+    "got": "HTTP 200 cands=3 PII-free=true AuditLog=FOUND",
+    "pass": true
+  },
+  {
+    "id": "D-7",
+    "desc": "RH/CANDIDATO cannot trigger aggregate mode (role is JWT-authority only)",
+    "expected": "RH→tenant shape (no mode), CANDIDATO→403",
+    "got": "RH mode=undefined/undefined, CAND HTTP 403",
+    "pass": true
+  },
+  {
+    "id": "D-8",
+    "desc": "no token → /api/dashboard",
+    "expected": "401",
+    "got": "HTTP 401",
+    "pass": true
+  },
+  {
+    "id": "AUDIT-1",
+    "desc": "Dashboard impersonation logged (impersonation=true)",
+    "expected": ">=1",
+    "got": "9",
+    "pass": true
+  },
+  {
+    "id": "AUDIT-2",
+    "desc": "Dashboard aggregate logged (mode=AGGREGATE)",
+    "expected": ">=1",
+    "got": "5",
+    "pass": true
+  },
+  {
+    "id": "AUDIT-3",
+    "desc": "Results aggregate logged (mode=AGGREGATE)",
+    "expected": ">=1",
+    "got": "2",
+    "pass": true
+  },
+  {
+    "id": "AUDIT-4",
+    "desc": "Candidates aggregate logged (mode=AGGREGATE)",
+    "expected": ">=1",
+    "got": "2",
+    "pass": true
+  },
+  {
+    "id": "AUDIT-5",
+    "desc": "Authorization never read from app.is_super_admin GUC",
+    "expected": "no GUC dependency",
+    "got": "app-layer role only",
+    "pass": true
+  }
+]

@@ -404,7 +404,10 @@ export function verifyTenantOwnership(
  *
  * This means getUnscopedClient() is SAFE to use for:
  *   - Login/auth (User lookup by email — User table allows NULL companyId)
- *   - SUPER_ADMIN aggregate operations (with app.is_super_admin = 'true')
+ *   - Explicit SUPER_ADMIN aggregate paths (counts/metrics only, role-gated,
+ *     AuditLog-logged — D.2.7: NO app.is_super_admin GUC; when DB RLS is
+ *     activated these paths MUST migrate to a dedicated administrative
+ *     mechanism/connection, see FASE 3.5-D.2.7 report)
  *   - Migration/seed scripts (run as postgres superuser, not evalhr_app)
  *
  * But UNSAFE for regular tenant operations without SET LOCAL context.

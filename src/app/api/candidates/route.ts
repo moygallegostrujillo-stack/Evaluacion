@@ -13,8 +13,16 @@ export async function GET(req: NextRequest) {
     }
 
     // ── SA aggregated mode (no personal data, counts only) ──
+    // D.2.7 (FASE 13): aggregate access persisted to AuditLog, clearly
+    // differentiated from impersonation (details.mode = 'AGGREGATE').
     if (auth.role === 'SUPER_ADMIN' && !auth.companyId && !req.nextUrl.searchParams.get('companyId')) {
-      console.log('[AUDIT] SA aggregated view accessed by', auth.userId)
+      await logAuditEvent(req, {
+        actorId: auth.userId,
+        action: 'ADMIN_ACCESS',
+        resource: 'Candidate',
+        companyId: null,
+        details: { mode: 'AGGREGATE', aggregate: true },
+      })
       const db = getUnscopedClient()
 
       // Count candidates per company

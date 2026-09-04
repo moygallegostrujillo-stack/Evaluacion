@@ -1,8 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createRLSClient, createSuperAdminRLSClient } from '@/lib/rls'
+import { createRLSClient, createSuperAdminRLSClient, getUnscopedClient } from '@/lib/rls'
 import { getAuthFromHeaders } from '@/lib/auth'
+import { logAuditEvent, logUnauthorizedAccess } from '@/lib/audit'
 import { resolveTargetCompanyId } from '@/lib/impersonation'
 
+/**
+ * PHASE 3.5-D.2.7 — Dashboard migration to the Tenant DB Access layer.
+ *
+ * The endpoint now has THREE explicitly separated access modes:
+ *
+ *   1. SA AGGREGATE   — SUPER_ADMIN without companyId/target. Uses the
+ *      unscoped administrative client EXPLICITLY (getUnscopedClient) and
+ *      returns ONLY global counts/metrics (minimum-information principle,
+ *      FASE 8). No candidate PII, no emails/phones, no individual scores.
+ *      Every access is persisted to AuditLog with mode='AGGREGATE'.
+ *
+ *   2. SA IMPERSONATION — SUPER_ADMIN with ?companyId=B. Tenant-scoped to B
+ *      via createSuperAdminRLSClient; impersonation is logged to AuditLog
+ *      by resolveTargetCompanyId (impersonation=true).
+ *
+ *   3. TENANT — RH/GERENTE. Tenant-scoped via createRLSClient(auth);
+ *      auth.companyId comes from the JWT/middleware ONLY. Client-supplied
+ *      companyId / targetCompanyId params are IGNORED for non-SUPER_ADMIN.
+ *
+ * ROLE GATE (D.2.7): CANDIDATO is denied (403). The dashboard exposes
+ * company-level HR metrics and recent results including candidate PII —
+ * candidates must never read other candidates' data through it.
+ *
+ * app.is_super_admin is NOT used anywhere (D.2.7 decision: the SA aggregate
+ * mode is an explicit app-layer administrative path, never a DB GUC bypass).
+ */
 export async function GET(req: NextRequest) {
   try {
     const auth = getAuthFromHeaders(req.headers)
@@ -10,8 +37,100 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // For SUPER_ADMIN with a specific target companyId from query param, scope to that company
-    const { targetCompanyId } = await resolveTargetCompanyId(auth, req, {
+    // ── ROLE GATE: candidates must never access the HR dashboard ──
+    if (auth.role === 'CANDIDATO') {
+      await logUnauthorizedAccess(req, {
+        actorId: auth.userId,
+        resource: 'Dashboard',
+        companyId: auth.companyId,
+        reason: 'CANDIDATO role cannot access HR dashboard metrics',
+      })
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    // ── MODE 1: SA AGGREGATE (explicit administrative path) ──
+    // SUPER_ADMIN without own companyId and without a target → global
+    // metrics ONLY. Minimum-information principle: no candidate PII.
+    if (auth.role === 'SUPER_ADMIN' && !auth.companyId && !req.nextUrl.searchParams.get('companyId')) {
+      await logAuditEvent(req, {
+        actorId: auth.userId,
+        action: 'ADMIN_ACCESS',
+        resource: 'Dashboard',
+        companyId: null,
+        details: { mode: 'AGGREGATE', aggregate: true },
+      })
+
+      // Explicit administrative client — unscoped ON PURPOSE, isolated in
+      // this branch. This is the app-layer aggregate path (D.2.7); it does
+      // NOT depend on app.is_super_admin or any DB GUC.
+      const db = getUnscopedClient()
+
+      // Total candidates (global count)
+      const totalCandidates = await db.user.count({
+        where: { role: 'CANDIDATO', active: true },
+      })
+
+      // Completed evaluations (global count)
+      const completedEvaluations = await db.evaluationSession.count({
+        where: { status: 'COMPLETED' },
+      })
+
+      // Pending evaluations (NOT_STARTED + IN_PROGRESS, global count)
+      const pendingEvaluations = await db.evaluationSession.count({
+        where: { status: { in: ['NOT_STARTED', 'IN_PROGRESS'] } },
+      })
+
+      // Guidance level counts (NOT hiring decisions — orientation only)
+      const perfilCompletoCount = await db.evaluationResult.count({
+        where: { recommendation: 'PERFIL_COMPLETO' },
+      })
+
+      const perfilParcialCount = await db.evaluationResult.count({
+        where: { recommendation: 'PERFIL_PARCIAL' },
+      })
+
+      const pendienteCount = await db.evaluationResult.count({
+        where: { recommendation: 'PENDIENTE' },
+      })
+
+      // Position metrics — titles + counts only (no candidate data)
+      const sessions = await db.evaluationSession.findMany({
+        select: { positionId: true, position: { select: { id: true, title: true } } },
+      })
+
+      const positionMap = new Map<string, { id: string; title: string; count: number }>()
+      for (const s of sessions) {
+        const key = s.positionId
+        if (positionMap.has(key)) {
+          positionMap.get(key)!.count++
+        } else {
+          positionMap.set(key, { id: s.position.id, title: s.position.title, count: 1 })
+        }
+      }
+      const positionStats = Array.from(positionMap.values())
+
+      return NextResponse.json({
+        totalCandidates,
+        completedEvaluations,
+        pendingEvaluations,
+        perfilCompletoCount,
+        perfilParcialCount,
+        pendienteCount,
+        // FASE 8 (minimum information): aggregate mode returns NO recent
+        // results — candidate names/emails/phones/individual scores are
+        // unnecessary for a global metrics view.
+        recentResults: [],
+        positionStats,
+        mode: 'aggregated',
+      })
+    }
+
+    // ── MODE 2/3: SA IMPERSONATION or TENANT ──
+    // For non-SUPER_ADMIN, resolveTargetCompanyId returns auth.companyId (with
+    // isImpersonation=false) and IGNORES any client-supplied companyId
+    // (anti-IDOR). For SUPER_ADMIN with a target, it returns the target and
+    // persists an impersonation AuditLog.
+    const { targetCompanyId, isImpersonation } = await resolveTargetCompanyId(auth, req, {
       action: 'ACCESS',
       resource: 'Dashboard',
     })
@@ -19,7 +138,8 @@ export async function GET(req: NextRequest) {
       ? createSuperAdminRLSClient(targetCompanyId)
       : createRLSClient(auth)
 
-    // RLS auto-injects companyId for non-SUPER_ADMIN; SUPER_ADMIN gets unscoped or scoped to target
+    // RLS auto-injects companyId for the tenant context in effect
+    // (auth.companyId for tenant; targetCompanyId for impersonation).
 
     // Total candidates
     const totalCandidates = await rlsDb.user.count({
@@ -79,6 +199,10 @@ export async function GET(req: NextRequest) {
     }
     const positionStats = Array.from(positionMap.values())
 
+    // Zero-functional-change (FASE 16/20): the tenant/impersonation response
+    // shape is unchanged — no mode field is added to it. Mode separation is
+    // internal (this comment + the AGGREGATE branch above + AuditLog details).
+    void isImpersonation
     return NextResponse.json({
       totalCandidates,
       completedEvaluations,

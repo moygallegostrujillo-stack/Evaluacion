@@ -1,0 +1,635 @@
+{
+  "dashRhA": {
+    "status": 200,
+    "body": {
+      "totalCandidates": 2,
+      "completedEvaluations": 2,
+      "pendingEvaluations": 0,
+      "perfilCompletoCount": 2,
+      "perfilParcialCount": 0,
+      "pendienteCount": 0,
+      "recentResults": [
+        {
+          "id": "cmtmdm74e000ro0cby83klkoy",
+          "sessionId": "cmtmdm74b000lo0cbya5zeeuq",
+          "candidateId": "cmtmdm748000bo0cbv6k0p3bd",
+          "candidateName": "D26 Candidato A2",
+          "positionId": "cmtmdm749000fo0cbv83ndrbd",
+          "positionTitle": "D26 Mesero A 1788491424080",
+          "companyId": "cmtmdm7410000o0cbnqjy3n92",
+          "openness": 55,
+          "conscientiousness": 60.5,
+          "extraversion": 49.25,
+          "agreeableness": 66,
+          "neuroticism": 40,
+          "stressLevel": 50.5,
+          "empathy": 57,
+          "adaptability": 61.25,
+          "leadership": 44.5,
+          "teamwork": 63.75,
+          "knowledgeScore": 70.5,
+          "integrityScore": 73,
+          "overallScore": 57.3,
+          "recommendation": "PERFIL_COMPLETO",
+          "summary": "D26 SNAPSHOT SUMMARY A2 — must remain identical",
+          "retainedUntil": null,
+          "purgedAt": null,
+          "createdAt": "2026-09-04T03:10:24.399Z",
+          "candidate": {
+            "id": "cmtmdm748000bo0cbv6k0p3bd",
+            "name": "D26 Candidato A2",
+            "email": "d26-cand-a2-1788491424080@test.local",
+            "phone": "+52 961 000 0002"
+          },
+          "position": {
+            "id": "cmtmdm749000fo0cbv83ndrbd",
+            "title": "D26 Mesero A 1788491424080"
+          }
+        },
+        {
+          "id": "cmtmdm74d000po0cbhtr9krlt",
+          "sessionId": "cmtmdm74b000jo0cb758le64f",
+          "candidateId": "cmtmdm7460009o0cbmxtgupov",
+          "candidateName": "D26 Candidato A",
+          "positionId": "cmtmdm749000fo0cbv83ndrbd",
+          "positionTitle": "D26 Mesero A 1788491424080",
+          "companyId": "cmtmdm7410000o0cbnqjy3n92",
+          "openness": 71.5,
+          "conscientiousness": 82.25,
+          "extraversion": 63,
+          "agreeableness": 77.5,
+          "neuroticism": 21.25,
+          "stressLevel": 30.5,
+          "empathy": 74,
+          "adaptability": 69.25,
+          "leadership": 58.5,
+          "teamwork": 80.75,
+          "knowledgeScore": 88,
+          "integrityScore": 91.5,
+          "overallScore": 76.4,
+          "recommendation": "PERFIL_COMPLETO",
+          "summary": "D26 SNAPSHOT SUMMARY A — must remain identical",
+          "retainedUntil": null,
+          "purgedAt": null,
+          "createdAt": "2026-09-04T03:10:24.398Z",
+          "candidate": {
+            "id": "cmtmdm7460009o0cbmxtgupov",
+            "name": "D26 Candidato A",
+            "email": "d26-cand-a-1788491424080@test.local",
+            "phone": "+52 961 000 0001"
+          },
+          "position": {
+            "id": "cmtmdm749000fo0cbv83ndrbd",
+            "title": "D26 Mesero A 1788491424080"
+          }
+        }
+      ],
+      "positionStats": [
+        {
+          "id": "cmtmdm749000fo0cbv83ndrbd",
+          "title": "D26 Mesero A 1788491424080",
+          "count": 2
+        }
+      ]
+    }
+  },
+  "dashRhB": {
+    "status": 200,
+    "body": {
+      "totalCandidates": 1,
+      "completedEvaluations": 1,
+      "pendingEvaluations": 0,
+      "perfilCompletoCount": 0,
+      "perfilParcialCount": 1,
+      "pendienteCount": 0,
+      "recentResults": [
+        {
+          "id": "cmtmdm74f000to0cbxk5vorhs",
+          "sessionId": "cmtmdm74c000no0cbj71be0of",
+          "candidateId": "cmtmdm748000do0cbnhfx41mz",
+          "candidateName": "D26 Candidato B",
+          "positionId": "cmtmdm74a000ho0cbnx93sksi",
+          "positionTitle": "D26 Vendedor B 1788491424080",
+          "companyId": "cmtmdm7420001o0cbckvcnhm2",
+          "openness": 44.25,
+          "conscientiousness": 51,
+          "extraversion": 38.75,
+          "agreeableness": 49.5,
+          "neuroticism": 66,
+          "stressLevel": 72.25,
+          "empathy": 41,
+          "adaptability": 47.75,
+          "leadership": 35.5,
+          "teamwork": 52.25,
+          "knowledgeScore": null,
+          "integrityScore": 60,
+          "overallScore": 47.9,
+          "recommendation": "PERFIL_PARCIAL",
+          "summary": "D26 SNAPSHOT SUMMARY B — must remain identical",
+          "retainedUntil": null,
+          "purgedAt": null,
+          "createdAt": "2026-09-04T03:10:24.400Z",
+          "candidate": {
+            "id": "cmtmdm748000do0cbnhfx41mz",
+            "name": "D26 Candidato B",
+            "email": "d26-cand-b-1788491424080@test.local",
+            "phone": "+52 961 000 0003"
+          },
+          "position": {
+            "id": "cmtmdm74a000ho0cbnx93sksi",
+            "title": "D26 Vendedor B 1788491424080"
+          }
+        }
+      ],
+      "positionStats": [
+        {
+          "id": "cmtmdm74a000ho0cbnx93sksi",
+          "title": "D26 Vendedor B 1788491424080",
+          "count": 1
+        }
+      ]
+    }
+  },
+  "dashRhA_companyIdB": {
+    "status": 200,
+    "body": {
+      "totalCandidates": 2,
+      "completedEvaluations": 2,
+      "pendingEvaluations": 0,
+      "perfilCompletoCount": 2,
+      "perfilParcialCount": 0,
+      "pendienteCount": 0,
+      "recentResults": [
+        {
+          "id": "cmtmdm74e000ro0cby83klkoy",
+          "sessionId": "cmtmdm74b000lo0cbya5zeeuq",
+          "candidateId": "cmtmdm748000bo0cbv6k0p3bd",
+          "candidateName": "D26 Candidato A2",
+          "positionId": "cmtmdm749000fo0cbv83ndrbd",
+          "positionTitle": "D26 Mesero A 1788491424080",
+          "companyId": "cmtmdm7410000o0cbnqjy3n92",
+          "openness": 55,
+          "conscientiousness": 60.5,
+          "extraversion": 49.25,
+          "agreeableness": 66,
+          "neuroticism": 40,
+          "stressLevel": 50.5,
+          "empathy": 57,
+          "adaptability": 61.25,
+          "leadership": 44.5,
+          "teamwork": 63.75,
+          "knowledgeScore": 70.5,
+          "integrityScore": 73,
+          "overallScore": 57.3,
+          "recommendation": "PERFIL_COMPLETO",
+          "summary": "D26 SNAPSHOT SUMMARY A2 — must remain identical",
+          "retainedUntil": null,
+          "purgedAt": null,
+          "createdAt": "2026-09-04T03:10:24.399Z",
+          "candidate": {
+            "id": "cmtmdm748000bo0cbv6k0p3bd",
+            "name": "D26 Candidato A2",
+            "email": "d26-cand-a2-1788491424080@test.local",
+            "phone": "+52 961 000 0002"
+          },
+          "position": {
+            "id": "cmtmdm749000fo0cbv83ndrbd",
+            "title": "D26 Mesero A 1788491424080"
+          }
+        },
+        {
+          "id": "cmtmdm74d000po0cbhtr9krlt",
+          "sessionId": "cmtmdm74b000jo0cb758le64f",
+          "candidateId": "cmtmdm7460009o0cbmxtgupov",
+          "candidateName": "D26 Candidato A",
+          "positionId": "cmtmdm749000fo0cbv83ndrbd",
+          "positionTitle": "D26 Mesero A 1788491424080",
+          "companyId": "cmtmdm7410000o0cbnqjy3n92",
+          "openness": 71.5,
+          "conscientiousness": 82.25,
+          "extraversion": 63,
+          "agreeableness": 77.5,
+          "neuroticism": 21.25,
+          "stressLevel": 30.5,
+          "empathy": 74,
+          "adaptability": 69.25,
+          "leadership": 58.5,
+          "teamwork": 80.75,
+          "knowledgeScore": 88,
+          "integrityScore": 91.5,
+          "overallScore": 76.4,
+          "recommendation": "PERFIL_COMPLETO",
+          "summary": "D26 SNAPSHOT SUMMARY A — must remain identical",
+          "retainedUntil": null,
+          "purgedAt": null,
+          "createdAt": "2026-09-04T03:10:24.398Z",
+          "candidate": {
+            "id": "cmtmdm7460009o0cbmxtgupov",
+            "name": "D26 Candidato A",
+            "email": "d26-cand-a-1788491424080@test.local",
+            "phone": "+52 961 000 0001"
+          },
+          "position": {
+            "id": "cmtmdm749000fo0cbv83ndrbd",
+            "title": "D26 Mesero A 1788491424080"
+          }
+        }
+      ],
+      "positionStats": [
+        {
+          "id": "cmtmdm749000fo0cbv83ndrbd",
+          "title": "D26 Mesero A 1788491424080",
+          "count": 2
+        }
+      ]
+    }
+  },
+  "dashRhA_targetB": {
+    "status": 200,
+    "body": {
+      "totalCandidates": 2,
+      "completedEvaluations": 2,
+      "pendingEvaluations": 0,
+      "perfilCompletoCount": 2,
+      "perfilParcialCount": 0,
+      "pendienteCount": 0,
+      "recentResults": [
+        {
+          "id": "cmtmdm74e000ro0cby83klkoy",
+          "sessionId": "cmtmdm74b000lo0cbya5zeeuq",
+          "candidateId": "cmtmdm748000bo0cbv6k0p3bd",
+          "candidateName": "D26 Candidato A2",
+          "positionId": "cmtmdm749000fo0cbv83ndrbd",
+          "positionTitle": "D26 Mesero A 1788491424080",
+          "companyId": "cmtmdm7410000o0cbnqjy3n92",
+          "openness": 55,
+          "conscientiousness": 60.5,
+          "extraversion": 49.25,
+          "agreeableness": 66,
+          "neuroticism": 40,
+          "stressLevel": 50.5,
+          "empathy": 57,
+          "adaptability": 61.25,
+          "leadership": 44.5,
+          "teamwork": 63.75,
+          "knowledgeScore": 70.5,
+          "integrityScore": 73,
+          "overallScore": 57.3,
+          "recommendation": "PERFIL_COMPLETO",
+          "summary": "D26 SNAPSHOT SUMMARY A2 — must remain identical",
+          "retainedUntil": null,
+          "purgedAt": null,
+          "createdAt": "2026-09-04T03:10:24.399Z",
+          "candidate": {
+            "id": "cmtmdm748000bo0cbv6k0p3bd",
+            "name": "D26 Candidato A2",
+            "email": "d26-cand-a2-1788491424080@test.local",
+            "phone": "+52 961 000 0002"
+          },
+          "position": {
+            "id": "cmtmdm749000fo0cbv83ndrbd",
+            "title": "D26 Mesero A 1788491424080"
+          }
+        },
+        {
+          "id": "cmtmdm74d000po0cbhtr9krlt",
+          "sessionId": "cmtmdm74b000jo0cb758le64f",
+          "candidateId": "cmtmdm7460009o0cbmxtgupov",
+          "candidateName": "D26 Candidato A",
+          "positionId": "cmtmdm749000fo0cbv83ndrbd",
+          "positionTitle": "D26 Mesero A 1788491424080",
+          "companyId": "cmtmdm7410000o0cbnqjy3n92",
+          "openness": 71.5,
+          "conscientiousness": 82.25,
+          "extraversion": 63,
+          "agreeableness": 77.5,
+          "neuroticism": 21.25,
+          "stressLevel": 30.5,
+          "empathy": 74,
+          "adaptability": 69.25,
+          "leadership": 58.5,
+          "teamwork": 80.75,
+          "knowledgeScore": 88,
+          "integrityScore": 91.5,
+          "overallScore": 76.4,
+          "recommendation": "PERFIL_COMPLETO",
+          "summary": "D26 SNAPSHOT SUMMARY A — must remain identical",
+          "retainedUntil": null,
+          "purgedAt": null,
+          "createdAt": "2026-09-04T03:10:24.398Z",
+          "candidate": {
+            "id": "cmtmdm7460009o0cbmxtgupov",
+            "name": "D26 Candidato A",
+            "email": "d26-cand-a-1788491424080@test.local",
+            "phone": "+52 961 000 0001"
+          },
+          "position": {
+            "id": "cmtmdm749000fo0cbv83ndrbd",
+            "title": "D26 Mesero A 1788491424080"
+          }
+        }
+      ],
+      "positionStats": [
+        {
+          "id": "cmtmdm749000fo0cbv83ndrbd",
+          "title": "D26 Mesero A 1788491424080",
+          "count": 2
+        }
+      ]
+    }
+  },
+  "dashSaImpB": {
+    "status": 200,
+    "body": {
+      "totalCandidates": 1,
+      "completedEvaluations": 1,
+      "pendingEvaluations": 0,
+      "perfilCompletoCount": 0,
+      "perfilParcialCount": 1,
+      "pendienteCount": 0,
+      "recentResults": [
+        {
+          "id": "cmtmdm74f000to0cbxk5vorhs",
+          "sessionId": "cmtmdm74c000no0cbj71be0of",
+          "candidateId": "cmtmdm748000do0cbnhfx41mz",
+          "candidateName": "D26 Candidato B",
+          "positionId": "cmtmdm74a000ho0cbnx93sksi",
+          "positionTitle": "D26 Vendedor B 1788491424080",
+          "companyId": "cmtmdm7420001o0cbckvcnhm2",
+          "openness": 44.25,
+          "conscientiousness": 51,
+          "extraversion": 38.75,
+          "agreeableness": 49.5,
+          "neuroticism": 66,
+          "stressLevel": 72.25,
+          "empathy": 41,
+          "adaptability": 47.75,
+          "leadership": 35.5,
+          "teamwork": 52.25,
+          "knowledgeScore": null,
+          "integrityScore": 60,
+          "overallScore": 47.9,
+          "recommendation": "PERFIL_PARCIAL",
+          "summary": "D26 SNAPSHOT SUMMARY B — must remain identical",
+          "retainedUntil": null,
+          "purgedAt": null,
+          "createdAt": "2026-09-04T03:10:24.400Z",
+          "candidate": {
+            "id": "cmtmdm748000do0cbnhfx41mz",
+            "name": "D26 Candidato B",
+            "email": "d26-cand-b-1788491424080@test.local",
+            "phone": "+52 961 000 0003"
+          },
+          "position": {
+            "id": "cmtmdm74a000ho0cbnx93sksi",
+            "title": "D26 Vendedor B 1788491424080"
+          }
+        }
+      ],
+      "positionStats": [
+        {
+          "id": "cmtmdm74a000ho0cbnx93sksi",
+          "title": "D26 Vendedor B 1788491424080",
+          "count": 1
+        }
+      ]
+    }
+  },
+  "dashSaAgg": {
+    "status": 200,
+    "body": {
+      "totalCandidates": 3,
+      "completedEvaluations": 3,
+      "pendingEvaluations": 0,
+      "perfilCompletoCount": 2,
+      "perfilParcialCount": 1,
+      "pendienteCount": 0,
+      "recentResults": [
+        {
+          "id": "cmtmdm74f000to0cbxk5vorhs",
+          "sessionId": "cmtmdm74c000no0cbj71be0of",
+          "candidateId": "cmtmdm748000do0cbnhfx41mz",
+          "candidateName": "D26 Candidato B",
+          "positionId": "cmtmdm74a000ho0cbnx93sksi",
+          "positionTitle": "D26 Vendedor B 1788491424080",
+          "companyId": "cmtmdm7420001o0cbckvcnhm2",
+          "openness": 44.25,
+          "conscientiousness": 51,
+          "extraversion": 38.75,
+          "agreeableness": 49.5,
+          "neuroticism": 66,
+          "stressLevel": 72.25,
+          "empathy": 41,
+          "adaptability": 47.75,
+          "leadership": 35.5,
+          "teamwork": 52.25,
+          "knowledgeScore": null,
+          "integrityScore": 60,
+          "overallScore": 47.9,
+          "recommendation": "PERFIL_PARCIAL",
+          "summary": "D26 SNAPSHOT SUMMARY B — must remain identical",
+          "retainedUntil": null,
+          "purgedAt": null,
+          "createdAt": "2026-09-04T03:10:24.400Z",
+          "candidate": {
+            "id": "cmtmdm748000do0cbnhfx41mz",
+            "name": "D26 Candidato B",
+            "email": "d26-cand-b-1788491424080@test.local",
+            "phone": "+52 961 000 0003"
+          },
+          "position": {
+            "id": "cmtmdm74a000ho0cbnx93sksi",
+            "title": "D26 Vendedor B 1788491424080"
+          }
+        },
+        {
+          "id": "cmtmdm74e000ro0cby83klkoy",
+          "sessionId": "cmtmdm74b000lo0cbya5zeeuq",
+          "candidateId": "cmtmdm748000bo0cbv6k0p3bd",
+          "candidateName": "D26 Candidato A2",
+          "positionId": "cmtmdm749000fo0cbv83ndrbd",
+          "positionTitle": "D26 Mesero A 1788491424080",
+          "companyId": "cmtmdm7410000o0cbnqjy3n92",
+          "openness": 55,
+          "conscientiousness": 60.5,
+          "extraversion": 49.25,
+          "agreeableness": 66,
+          "neuroticism": 40,
+          "stressLevel": 50.5,
+          "empathy": 57,
+          "adaptability": 61.25,
+          "leadership": 44.5,
+          "teamwork": 63.75,
+          "knowledgeScore": 70.5,
+          "integrityScore": 73,
+          "overallScore": 57.3,
+          "recommendation": "PERFIL_COMPLETO",
+          "summary": "D26 SNAPSHOT SUMMARY A2 — must remain identical",
+          "retainedUntil": null,
+          "purgedAt": null,
+          "createdAt": "2026-09-04T03:10:24.399Z",
+          "candidate": {
+            "id": "cmtmdm748000bo0cbv6k0p3bd",
+            "name": "D26 Candidato A2",
+            "email": "d26-cand-a2-1788491424080@test.local",
+            "phone": "+52 961 000 0002"
+          },
+          "position": {
+            "id": "cmtmdm749000fo0cbv83ndrbd",
+            "title": "D26 Mesero A 1788491424080"
+          }
+        },
+        {
+          "id": "cmtmdm74d000po0cbhtr9krlt",
+          "sessionId": "cmtmdm74b000jo0cb758le64f",
+          "candidateId": "cmtmdm7460009o0cbmxtgupov",
+          "candidateName": "D26 Candidato A",
+          "positionId": "cmtmdm749000fo0cbv83ndrbd",
+          "positionTitle": "D26 Mesero A 1788491424080",
+          "companyId": "cmtmdm7410000o0cbnqjy3n92",
+          "openness": 71.5,
+          "conscientiousness": 82.25,
+          "extraversion": 63,
+          "agreeableness": 77.5,
+          "neuroticism": 21.25,
+          "stressLevel": 30.5,
+          "empathy": 74,
+          "adaptability": 69.25,
+          "leadership": 58.5,
+          "teamwork": 80.75,
+          "knowledgeScore": 88,
+          "integrityScore": 91.5,
+          "overallScore": 76.4,
+          "recommendation": "PERFIL_COMPLETO",
+          "summary": "D26 SNAPSHOT SUMMARY A — must remain identical",
+          "retainedUntil": null,
+          "purgedAt": null,
+          "createdAt": "2026-09-04T03:10:24.398Z",
+          "candidate": {
+            "id": "cmtmdm7460009o0cbmxtgupov",
+            "name": "D26 Candidato A",
+            "email": "d26-cand-a-1788491424080@test.local",
+            "phone": "+52 961 000 0001"
+          },
+          "position": {
+            "id": "cmtmdm749000fo0cbv83ndrbd",
+            "title": "D26 Mesero A 1788491424080"
+          }
+        }
+      ],
+      "positionStats": [
+        {
+          "id": "cmtmdm749000fo0cbv83ndrbd",
+          "title": "D26 Mesero A 1788491424080",
+          "count": 2
+        },
+        {
+          "id": "cmtmdm74a000ho0cbnx93sksi",
+          "title": "D26 Vendedor B 1788491424080",
+          "count": 1
+        }
+      ]
+    }
+  },
+  "dashCandA": {
+    "status": 200,
+    "body": {
+      "totalCandidates": 2,
+      "completedEvaluations": 2,
+      "pendingEvaluations": 0,
+      "perfilCompletoCount": 2,
+      "perfilParcialCount": 0,
+      "pendienteCount": 0,
+      "recentResults": [
+        {
+          "id": "cmtmdm74e000ro0cby83klkoy",
+          "sessionId": "cmtmdm74b000lo0cbya5zeeuq",
+          "candidateId": "cmtmdm748000bo0cbv6k0p3bd",
+          "candidateName": "D26 Candidato A2",
+          "positionId": "cmtmdm749000fo0cbv83ndrbd",
+          "positionTitle": "D26 Mesero A 1788491424080",
+          "companyId": "cmtmdm7410000o0cbnqjy3n92",
+          "openness": 55,
+          "conscientiousness": 60.5,
+          "extraversion": 49.25,
+          "agreeableness": 66,
+          "neuroticism": 40,
+          "stressLevel": 50.5,
+          "empathy": 57,
+          "adaptability": 61.25,
+          "leadership": 44.5,
+          "teamwork": 63.75,
+          "knowledgeScore": 70.5,
+          "integrityScore": 73,
+          "overallScore": 57.3,
+          "recommendation": "PERFIL_COMPLETO",
+          "summary": "D26 SNAPSHOT SUMMARY A2 — must remain identical",
+          "retainedUntil": null,
+          "purgedAt": null,
+          "createdAt": "2026-09-04T03:10:24.399Z",
+          "candidate": {
+            "id": "cmtmdm748000bo0cbv6k0p3bd",
+            "name": "D26 Candidato A2",
+            "email": "d26-cand-a2-1788491424080@test.local",
+            "phone": "+52 961 000 0002"
+          },
+          "position": {
+            "id": "cmtmdm749000fo0cbv83ndrbd",
+            "title": "D26 Mesero A 1788491424080"
+          }
+        },
+        {
+          "id": "cmtmdm74d000po0cbhtr9krlt",
+          "sessionId": "cmtmdm74b000jo0cb758le64f",
+          "candidateId": "cmtmdm7460009o0cbmxtgupov",
+          "candidateName": "D26 Candidato A",
+          "positionId": "cmtmdm749000fo0cbv83ndrbd",
+          "positionTitle": "D26 Mesero A 1788491424080",
+          "companyId": "cmtmdm7410000o0cbnqjy3n92",
+          "openness": 71.5,
+          "conscientiousness": 82.25,
+          "extraversion": 63,
+          "agreeableness": 77.5,
+          "neuroticism": 21.25,
+          "stressLevel": 30.5,
+          "empathy": 74,
+          "adaptability": 69.25,
+          "leadership": 58.5,
+          "teamwork": 80.75,
+          "knowledgeScore": 88,
+          "integrityScore": 91.5,
+          "overallScore": 76.4,
+          "recommendation": "PERFIL_COMPLETO",
+          "summary": "D26 SNAPSHOT SUMMARY A — must remain identical",
+          "retainedUntil": null,
+          "purgedAt": null,
+          "createdAt": "2026-09-04T03:10:24.398Z",
+          "candidate": {
+            "id": "cmtmdm7460009o0cbmxtgupov",
+            "name": "D26 Candidato A",
+            "email": "d26-cand-a-1788491424080@test.local",
+            "phone": "+52 961 000 0001"
+          },
+          "position": {
+            "id": "cmtmdm749000fo0cbv83ndrbd",
+            "title": "D26 Mesero A 1788491424080"
+          }
+        }
+      ],
+      "positionStats": [
+        {
+          "id": "cmtmdm749000fo0cbv83ndrbd",
+          "title": "D26 Mesero A 1788491424080",
+          "count": 2
+        }
+      ]
+    }
+  },
+  "dashNoToken": {
+    "status": 401,
+    "body": {
+      "error": "Authentication required",
+      "code": "AUTH_MISSING"
+    }
+  }
+}
