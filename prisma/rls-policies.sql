@@ -133,6 +133,8 @@ ALTER TABLE "VacancyQuestion" FORCE ROW LEVEL SECURITY;
 
 ALTER TABLE "VacancyApplicationResponse" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "VacancyApplicationResponse" FORCE ROW LEVEL SECURITY;
+ALTER TABLE "CompanyPrivacyNotice" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "CompanyPrivacyNotice" FORCE ROW LEVEL SECURITY;
 
 -- ════════════════════════════════════════════════════════════
 -- STEP 2: Create RLS Policies
@@ -483,6 +485,33 @@ CREATE POLICY "rls_vacappresponse_update" ON "VacancyApplicationResponse" FOR UP
   "companyId" = evalhr_current_tenant()
 );
 CREATE POLICY "rls_vacappresponse_delete" ON "VacancyApplicationResponse" FOR DELETE USING (
+  "companyId" = evalhr_current_tenant()
+);
+
+-- ────────────────────────────────────────────────────────────
+-- CompanyPrivacyNotice (PHASE 3.5-H — PARTE 16 DECISION A)
+-- Per-tenant legal document (companyId @unique). Registered in the
+-- app-layer TENANT_SCOPED_MODELS as of 3.5-H; this block makes the DB
+-- layer consistent so the "sin RLS" gap never reopens. NOT EXECUTED in
+-- 3.5-H — activates with the rest of the RLS artifact set.
+-- ────────────────────────────────────────────────────────────
+DROP POLICY IF EXISTS "rls_privnotice_select" ON "CompanyPrivacyNotice";
+DROP POLICY IF EXISTS "rls_privnotice_insert" ON "CompanyPrivacyNotice";
+DROP POLICY IF EXISTS "rls_privnotice_update" ON "CompanyPrivacyNotice";
+DROP POLICY IF EXISTS "rls_privnotice_delete" ON "CompanyPrivacyNotice";
+
+CREATE POLICY "rls_privnotice_select" ON "CompanyPrivacyNotice" FOR SELECT USING (
+  "companyId" = evalhr_current_tenant()
+);
+CREATE POLICY "rls_privnotice_insert" ON "CompanyPrivacyNotice" FOR INSERT WITH CHECK (
+  "companyId" = evalhr_current_tenant()
+);
+CREATE POLICY "rls_privnotice_update" ON "CompanyPrivacyNotice" FOR UPDATE USING (
+  "companyId" = evalhr_current_tenant()
+) WITH CHECK (
+  "companyId" = evalhr_current_tenant()
+);
+CREATE POLICY "rls_privnotice_delete" ON "CompanyPrivacyNotice" FOR DELETE USING (
   "companyId" = evalhr_current_tenant()
 );
 

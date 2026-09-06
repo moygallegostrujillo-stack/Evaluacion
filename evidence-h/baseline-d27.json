@@ -87,8 +87,8 @@
     "id": "D-6",
     "desc": "SA aggregate → global metrics A+B, no PII, audited",
     "expected": "200 + mode=aggregated + counts(A+B) + sin PII + AuditLog",
-    "got": "HTTP 200 cands=7/7 PII-free=true AuditLog=FOUND",
-    "pass": true
+    "got": "HTTP 500 cands=undefined/3 PII-free=false AuditLog=FOUND",
+    "pass": false
   },
   {
     "id": "D-7",
@@ -108,28 +108,28 @@
     "id": "AUDIT-1",
     "desc": "Dashboard impersonation logged (impersonation=true)",
     "expected": ">=1",
-    "got": "4",
+    "got": "2",
     "pass": true
   },
   {
     "id": "AUDIT-2",
     "desc": "Dashboard aggregate logged (mode=AGGREGATE)",
     "expected": ">=1",
-    "got": "4",
+    "got": "1",
     "pass": true
   },
   {
     "id": "AUDIT-3",
     "desc": "Results aggregate logged (mode=AGGREGATE)",
     "expected": ">=1",
-    "got": "6",
+    "got": "2",
     "pass": true
   },
   {
     "id": "AUDIT-4",
     "desc": "Candidates aggregate logged (mode=AGGREGATE)",
     "expected": ">=1",
-    "got": "6",
+    "got": "2",
     "pass": true
   },
   {

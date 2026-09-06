@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createRLSClient, createSuperAdminRLSClient, getUnscopedClient } from '@/lib/rls'
 import { getAuthFromHeaders } from '@/lib/auth'
-import { logAuditEvent } from '@/lib/audit'
+import { logAuditEvent, logUnauthorizedAccess } from '@/lib/audit'
 import { resolveTargetCompanyId } from '@/lib/impersonation'
 
 import crypto from 'crypto'
@@ -11,6 +11,21 @@ export async function GET(req: NextRequest) {
     const auth = getAuthFromHeaders(req.headers)
     if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // ── PHASE 3.5-H (VUL-H3 family): invitations are an RH recruitment
+    // pipeline resource — the list exposes candidate PII AND the invitation
+    // tokens (the capability to take the evaluation). CANDIDATO must never
+    // list them.
+    if (auth.role === 'CANDIDATO') {
+      await logUnauthorizedAccess(req, {
+        actorId: auth.userId,
+        action: 'ACCESS',
+        resource: 'CandidateInvitation',
+        companyId: auth.companyId,
+        reason: 'CANDIDATO attempted to list invitations',
+      })
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const { targetCompanyId } = await resolveTargetCompanyId(auth, req, {
@@ -102,11 +117,14 @@ export async function POST(req: NextRequest) {
     }
 
     // Verify position exists
+    // PHASE 3.5-H: tenant check added — the position MUST belong to the
+    // tenant the invitation is being created for (closes the cross-tenant
+    // positionId FK injection + title oracle found in the G audit).
     const position = await getUnscopedClient().position.findUnique({
       where: { id: positionId },
     })
 
-    if (!position) {
+    if (!position || position.companyId !== companyId) {
       return NextResponse.json({ error: 'Position not found' }, { status: 404 })
     }
 
@@ -187,15 +205,65 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // ── PHASE 3.5-H (VUL-H4): ROLE GATE. Previously there was NO role check
+    // — a CANDIDATO could delete their company's entire invitation pipeline
+    // (including auto-created candidate users and their evaluation sessions).
+    //   CANDIDATO                     → 403 + audit
+    //   RH/GERENTE                    → own tenant only
+    //   SUPER_ADMIN + ?companyId=B    → impersonation on B (audited)
+    //   SUPER_ADMIN without target    → 400 (SA aggregate is NEVER used for
+    //                                    tenant mutations — no global delete)
+    if (auth.role === 'CANDIDATO') {
+      await logUnauthorizedAccess(req, {
+        actorId: auth.userId,
+        action: 'DELETE',
+        resource: 'CandidateInvitation',
+        companyId: auth.companyId,
+        reason: 'CANDIDATO attempted to delete invitations',
+      })
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     const { searchParams } = new URL(req.url)
     const invitationId = searchParams.get('id')
     const deleteAll = searchParams.get('all') === 'true'
+
+    // Resolve the tenant this deletion is scoped to.
+    // For SUPER_ADMIN: a ?companyId target is REQUIRED (impersonation).
+    let saTargetCompanyId: string | null = null
+    if (auth.role === 'SUPER_ADMIN') {
+      saTargetCompanyId = searchParams.get('companyId')
+      if (!saTargetCompanyId) {
+        return NextResponse.json(
+          { error: 'SUPER_ADMIN must specify ?companyId (impersonation) to delete invitations. Global deletion is not allowed.' },
+          { status: 400 }
+        )
+      }
+      // Impersonation audit — SA operating inside tenant B.
+      await logAuditEvent(req, {
+        actorId: auth.userId,
+        action: 'DELETE',
+        resource: 'CandidateInvitation',
+        companyId: saTargetCompanyId,
+        details: {
+          impersonation: true,
+          targetCompanyId: saTargetCompanyId,
+          actorRole: auth.role,
+          action: 'DELETE',
+          deleteAll,
+        },
+      })
+    }
 
     const db = getUnscopedClient()
 
     // DELETE ALL invitations for the company (or all if SUPER_ADMIN)
     if (deleteAll) {
-      const where = auth.role === 'SUPER_ADMIN' ? {} : { companyId: auth.companyId }
+      // PHASE 3.5-H (VUL-H4): scope is ALWAYS a single tenant — the actor's
+      // own company (RH/GERENTE) or the impersonation target (SA).
+      const where = auth.role === 'SUPER_ADMIN'
+        ? { companyId: saTargetCompanyId as string }
+        : { companyId: auth.companyId as string }
 
       // First, find the invitations so we can clean up associated users
       const invitations = await db.candidateInvitation.findMany({
@@ -247,6 +315,20 @@ export async function DELETE(req: NextRequest) {
         }
       }
 
+      // PHASE 3.5-H (VUL-H4): destructive operation audited.
+      await logAuditEvent(req, {
+        actorId: auth.userId,
+        action: 'DELETE',
+        resource: 'CandidateInvitation',
+        companyId: where.companyId,
+        details: {
+          deleteAll: true,
+          deleted: result.count,
+          cleanedUpUsers,
+          scope: where.companyId,
+        },
+      })
+
       return NextResponse.json({
         success: true,
         deleted: result.count,
@@ -268,8 +350,22 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Invitación no encontrada' }, { status: 404 })
     }
 
-    // Check authorization: SUPER_ADMIN or same company
-    if (auth.role !== 'SUPER_ADMIN' && auth.companyId !== invitation.companyId) {
+    // Check authorization:
+    //   RH/GERENTE: only invitations of their own company.
+    //   SUPER_ADMIN: only within the REQUIRED impersonation target company.
+    if (auth.role === 'SUPER_ADMIN') {
+      if (invitation.companyId !== saTargetCompanyId) {
+        return NextResponse.json({ error: 'Invitación no encontrada' }, { status: 404 })
+      }
+    } else if (auth.companyId !== invitation.companyId) {
+      await logUnauthorizedAccess(req, {
+        actorId: auth.userId,
+        action: 'DELETE',
+        resource: 'CandidateInvitation',
+        resourceId: invitationId,
+        companyId: auth.companyId,
+        reason: 'RH/GERENTE attempted to delete an invitation from another company',
+      })
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
     }
 
@@ -304,6 +400,19 @@ export async function DELETE(req: NextRequest) {
 
     await db.candidateInvitation.delete({
       where: { id: invitationId },
+    })
+
+    // PHASE 3.5-H (VUL-H4): destructive operation audited.
+    await logAuditEvent(req, {
+      actorId: auth.userId,
+      action: 'DELETE',
+      resource: 'CandidateInvitation',
+      resourceId: invitationId,
+      companyId: invitation.companyId,
+      details: {
+        deleteAll: false,
+        ...(auth.role === 'SUPER_ADMIN' ? { impersonation: true, targetCompanyId: saTargetCompanyId } : {}),
+      },
     })
 
     return NextResponse.json({ success: true })

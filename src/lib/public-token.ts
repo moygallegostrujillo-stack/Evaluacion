@@ -8,6 +8,14 @@
  *
  * Token format: <resourceId>.<hmac>
  * HMAC = HMAC-SHA256(resourceId, JWT_SECRET)
+ *
+ * PHASE 3.5-H (VUL-H1 — Fase 3.5-G finding): the legacy fallback
+ * `token === resourceId` was REMOVED. There is deliberately:
+ *   - NO legacy mode, NO compatibility branch, NO feature flag,
+ *     NO debug mode, NO temporary exception.
+ * A token is valid if and only if it is exactly
+ * `<resourceId>.<HMAC-SHA256(resourceId, secret)>` compared in
+ * constant time. Anything else is rejected.
  */
 import crypto from 'crypto'
 
@@ -23,25 +31,25 @@ export function generatePublicToken(resourceId: string): string {
 
 /**
  * Verify a signed token for a public resource.
- * Returns true if the token is valid and matches the resourceId.
+ *
+ * PHASE 3.5-H (VUL-H1): strict HMAC-only verification.
+ * Returns true ONLY for a well-formed `<resourceId>.<hmac>` token whose
+ * HMAC matches the server secret, compared in constant time.
+ *
+ * Rejected (all fail closed):
+ *   - empty/missing token or resourceId
+ *   - bare resourceId ("legacy" form — the previously exploitable path)
+ *   - wrong number of segments, wrong resourceId segment, wrong HMAC
  */
 export function verifyPublicToken(token: string, resourceId: string): boolean {
   if (!token || !resourceId) return false
 
-  // Support both new HMAC tokens and legacy slug-based tokens
-  // (for backward compatibility during migration)
-  const parts = token.split('.')
-  if (parts.length === 2 && parts[0] === resourceId) {
-    // New HMAC token format
-    const expectedToken = generatePublicToken(resourceId)
-    // Use constant-time comparison to prevent timing attacks
-    const a = Buffer.from(token)
-    const b = Buffer.from(expectedToken)
-    if (a.length !== b.length) return false
-    return crypto.timingSafeEqual(a, b)
-  }
+  const expectedToken = generatePublicToken(resourceId)
 
-  // Legacy: token is just the resourceId itself (less secure, but backward compatible)
-  // This allows existing flows to continue working during migration
-  return token === resourceId
+  // Constant-time comparison. Length check first (timing-safe: length is
+  // not secret — the token format is public knowledge).
+  const a = Buffer.from(token)
+  const b = Buffer.from(expectedToken)
+  if (a.length !== b.length) return false
+  return crypto.timingSafeEqual(a, b)
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createRLSClient } from '@/lib/rls'
 import { getAuthFromHeaders } from '@/lib/auth'
+import { logUnauthorizedAccess } from '@/lib/audit'
 
 // ============================================
 // GET - List applications for a vacancy
@@ -14,6 +15,23 @@ export async function GET(
     const auth = getAuthFromHeaders(req.headers)
     if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // ── PHASE 3.5-H (VUL-H3): applications listing exposes candidate PII
+    // (names, emails, video URLs) + scores. It is an RH administrative view.
+    // A CANDIDATO may only access their OWN application — through the
+    // token-bound public flow (/api/public/apply) or their own result via
+    // /api/results?resultId=<own>. Never this list. 403 + audit.
+    if (auth.role === 'CANDIDATO') {
+      await logUnauthorizedAccess(req, {
+        actorId: auth.userId,
+        action: 'ACCESS',
+        resource: 'VacancyApplication',
+        resourceId: (await params).id,
+        companyId: auth.companyId,
+        reason: 'CANDIDATO attempted to list vacancy applications',
+      })
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const { client: rlsDb } = createRLSClient(auth)

@@ -25,6 +25,7 @@ model Company {
 
   users       User[]
   positions   Position[]
+  arcoRequests ArcoRequest[]
   invitations CandidateInvitation[]
   results     EvaluationResult[]
   interviews  InterviewSchedule[]
@@ -57,12 +58,21 @@ model User {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
+  // PHASE 3.5 (B4) retention columns — synced from schema.prisma (source of truth)
+  piiPurgeAt       DateTime? // When candidate PII should be purged (2 years after eval)
+  sensitivePurgeAt DateTime? // When sensitive data should be purged (on conclusion/withdrawal)
+
   company          Company?              @relation(fields: [companyId], references: [id])
   sessions         EvaluationSession[]
   results          EvaluationResult[]
   sentInvitations  CandidateInvitation[] @relation("InvitationSender")
   interviews       InterviewSchedule[]   @relation("InterviewCandidate")
   consentLogs      ConsentLog[]
+  // PHASE 3.5-H sync: relations restored (were missing from this prod schema)
+  auditLogs        AuditLog[]             @relation("AuditActor")
+  arcoRequests     ArcoRequest[]          @relation("ArcoRequestSubject")
+  arcoAssignments  ArcoRequest[]          @relation("ArcoRequestAssignee")
+  vacancyApplications VacancyApplication[] @relation("VacancyApplicant")
 }
 
 model CompanyPrivacyNotice {
@@ -108,13 +118,14 @@ model EvaluationTemplate {
   order       Int      @default(1)
   active      Boolean  @default(true)
   positionId  String
-  // PHASE 3.5-D.2.9: direct tenant column (nullable until prod backfill).
-  companyId   String?
+  // PHASE 3.5-D.2.9: direct tenant column — REQUIRED (synced with
+  // schema.prisma; prod column is backfilled by backfill-indirect-companyid.sql).
+  companyId   String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   position  Position   @relation(fields: [positionId], references: [id])
-  company   Company?   @relation(fields: [companyId], references: [id])
+  company   Company    @relation(fields: [companyId], references: [id])
   questions Question[]
 
   @@index([companyId])
@@ -184,14 +195,13 @@ model EvaluationResponse {
   questionId   String
   value        String
   numericValue Int?
-  // PHASE 3.5-D.2.9: direct tenant column. Nullable in the PROD schema until
-  // the backfill SQL runs; NOT NULL is applied at the RLS activation phase.
-  companyId    String?
+  // PHASE 3.5-D.2.9: direct tenant column — REQUIRED (synced with schema.prisma).
+  companyId    String
   createdAt    DateTime @default(now())
 
   session  EvaluationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   question Question          @relation(fields: [questionId], references: [id])
-  company  Company?          @relation(fields: [companyId], references: [id])
+  company  Company           @relation(fields: [companyId], references: [id])
 
   @@unique([sessionId, questionId])
   @@index([companyId])
@@ -232,6 +242,10 @@ model EvaluationResult {
   summary           String?
 
   createdAt         DateTime @default(now())
+
+  // PHASE 3.5 (B4) retention columns — synced from schema.prisma
+  retainedUntil     DateTime? // When this result should be purged (2 years after createdAt)
+  purgedAt          DateTime? // When the result was actually purged/anonymized
 
   session           EvaluationSession @relation(fields: [sessionId], references: [id])
   candidate         User              @relation(fields: [candidateId], references: [id])
@@ -285,12 +299,12 @@ model VacancyQuestion {
   correctAnswer  Int?     // 0-based index of correct answer
   order          Int
   vacancyId      String
-  // PHASE 3.5-D.2.9: direct tenant column (nullable until prod backfill).
-  companyId      String?
+  // PHASE 3.5-D.2.9: direct tenant column — REQUIRED (synced with schema.prisma).
+  companyId      String
   createdAt      DateTime @default(now())
 
   vacancy    Vacancy                       @relation(fields: [vacancyId], references: [id], onDelete: Cascade)
-  company    Company?                      @relation(fields: [companyId], references: [id])
+  company    Company                       @relation(fields: [companyId], references: [id])
   responses  VacancyApplicationResponse[]
 
   @@index([companyId])
@@ -342,6 +356,10 @@ model VacancyApplication {
   vacancy    Vacancy                      @relation(fields: [vacancyId], references: [id])
   company    Company                      @relation(fields: [companyId], references: [id])
   responses  VacancyApplicationResponse[]
+  // PHASE 3.5-H sync: candidateUser FK restored (D.2.6 VUL-01 ownership
+  // checks depend on candidateUserId — it was missing from this prod schema).
+  candidateUserId    String?
+  candidateUser User?                        @relation("VacancyApplicant", fields: [candidateUserId], references: [id], onDelete: SetNull)
 }
 
 model VacancyApplicationResponse {
@@ -349,30 +367,99 @@ model VacancyApplicationResponse {
   applicationId    String
   questionId       String?  // for system questions from EvaluationTemplate
   vacancyQuestionId String? // for custom vacancy questions
-  section          String   // PSICOMETRICA, PSICOLOGICA, CONOCIMIENTOS
+  section          String   // PSICOMETRICA, PSICOLOGICA, CONOCIMIENTOS, INTEGRIDAD
   value            String
   numericValue     Int?
-  // PHASE 3.5-D.2.9: direct tenant column (nullable until prod backfill).
-  companyId        String?
+  // PHASE 3.5-D.2.9: direct tenant column — REQUIRED (synced with schema.prisma).
+  companyId        String
   createdAt        DateTime @default(now())
 
   application     VacancyApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   vacancyQuestion VacancyQuestion?   @relation(fields: [vacancyQuestionId], references: [id])
-  company         Company?           @relation(fields: [companyId], references: [id])
+  company         Company            @relation(fields: [companyId], references: [id])
 
   @@index([companyId])
 }
 
 model ConsentLog {
   id              String   @id @default(cuid())
-  userId          String
-  action          String   // GIVEN, WITHDRAWN, MODIFIED
-  previousOption  String?  // e.g., FULL
-  newOption       String?  // e.g., KNOWLEDGE_ONLY
+  userId          String?  // NULLABLE — when User is deleted, this becomes NULL (SET NULL)
+                          // but the consent evidence (snapshots below) is preserved.
+  action          String   // GIVEN, WITHDRAWN, MODIFIED, REVOKED, RE_CONSENTED
+  previousOption  String?
+  newOption       String?
   anonymousStats  Boolean  @default(false)
   consentVersion  String?
   ipAddress       String?
+  userAgent       String?  // Browser user-agent string for evidentiary completeness
+  companyId       String?  // Tenant context at time of consent
+  adminUserId     String?  // If action was performed by an admin (e.g., system override)
+  reason          String?  // Optional reason for withdrawal/modification
+  // PII snapshots — captured at consent time so evidence survives user deletion.
+  candidateNameSnapshot    String?  // Snapshot of User.name at consent time
+  candidateEmailSnapshot   String?  // Snapshot of User.email at consent time
+  candidatePhoneSnapshot   String?  // Snapshot of User.phone at consent time
+  // Hash of the privacy notice text at consent time — cryptographic binding
+  noticeHash     String?
   createdAt       DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull) // CHANGED: CASCADE → SetNull
+}
+
+// PHASE 3.5-H sync: AuditLog restored — it was MISSING from this production
+// schema, which silently dropped every impersonation/aggregate/unauthorized
+// audit write at deployment time (audit.ts swallows write errors).
+model AuditLog {
+  id          String   @id @default(cuid())
+  actorId     String?  // User who performed the action (null = system/anonymous)
+  action      String   // LOGIN, LOGOUT, ACCESS, CREATE, UPDATE, DELETE, CONSENT_CHANGE, PERMISSION_CHANGE, ADMIN_ACCESS, UNAUTHORIZED_ATTEMPT, RETENTION_PURGE
+  resource    String?  // Model/table affected (e.g., "User", "EvaluationResult")
+  resourceId  String?  // ID of the affected record
+  companyId   String?  // Tenant context
+  details     String?  // JSON string with additional context (NO secrets)
+  ipAddress   String?  // Client IP
+  userAgent   String?  // Client user-agent
+  success     Boolean  @default(true) // false = failed/unauthorized attempt
+  createdAt   DateTime @default(now())
+
+  actor User? @relation("AuditActor", fields: [actorId], references: [id])
+
+  @@index([actorId])
+  @@index([companyId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+// PHASE 3.5-H sync: ArcoRequest restored — it was MISSING from this
+// production schema while /api/arco and the RLS artifact set both expect it
+// (rls-policies.sql enables FORCE RLS on "ArcoRequest").
+model ArcoRequest {
+  id              String   @id @default(cuid())
+  // The data subject — may be a registered User, or an external requester
+  userId          String?  // FK to User if they have an account (nullable for external requesters)
+  requesterName   String   // Name of the person making the request
+  requesterEmail  String   // Contact email for response
+  requesterPhone  String?  // Optional phone
+  rightType       String   // ACCESS, RECTIFICATION, CANCELLATION, OPPOSITION
+  description     String   // Free-text description of what they want
+  companyId       String   // Which company is the data controller
+  status          String   @default("PENDING") // PENDING, IN_REVIEW, IDENTIFICATION_REQUIRED, APPROVED, REJECTED, COMPLETED, CANCELLED
+  assignedTo      String?  // User ID of the RH/SUPER_ADMIN handling the request
+  requestedAt     DateTime @default(now())
+  legalDeadline   DateTime // 20 business days per LFPDPPP Art. 32 Reglamento
+  resolvedAt      DateTime?
+  resolutionNotes String? // What was done, by whom, when
+  responseDocumentUrl String? // URL to any document delivered to the requester
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user         User?    @relation("ArcoRequestSubject", fields: [userId], references: [id], onDelete: SetNull)
+  assignee     User?    @relation("ArcoRequestAssignee", fields: [assignedTo], references: [id], onDelete: SetNull)
+  company      Company  @relation(fields: [companyId], references: [id])
+
+  @@index([userId])
+  @@index([companyId])
+  @@index([status])
+  @@index([rightType])
+  @@index([legalDeadline])
 }

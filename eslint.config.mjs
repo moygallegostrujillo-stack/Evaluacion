@@ -50,19 +50,33 @@ const eslintConfig = [...nextCoreWebVitals, ...nextTypescript, {
   // FASE 3.5-D.2.8 — ADMIN DB ARCHITECTURAL GUARD
   // src/lib/admin-db.ts is the isolated SA AGGREGATE mechanism
   // (server-only, audited). Tenant routes/components must NEVER
-  // import it. Only the three aggregate endpoints are whitelisted.
+  // import it. Only the aggregate endpoints below are whitelisted.
+  //
+  // PHASE 3.5-H (VUL-H6): the whitelist grows from 3 to 7 — SA global
+  // lists (users/interviews/vacancies/positions) were moved OFF the
+  // shared unscoped client and ONTO the audited admin-db channel via
+  // the getAggregate*Directory()/getAggregatePositionCatalog() functions.
+  // Every other file in the repo remains restricted.
   // ════════════════════════════════════════════════════════════
   files: ["**/*.{ts,tsx}"],
   rules: {
     "no-restricted-imports": ["error", {
       patterns: [{
         group: ["@/lib/admin-db", "@/lib/admin-db/*", "src/lib/admin-db", "./admin-db", "../lib/admin-db"],
-        message: "admin-db is the isolated SA AGGREGATE mechanism (global administrative access). Only /api/dashboard, /api/results and /api/candidates aggregate branches may import it, and only through the high-level getAggregate*Metrics() functions. Tenant endpoints must use createRLSClient()/createSuperAdminRLSClient() from @/lib/rls."
+        message: "admin-db is the isolated SA AGGREGATE mechanism (global administrative access). Only /api/dashboard, /api/results, /api/candidates, /api/users, /api/interviews, /api/vacancies and /api/positions aggregate branches may import it, and only through the high-level getAggregate*Metrics()/getAggregate*Directory()/getAggregatePositionCatalog() functions. Tenant endpoints must use createRLSClient()/createSuperAdminRLSClient() from @/lib/rls."
       }]
     }]
   }
 }, {
-  files: ["src/app/api/dashboard/route.ts", "src/app/api/results/route.ts", "src/app/api/candidates/route.ts"],
+  files: [
+    "src/app/api/dashboard/route.ts",
+    "src/app/api/results/route.ts",
+    "src/app/api/candidates/route.ts",
+    "src/app/api/users/route.ts",
+    "src/app/api/interviews/route.ts",
+    "src/app/api/vacancies/route.ts",
+    "src/app/api/positions/route.ts",
+  ],
   rules: {
     "no-restricted-imports": "off"
   }

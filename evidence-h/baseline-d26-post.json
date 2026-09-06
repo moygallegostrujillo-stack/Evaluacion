@@ -241,15 +241,15 @@
     "id": "RG-sa-aggregate-results",
     "desc": "Regression: SA aggregate mode",
     "expected": "per contract",
-    "got": "HTTP 200 {\"aggregated\":[{\"companyId\":\"cmtq4s8070000p4cnypkxqrtf\",\"companyName\":\"D26 Empresa A 1788718453333\",",
-    "pass": true
+    "got": "HTTP 500 {\"error\":\"Error fetching results\"}",
+    "pass": false
   },
   {
     "id": "RG-sa-aggregate-candidates",
     "desc": "Regression: SA aggregate candidates",
     "expected": "per contract",
-    "got": "HTTP 200 {\"aggregated\":[{\"companyId\":\"cmtq4s8070000p4cnypkxqrtf\",\"companyName\":\"D26 Empresa A 1788718453333\",",
-    "pass": true
+    "got": "HTTP 500 {\"error\":\"Error fetching candidates\"}",
+    "pass": false
   },
   {
     "id": "RG-sa-impersonation-positions",

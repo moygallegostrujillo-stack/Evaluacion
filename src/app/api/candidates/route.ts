@@ -13,6 +13,21 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // ── PHASE 3.5-H (VUL-H3): candidates listing is an RH/GERENTE/SA
+    // administrative view (roster with PII + scores). CANDIDATO must NEVER
+    // receive it — 403 + audit. This is application-layer AUTHORIZATION;
+    // it does not rely on RLS.
+    if (auth.role === 'CANDIDATO') {
+      await logUnauthorizedAccess(req, {
+        actorId: auth.userId,
+        action: 'ACCESS',
+        resource: 'Candidate',
+        companyId: auth.companyId,
+        reason: 'CANDIDATO attempted to list candidates',
+      })
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     // ── SA aggregated mode (no personal data, counts only) ──
     // D.2.8: aggregate queries AND the AuditLog entry (details.mode=
     // 'AGGREGATE', differentiated from impersonation) live inside the

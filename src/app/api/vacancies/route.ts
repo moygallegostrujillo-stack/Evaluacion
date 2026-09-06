@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createRLSClient, createSuperAdminRLSClient, getUnscopedClient } from '@/lib/rls'
 import { getAuthFromHeaders } from '@/lib/auth'
-import { logAuditEvent } from '@/lib/audit'
+import { logAuditEvent, logUnauthorizedAccess } from '@/lib/audit'
 import { resolveTargetCompanyId } from '@/lib/impersonation'
+import { getAggregateVacancyDirectory } from '@/lib/admin-db'
 
 // ============================================
 // SLUG GENERATION
@@ -44,6 +45,32 @@ export async function GET(req: NextRequest) {
     const auth = getAuthFromHeaders(req.headers)
     if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // ── PHASE 3.5-H (VUL-H3): vacancy management (with correctAnswer of
+    // knowledge questions) is an RH/GERENTE administrative view. CANDIDATO
+    // consumes vacancies through the PUBLIC catalog (/api/public/vacancy)
+    // — never through this listing. 403 + audit.
+    if (auth.role === 'CANDIDATO') {
+      await logUnauthorizedAccess(req, {
+        actorId: auth.userId,
+        action: 'ACCESS',
+        resource: 'Vacancy',
+        companyId: auth.companyId,
+        reason: 'CANDIDATO attempted to list vacancy management data',
+      })
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    // ── PHASE 3.5-H (VUL-H6): SA without a target → ADMIN DB directory ──
+    // (evalhr_sa, audited, fail-closed) — NOT the shared unscoped client.
+    if (auth.role === 'SUPER_ADMIN' && !req.nextUrl.searchParams.get('companyId')) {
+      const { vacancies } = await getAggregateVacancyDirectory({
+        req,
+        actorId: auth.userId,
+        role: auth.role,
+      })
+      return NextResponse.json({ vacancies })
     }
 
     // For SUPER_ADMIN with a specific target companyId from query param, scope to that company
@@ -183,6 +210,10 @@ export async function POST(req: NextRequest) {
                 options: JSON.stringify(q.options),
                 correctAnswer: q.correctAnswer,
                 order: index + 1,
+                // PHASE 3.5-H: explicit companyId (same value the RLS
+                // extension injects) — resolves the pre-existing TS2322
+                // on the nested create without changing behaviour.
+                companyId,
               })),
             }
           : undefined,

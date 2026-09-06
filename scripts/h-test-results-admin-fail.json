@@ -1,0 +1,352 @@
+[
+  {
+    "id": "H1-1",
+    "desc": "GET resume SIN token → DENIED (ya no acuña tokens)",
+    "expected": "404",
+    "got": "HTTP 404",
+    "pass": true
+  },
+  {
+    "id": "H1-2",
+    "desc": "GET resume con token LEGACY (bare applicationId) → DENIED",
+    "expected": "404",
+    "got": "HTTP 404",
+    "pass": true
+  },
+  {
+    "id": "H1-3",
+    "desc": "GET resume con HMAC válido → 200",
+    "expected": "200",
+    "got": "HTTP 200",
+    "pass": true
+  },
+  {
+    "id": "H1-4",
+    "desc": "POST answer con token LEGACY → 403 TOKEN_INVALID",
+    "expected": "403",
+    "got": "HTTP 403 code=TOKEN_INVALID",
+    "pass": true
+  },
+  {
+    "id": "H2-1",
+    "desc": "datos legítimos → 200 + applicationId + token",
+    "expected": "200 + token",
+    "got": "HTTP 200 token=yes",
+    "pass": true
+  },
+  {
+    "id": "H2-1b",
+    "desc": "resume legítimo (mismos datos) → 200 resumed + token",
+    "expected": "200 + token",
+    "got": "HTTP 200 resumed=true token=yes",
+    "pass": true
+  },
+  {
+    "id": "H2-2",
+    "desc": "email+slug sin prueba de posesión (nombre incorrecto) → DENIED sin capability",
+    "expected": "403 sin applicationId/token",
+    "got": "HTTP 403 code=RESUME_PROOF_MISMATCH leak=false",
+    "pass": true
+  },
+  {
+    "id": "H2-2b",
+    "desc": "nombre correcto + teléfono incorrecto → DENIED sin capability",
+    "expected": "403 sin applicationId/token",
+    "got": "HTTP 403 leak=false",
+    "pass": true
+  },
+  {
+    "id": "H2-3",
+    "desc": "email de víctima + slug B → NO entrega application de A",
+    "expected": "applicationId ≠ A",
+    "got": "HTTP 200 gotVictimsApp=false",
+    "pass": true
+  },
+  {
+    "id": "H2-4",
+    "desc": "applicationId conocido sin token → DENIED",
+    "expected": "404",
+    "got": "HTTP 404",
+    "pass": true
+  },
+  {
+    "id": "H2-5",
+    "desc": "token incorrecto → DENIED",
+    "expected": "404",
+    "got": "HTTP 404",
+    "pass": true
+  },
+  {
+    "id": "H2-6",
+    "desc": "token A + application B → DENIED",
+    "expected": "404",
+    "got": "HTTP 404",
+    "pass": true
+  },
+  {
+    "id": "H2-7",
+    "desc": "token B + application A → DENIED",
+    "expected": "404",
+    "got": "HTTP 404",
+    "pass": true
+  },
+  {
+    "id": "H2-8",
+    "desc": "respuesta de denegación sin datos de la aplicación",
+    "expected": "sin capability/PII",
+    "got": "leaks= victimEmail=false",
+    "pass": true
+  },
+  {
+    "id": "H3-1",
+    "desc": "CAND-A → candidates list → 403",
+    "expected": "403",
+    "got": "HTTP 403",
+    "pass": true
+  },
+  {
+    "id": "H3-2",
+    "desc": "CAND-A → results (sin parámetros) → solo propios",
+    "expected": "200 sin ajenos",
+    "got": "HTTP 200 rows=1 foreign=0",
+    "pass": true
+  },
+  {
+    "id": "H3-3",
+    "desc": "CAND-A → interviews list (RH) → 403",
+    "expected": "403",
+    "got": "HTTP 403",
+    "pass": true
+  },
+  {
+    "id": "H3-5a",
+    "desc": "CAND-A → sus propias entrevistas (flujo legítimo) → 200 solo propias",
+    "expected": "200 sin ajenas",
+    "got": "HTTP 200 rows=0 foreign=0",
+    "pass": true
+  },
+  {
+    "id": "H3-6a",
+    "desc": "CAND-A → interviews de CAND-A2 → 403",
+    "expected": "403",
+    "got": "HTTP 403",
+    "pass": true
+  },
+  {
+    "id": "H3-4a",
+    "desc": "CAND-A → vacancies management list → 403",
+    "expected": "403",
+    "got": "HTTP 403",
+    "pass": true
+  },
+  {
+    "id": "H3-4b",
+    "desc": "CAND-A → applications list de vacancy A → 403",
+    "expected": "403",
+    "got": "HTTP 403",
+    "pass": true
+  },
+  {
+    "id": "H3-8",
+    "desc": "CAND-A → invitations list (expone tokens) → 403",
+    "expected": "403",
+    "got": "HTTP 403",
+    "pass": true
+  },
+  {
+    "id": "H3-5",
+    "desc": "CAND-A → su propio resultado → 200",
+    "expected": "200",
+    "got": "HTTP 200",
+    "pass": true
+  },
+  {
+    "id": "H3-6",
+    "desc": "CAND-A → resultado de CAND-A2 → DENIED",
+    "expected": "403",
+    "got": "HTTP 403",
+    "pass": true
+  },
+  {
+    "id": "H3-7",
+    "desc": "CAND-A → resultado de tenant B → DENIED (404 sin existencia)",
+    "expected": "404",
+    "got": "HTTP 404",
+    "pass": true
+  },
+  {
+    "id": "H3-1b",
+    "desc": "CAND-A2 → candidates list → 403",
+    "expected": "403",
+    "got": "HTTP 403",
+    "pass": true
+  },
+  {
+    "id": "H4-1",
+    "desc": "CAND → delete invitation → 403",
+    "expected": "403",
+    "got": "HTTP 403",
+    "pass": true
+  },
+  {
+    "id": "H4-2",
+    "desc": "RH-A → invitation A → PASS",
+    "expected": "200",
+    "got": "HTTP 200 success=true",
+    "pass": true
+  },
+  {
+    "id": "H4-3",
+    "desc": "RH-A → invitation B → DENIED",
+    "expected": "403",
+    "got": "HTTP 403",
+    "pass": true
+  },
+  {
+    "id": "H4-4",
+    "desc": "SA impersonate B → invitation B → PASS + AuditLog",
+    "expected": "200 + audit",
+    "got": "HTTP 200 audit=true",
+    "pass": true
+  },
+  {
+    "id": "H4-5",
+    "desc": "SA impersonate B → invitation A → DENIED",
+    "expected": "404",
+    "got": "HTTP 404",
+    "pass": true
+  },
+  {
+    "id": "H4-6",
+    "desc": "SA sin target → NO eliminación global → 400",
+    "expected": "400",
+    "got": "HTTP 400",
+    "pass": true
+  },
+  {
+    "id": "H4-7",
+    "desc": "RH-A delete ALL → solo empresa A; B intacta",
+    "expected": "B intacta",
+    "got": "HTTP 200 B:0->0 invA2 queda=0",
+    "pass": true
+  },
+  {
+    "id": "H5-1",
+    "desc": "RH-A → user A → companyId=B → 403 y companyId intacto",
+    "expected": "403",
+    "got": "HTTP 403 companyId=A",
+    "pass": true
+  },
+  {
+    "id": "H5-2",
+    "desc": "RH-A → user A sin companyId → PASS",
+    "expected": "200",
+    "got": "HTTP 200",
+    "pass": true
+  },
+  {
+    "id": "H5-3",
+    "desc": "RH-A → user B → DENIED",
+    "expected": "403",
+    "got": "HTTP 403",
+    "pass": true
+  },
+  {
+    "id": "H5-4",
+    "desc": "SA → transferencia de empresa → permitida + AuditLog(old,new)",
+    "expected": "200 + audit",
+    "got": "HTTP 200 moved=true auditOk=true",
+    "pass": true
+  },
+  {
+    "id": "H5-5",
+    "desc": "usuario re-login → companyId = tenant original",
+    "expected": "A",
+    "got": "HTTP 200 companyId=A",
+    "pass": true
+  },
+  {
+    "id": "H6-F1",
+    "desc": "SA → /api/users global SIN ADMIN_DATABASE_URL → FAIL CLOSED",
+    "expected": "500 sin datos",
+    "got": "HTTP 500 users=undefined",
+    "pass": true
+  },
+  {
+    "id": "H6-F2",
+    "desc": "SA → /api/interviews global SIN admin URL → FAIL CLOSED",
+    "expected": "500",
+    "got": "HTTP 500 interviews=undefined",
+    "pass": true
+  },
+  {
+    "id": "H6-F3",
+    "desc": "SA → /api/vacancies global SIN admin URL → FAIL CLOSED",
+    "expected": "500",
+    "got": "HTTP 500 vacancies=undefined",
+    "pass": true
+  },
+  {
+    "id": "H6-F4",
+    "desc": "SA → /api/positions?all=true SIN admin URL → FAIL CLOSED",
+    "expected": "500",
+    "got": "HTTP 500 positions=undefined",
+    "pass": true
+  },
+  {
+    "id": "H6-5",
+    "desc": "RH → positions?all=true → 403",
+    "expected": "403",
+    "got": "HTTP 403",
+    "pass": true
+  },
+  {
+    "id": "H6-6",
+    "desc": "RH-A → users?companyId=B → parámetro ignorado, solo empresa A",
+    "expected": "200 solo A",
+    "got": "HTTP 200 rows=3 foreign=0",
+    "pass": true
+  },
+  {
+    "id": "H6-7",
+    "desc": "SA → users?companyId=B → impersonation scoped a B",
+    "expected": "200 solo B",
+    "got": "HTTP 200 rows=2 wrong=0",
+    "pass": true
+  },
+  {
+    "id": "H6-8",
+    "desc": "CAND-A → users → 403",
+    "expected": "403",
+    "got": "HTTP 403",
+    "pass": true
+  },
+  {
+    "id": "AUD-1",
+    "desc": "CAND-A denied attempts → AuditLog UNAUTHORIZED_ATTEMPT",
+    "expected": "≥6 entradas",
+    "got": "31 entradas",
+    "pass": true
+  },
+  {
+    "id": "AUD-2",
+    "desc": "RH reasignación companyId denegada → AuditLog",
+    "expected": "≥1 entrada",
+    "got": "3 entradas",
+    "pass": true
+  },
+  {
+    "id": "AUD-3",
+    "desc": "CAND/RH invite deletion denegada → AuditLog",
+    "expected": "≥1 entrada",
+    "got": "9 entradas",
+    "pass": true
+  },
+  {
+    "id": "XT-1",
+    "desc": "cross-tenant: RH-A → resultId B → 404 sin existencia",
+    "expected": "404",
+    "got": "HTTP 404",
+    "pass": true
+  }
+]

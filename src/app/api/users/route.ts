@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getUnscopedClient } from '@/lib/rls'
+import { getUnscopedClient, createRLSClient, createSuperAdminRLSClient } from '@/lib/rls'
 import { getAuthFromHeaders } from '@/lib/auth'
 import { hashPassword } from '@/lib/password'
 import { logUnauthorizedAccess, logAuditEvent } from '@/lib/audit'
+import { resolveTargetCompanyId } from '@/lib/impersonation'
+import { getAggregateUserDirectory } from '@/lib/admin-db'
 
 export async function GET(req: NextRequest) {
   try {
@@ -11,18 +13,34 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const db = getUnscopedClient()
     const { searchParams } = new URL(req.url)
     const companyIdFilter = searchParams.get('companyId')
     const roleFilter = searchParams.get('role')
 
     if (auth.role === 'SUPER_ADMIN') {
-      const where: Record<string, unknown> = {}
-      if (companyIdFilter) where.companyId = companyIdFilter
-      if (roleFilter) where.role = roleFilter
+      // ── PHASE 3.5-H (VUL-H6): SA global user list → ADMIN DB (evalhr_sa). ──
+      // The previous implementation read ALL users through the shared tenant
+      // client (unscoped, unaudited). The global list is now an AGGREGATE
+      // operation on the isolated administrative connection, audited per
+      // invocation and fail-closed without ADMIN_DATABASE_URL.
+      if (!companyIdFilter) {
+        const { users } = await getAggregateUserDirectory({
+          req,
+          actorId: auth.userId,
+          role: auth.role,
+        })
+        return NextResponse.json({ users })
+      }
 
-      const users = await db.user.findMany({
-        where,
+      // SA with ?companyId=B → IMPERSONATION on tenant B (audited helper +
+      // RLS client scoped to B — NOT the shared global client).
+      const { targetCompanyId } = await resolveTargetCompanyId(auth, req, {
+        action: 'ACCESS',
+        resource: 'User',
+      })
+      const { client: saDb } = createSuperAdminRLSClient(targetCompanyId as string)
+      const users = await saDb.user.findMany({
+        where: roleFilter ? { role: roleFilter } : {},
         select: {
           id: true, email: true, name: true, role: true,
           phone: true, companyId: true, active: true,
@@ -39,10 +57,14 @@ export async function GET(req: NextRequest) {
       if (!auth.companyId) {
         return NextResponse.json({ error: 'No company associated' }, { status: 400 })
       }
-      const where: Record<string, unknown> = { companyId: auth.companyId }
+      // PHASE 3.5-H (VUL-H6 classification — TENANT): RH/GERENTE list users
+      // of their OWN company via the RLS client (evalhr_app + tenant scope).
+      // A client-supplied companyId is never trusted.
+      const where: Record<string, unknown> = {}
       if (roleFilter) where.role = roleFilter
 
-      const users = await db.user.findMany({
+      const { client: rlsDb } = createRLSClient(auth)
+      const users = await rlsDb.user.findMany({
         where,
         select: {
           id: true, email: true, name: true, role: true,
@@ -116,6 +138,16 @@ export async function POST(req: NextRequest) {
         createdAt: true,
         company: { select: { id: true, name: true } },
       },
+    })
+
+    // PHASE 3.5-H (PARTE 8): every SA global mutation is audited.
+    await logAuditEvent(req, {
+      actorId: auth.userId,
+      action: 'CREATE',
+      resource: 'User',
+      resourceId: user.id,
+      companyId,
+      details: { mode: 'GLOBAL', createdRole: role },
     })
 
     return NextResponse.json({ user }, { status: 201 })
@@ -198,6 +230,33 @@ export async function PUT(req: NextRequest) {
       }
     }
 
+    // ── PHASE 3.5-H (VUL-H5): companyId reassignment is SA-ONLY. ──
+    // Previously ANY RH could move a user (including themselves) to another
+    // company — full tenant-escape via re-login. Now:
+    //   RH/GERENTE: body.companyId is NEVER applied. If it points to a
+    //     DIFFERENT company than the actor's own → 403 + audit. If it equals
+    //     the actor's own company → silently ignored (ownership cannot be
+    //     changed through this endpoint).
+    //   SUPER_ADMIN: reassignment allowed and AUDITED with old/new company,
+    //   target user, actor and timestamp.
+    if (companyId !== undefined && auth.role !== 'SUPER_ADMIN') {
+      if (companyId !== auth.companyId) {
+        await logUnauthorizedAccess(req, {
+          actorId: auth.userId,
+          action: 'UPDATE',
+          resource: 'User',
+          resourceId: id,
+          companyId: auth.companyId,
+          reason: 'Non-SUPER_ADMIN attempted to reassign user companyId (tenant escape)',
+        })
+        return NextResponse.json(
+          { error: 'Forbidden: only a Super Admin can reassign a user to another company' },
+          { status: 403 }
+        )
+      }
+      // companyId === auth.companyId → ignored below (never applied).
+    }
+
     // If role is changing, validate it
     if (role) {
       const allowedRoles = auth.role === 'SUPER_ADMIN' ? ['RH', 'GERENTE', 'SUPER_ADMIN'] : ['RH', 'GERENTE']
@@ -206,8 +265,11 @@ export async function PUT(req: NextRequest) {
       }
     }
 
-    // If companyId is changing, verify it exists
-    if (companyId && companyId !== existingUser.companyId) {
+    // If companyId is changing (SUPER_ADMIN only — see VUL-H5 gate above),
+    // verify the target company exists.
+    const companyReassignment =
+      auth.role === 'SUPER_ADMIN' && companyId !== undefined && companyId !== existingUser.companyId
+    if (companyReassignment) {
       const company = await db.company.findUnique({ where: { id: companyId } })
       if (!company) {
         return NextResponse.json({ error: 'Company not found' }, { status: 404 })
@@ -215,12 +277,13 @@ export async function PUT(req: NextRequest) {
     }
 
     // Build update data (only include fields that were provided)
+    // PHASE 3.5-H (VUL-H5): companyId is applied ONLY for SUPER_ADMIN.
     const updateData: Record<string, unknown> = {}
     if (name !== undefined) updateData.name = name
     if (email !== undefined) updateData.email = email
     if (phone !== undefined) updateData.phone = phone || null
     if (role !== undefined) updateData.role = role
-    if (companyId !== undefined) updateData.companyId = companyId
+    if (auth.role === 'SUPER_ADMIN' && companyId !== undefined) updateData.companyId = companyId
 
     const updatedUser = await db.user.update({
       where: { id },
@@ -231,6 +294,29 @@ export async function PUT(req: NextRequest) {
         consentGiven: true, consentDate: true,
         createdAt: true,
         company: { select: { id: true, name: true } },
+      },
+    })
+
+    // PHASE 3.5-H (PARTE 8): audit the SA mutation — with the full
+    // reassignment trail when a company transfer happened.
+    await logAuditEvent(req, {
+      actorId: auth.userId,
+      action: 'UPDATE',
+      resource: 'User',
+      resourceId: id,
+      companyId: existingUser.companyId,
+      details: {
+        mode: 'GLOBAL',
+        targetUserId: id,
+        targetUserEmail: existingUser.email,
+        ...(companyReassignment
+          ? {
+              companyTransfer: true,
+              oldCompanyId: existingUser.companyId,
+              newCompanyId: companyId,
+            }
+          : { companyTransfer: false }),
+        changedFields: Object.keys(updateData),
       },
     })
 
@@ -318,6 +404,15 @@ export async function PATCH(req: NextRequest) {
             company: { select: { id: true, name: true } },
           },
         })
+        // PHASE 3.5-H (PARTE 8): mutation audited.
+        await logAuditEvent(req, {
+          actorId: auth.userId,
+          action: 'UPDATE',
+          resource: 'User',
+          resourceId: id,
+          companyId: existingUser.companyId,
+          details: { targetUserId: id, patchAction: 'toggle_access', active: newActive },
+        })
         return NextResponse.json({
           user: updatedUser,
           message: newActive
@@ -338,6 +433,16 @@ export async function PATCH(req: NextRequest) {
         await db.user.update({
           where: { id },
           data: { password: hashedPassword },
+        })
+        // PHASE 3.5-H (PARTE 8): password change by SA/RH is audited.
+        // NEVER store the password itself — only who changed whose.
+        await logAuditEvent(req, {
+          actorId: auth.userId,
+          action: 'UPDATE',
+          resource: 'User',
+          resourceId: id,
+          companyId: existingUser.companyId,
+          details: { targetUserId: id, patchAction: 'change_password' },
         })
         return NextResponse.json({
           message: `Contraseña actualizada para ${existingUser.name}`,
@@ -367,6 +472,16 @@ export async function PATCH(req: NextRequest) {
         // (we can't delete invitations easily due to FK, so we leave them)
 
         await db.user.delete({ where: { id } })
+
+        // PHASE 3.5-H (PARTE 8): destructive mutation audited.
+        await logAuditEvent(req, {
+          actorId: auth.userId,
+          action: 'DELETE',
+          resource: 'User',
+          resourceId: id,
+          companyId: existingUser.companyId,
+          details: { targetUserId: id, targetUserEmail: existingUser.email, patchAction: 'delete' },
+        })
 
         return NextResponse.json({
           message: `Usuario "${existingUser.name}" eliminado permanentemente`,
@@ -422,6 +537,16 @@ export async function DELETE(req: NextRequest) {
     await db.evaluationSession.deleteMany({ where: { candidateId: id } })
     await db.interviewSchedule.deleteMany({ where: { candidateId: id } })
     await db.user.delete({ where: { id } })
+
+    // PHASE 3.5-H (PARTE 8): destructive mutation audited.
+    await logAuditEvent(req, {
+      actorId: auth.userId,
+      action: 'DELETE',
+      resource: 'User',
+      resourceId: id,
+      companyId: existingUser.companyId,
+      details: { targetUserId: id, targetUserEmail: existingUser.email },
+    })
 
     return NextResponse.json({
       message: `Usuario "${existingUser.name}" eliminado permanentemente`,

@@ -139,6 +139,17 @@ interface AppState {
   compareIds: string[]
   setCompareIds: (ids: string[]) => void
 
+  // PHASE 3.5-H (VUL-H2): public vacancy application state.
+  // These fields were consumed by PublicEvaluationView but missing from the
+  // AppState type (and store implementation) — restored so the public apply
+  // flow is type-safe and runtime-functional.
+  vacancySlug: string
+  setVacancySlug: (slug: string) => void
+  vacancyApplicationId: string | null
+  setVacancyApplicationId: (id: string | null) => void
+  vacancyAnswers: Record<string, number | string>
+  setVacancyAnswer: (questionId: string, value: number | string) => void
+
   // Invitation token
   invitationToken: string | null
   setInvitationToken: (token: string | null) => void
@@ -216,6 +227,15 @@ export const useAppStore = create<AppState>((set) => ({
   // Comparison
   compareIds: [],
   setCompareIds: (compareIds) => set({ compareIds }),
+
+  // PHASE 3.5-H (VUL-H2): public vacancy application state
+  vacancySlug: '',
+  setVacancySlug: (vacancySlug) => set({ vacancySlug }),
+  vacancyApplicationId: null,
+  setVacancyApplicationId: (vacancyApplicationId) => set({ vacancyApplicationId }),
+  vacancyAnswers: {},
+  setVacancyAnswer: (questionId, value) =>
+    set((state) => ({ vacancyAnswers: { ...state.vacancyAnswers, [questionId]: value } })),
 
   // Invitation
   invitationToken: null,

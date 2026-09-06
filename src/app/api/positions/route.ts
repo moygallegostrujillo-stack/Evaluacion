@@ -4,6 +4,7 @@ import { getAuthFromHeaders } from '@/lib/auth'
 import { generateTemplatesForPosition } from '@/lib/generate-templates'
 import { logAuditEvent, logUnauthorizedAccess } from '@/lib/audit'
 import { resolveTargetCompanyId } from '@/lib/impersonation'
+import { getAggregatePositionCatalog } from '@/lib/admin-db'
 
 export async function GET(req: NextRequest) {
   try {
@@ -17,61 +18,31 @@ export async function GET(req: NextRequest) {
       action: 'ACCESS',
       resource: 'Position',
     })
-    const sector = req.nextUrl.searchParams.get('sector')
     const all = req.nextUrl.searchParams.get('all')
 
-    // If "all" is set, return all active positions (SUPER_ADMIN only for multi-tenant isolation)
+    // If "all" is set, this is the SA GLOBAL position catalog.
+    // ── PHASE 3.5-H (PARTE 7 / VUL-H6): the global catalog is an AGGREGATE
+    // operation on the ADMIN DB connection (evalhr_sa, audited per
+    // invocation, fail-closed without ADMIN_DATABASE_URL). No
+    // getUnscopedClient. Non-SUPER_ADMIN roles → 403 + audit: each role
+    // already receives its own company positions through the standard list
+    // or the RLS-scoped branch below.
     if (all === 'true') {
-      // Only SUPER_ADMIN can see positions from all companies — use unscoped client
-      if (auth.role === 'SUPER_ADMIN') {
-        const positions = await getUnscopedClient().position.findMany({
-          where: { active: true, status: 'ACTIVE', ...(sector ? { sector } : {}) },
-          orderBy: [{ sector: 'asc' }, { title: 'asc' }],
-          include: {
-            company: {
-              select: { id: true, name: true, sector: true },
-            },
-            evaluationTemplates: {
-              select: {
-                id: true,
-                name: true,
-                type: true,
-                order: true,
-                _count: { select: { questions: true } },
-              },
-              orderBy: { order: 'asc' },
-            },
-            _count: {
-              select: { sessions: true },
-            },
-          },
+      if (auth.role !== 'SUPER_ADMIN') {
+        await logUnauthorizedAccess(req, {
+          actorId: auth.userId,
+          action: 'ACCESS',
+          resource: 'Position',
+          companyId: auth.companyId,
+          reason: 'Non-SUPER_ADMIN requested the global position catalog (?all=true)',
         })
-        return NextResponse.json({ positions })
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
       }
 
-      // Non-admin: use RLS client (auto-scoped to their company)
-      const { client: rlsDb } = createRLSClient(auth)
-      const positions = await rlsDb.position.findMany({
-        where: { active: true, status: 'ACTIVE', ...(sector ? { sector } : {}) },
-        orderBy: [{ sector: 'asc' }, { title: 'asc' }],
-        include: {
-          company: {
-            select: { id: true, name: true, sector: true },
-          },
-          evaluationTemplates: {
-            select: {
-              id: true,
-              name: true,
-              type: true,
-              order: true,
-              _count: { select: { questions: true } },
-            },
-            orderBy: { order: 'asc' },
-          },
-          _count: {
-            select: { sessions: true },
-          },
-        },
+      const { positions } = await getAggregatePositionCatalog({
+        req,
+        actorId: auth.userId,
+        role: auth.role,
       })
       return NextResponse.json({ positions })
     }

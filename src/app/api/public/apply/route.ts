@@ -779,6 +779,22 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'applicationId is required' }, { status: 400 })
     }
 
+    // ── PHASE 3.5-H (VUL-H2): HMAC token REQUIRED before any lookup. ──
+    // The previous implementation accepted a bare applicationId and MINTED a
+    // fresh token in every response — turning a known/leaked applicationId
+    // into a full capability (application hijack via email+slug enumeration
+    // followed by this endpoint). Now the caller MUST present the token it
+    // received at creation/resume time. The response NEVER mints tokens.
+    // Invalid/missing tokens return the SAME generic 404 as an unknown
+    // applicationId (no existence signal — H2-8).
+    const token = req.nextUrl.searchParams.get('token')
+    if (!token || !verifyPublicToken(token, applicationId)) {
+      console.warn(
+        `[SECURITY] public/apply GET: token verification FAILED for application ${applicationId}`
+      )
+      return NextResponse.json({ error: 'Application not found' }, { status: 404 })
+    }
+
     const application = await db.vacancyApplication.findUnique({
       where: { id: applicationId },
       include: {
@@ -809,7 +825,6 @@ export async function GET(req: NextRequest) {
         step: 0,
         stepName: 'data',
         applicationId: application.id,
-        token: generatePublicToken(application.id),
       })
     }
 
@@ -821,7 +836,6 @@ export async function GET(req: NextRequest) {
           step: 1,
           stepName: 'psicometrica',
           applicationId: application.id,
-        token: generatePublicToken(application.id),
           questions: systemQuestions.bigFiveQuestions.map((q) => ({
             id: q.id,
             questionId: q.id,  // Include questionId so frontend can pass it back for proper upsert
@@ -845,7 +859,6 @@ export async function GET(req: NextRequest) {
         step: 1,
         stepName: 'psicometrica',
         applicationId: application.id,
-        token: generatePublicToken(application.id),
         questions: [],
       })
     }
@@ -858,7 +871,6 @@ export async function GET(req: NextRequest) {
           step: 2,
           stepName: 'psicologica',
           applicationId: application.id,
-        token: generatePublicToken(application.id),
           questions: systemQuestions.psychologicalQuestions.map((q) => ({
             id: q.id,
             questionId: q.id,  // Include questionId so frontend can pass it back for proper upsert
@@ -882,7 +894,6 @@ export async function GET(req: NextRequest) {
         step: 2,
         stepName: 'psicologica',
         applicationId: application.id,
-        token: generatePublicToken(application.id),
         questions: [],
       })
     }
@@ -895,7 +906,6 @@ export async function GET(req: NextRequest) {
           step: 3,
           stepName: 'integridad',
           applicationId: application.id,
-        token: generatePublicToken(application.id),
           questions: systemQuestions.integrityQuestions.map((q) => ({
             id: q.id,
             questionId: q.id,
@@ -919,7 +929,6 @@ export async function GET(req: NextRequest) {
         step: 3,
         stepName: 'integridad',
         applicationId: application.id,
-        token: generatePublicToken(application.id),
         questions: [],
       })
     }
@@ -960,7 +969,6 @@ export async function GET(req: NextRequest) {
         step: 4,
         stepName: 'conocimientos',
         applicationId: application.id,
-        token: generatePublicToken(application.id),
         questions: allQuestions,
       })
     }
@@ -971,7 +979,6 @@ export async function GET(req: NextRequest) {
         step: 5,
         stepName: 'done',
         applicationId: application.id,
-        token: generatePublicToken(application.id),
         status: application.status,
       })
     }
@@ -981,7 +988,6 @@ export async function GET(req: NextRequest) {
       step: application.currentStep,
       stepName: 'done',
       applicationId: application.id,
-        token: generatePublicToken(application.id),
       status: application.status,
     })
   } catch (error) {
@@ -1056,11 +1062,57 @@ export async function POST(req: NextRequest) {
       })
 
       if (existingApplication) {
-        // Resume existing application
+        // ── PHASE 3.5-H (VUL-H2): possession proof for resume. ──
+        // Previously this branch returned the bare applicationId to anyone
+        // presenting (email + slug). Combined with the GET that minted
+        // tokens, that was an application-hijack chain. The candidate must
+        // now prove possession by re-entering the identity data they
+        // originally submitted (name — always stored — and phone when one
+        // was stored). NO token or applicationId is ever released without
+        // this proof. No new credential system was introduced: this uses
+        // exactly the data the real flow already collects.
+        //
+        // Existence note (H2-8): the one-application-per-email-per-vacancy
+        // rule is a PRODUCT rule and is NOT changed here; the 403 below
+        // therefore inherently signals that SOME application exists for
+        // this email+slug. The security property that matters is stricter
+        // and holds: NO capability (applicationId/token) is released
+        // without the proof, and responses never leak whose application
+        // it is or any of its data.
+        const submittedName = (name || '').trim().toLowerCase()
+        const storedName = (existingApplication.candidateName || '').trim().toLowerCase()
+        const nameMatches = submittedName.length > 0 && storedName.length > 0 && submittedName === storedName
+
+        const storedPhone = (existingApplication.candidatePhone || '').trim()
+        const submittedPhone = (phone || '').trim()
+        // Phone participates in the proof only when one was stored. When
+        // stored, it MUST match exactly (the candidate re-entering their
+        // own data knows it; an attacker with just email+slug does not).
+        const phoneMatches = storedPhone.length === 0 || submittedPhone === storedPhone
+
+        if (!nameMatches || !phoneMatches) {
+          console.warn(
+            `[SECURITY] public/apply step=data: resume possession proof FAILED for vacancy ${vacancySlug}`
+          )
+          // Generic message — no applicationId, no token, no data, no
+          // indication of WHAT did not match.
+          return NextResponse.json(
+            {
+              error:
+                'No pudimos validar tu postulación existente con esos datos. Si ya te habías postulado, verifica tu nombre y teléfono exactamente como los registraste, o contacta a reclutamiento.',
+              code: 'RESUME_PROOF_MISMATCH',
+            },
+            { status: 403 }
+          )
+        }
+
+        // Proof OK — legitimate resume. Re-issue the (deterministic) HMAC
+        // token so the candidate can continue answer/advance on this device.
         return NextResponse.json({
           applicationId: existingApplication.id,
           step: existingApplication.currentStep,
           resumed: true,
+          token: generatePublicToken(existingApplication.id),
         })
       }
 

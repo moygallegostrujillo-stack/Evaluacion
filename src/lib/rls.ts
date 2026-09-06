@@ -86,6 +86,17 @@ const TENANT_SCOPED_MODELS: Record<string, { required: boolean }> = {
   VacancyApplication:  { required: true },
   VacancyApplicationResponse: { required: true },
   ArcoRequest:         { required: true }, // PHASE 3.5-B.2.1 (B2): tenant-scoped ARCO requests
+  // PHASE 3.5-H (PARTE 16 — DECISION A): CompanyPrivacyNotice carries a
+  // companyId (per-tenant legal document) and is reachable from tenant
+  // runtime (RH edits its own company's notice). "Sin RLS por diseño" is
+  // NOT acceptable for a companyId-bearing tenant table without an explicit
+  // equivalent barrier — so it is registered here (app-layer enforcement is
+  // IMMEDIATE for every RLS-client query) and added to prisma/rls-policies.sql
+  // + rls-rollback.sql so the DB-level ENABLE/FORCE/policies activate with
+  // the rest of the RLS artifact set (which remains NOT EXECUTED in this
+  // phase). Public bootstrap reads (unscoped client, pre-auth) are derived
+  // from server-verified data, never from client authority.
+  CompanyPrivacyNotice: { required: true },
 }
 
 /** Models that are tenant-scoped */

@@ -1,0 +1,23 @@
+[
+  {
+    "id": "AF-/api/dashboard",
+    "desc": "SA aggregate /api/dashboard sin ADMIN_DATABASE_URL → FAIL CLOSED (HTTP 500, sin datos)",
+    "expected": "HTTP 500 + error",
+    "got": "HTTP 500 msg=Error fetching dashboard data",
+    "pass": true
+  },
+  {
+    "id": "AF-/api/results",
+    "desc": "SA aggregate /api/results sin ADMIN_DATABASE_URL → FAIL CLOSED (HTTP 500, sin datos)",
+    "expected": "HTTP 500 + error",
+    "got": "HTTP 500 msg=Error fetching results",
+    "pass": true
+  },
+  {
+    "id": "AF-/api/candidates",
+    "desc": "SA aggregate /api/candidates sin ADMIN_DATABASE_URL → FAIL CLOSED (HTTP 500, sin datos)",
+    "expected": "HTTP 500 + error",
+    "got": "HTTP 500 msg=Error fetching candidates",
+    "pass": true
+  }
+]

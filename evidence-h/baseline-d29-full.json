@@ -37,8 +37,8 @@
   {
     "id": "I-6",
     "desc": "Create sin companyId → auto-inyecta companyId del contexto (invariante)",
-    "expected": "== compA (cmtq700ty0000p4d72x6u5v5r)",
-    "got": "cmtq700ty0000p4d72x6u5v5r",
+    "expected": "== compA (cmtq569ct0000p47y1k433twy)",
+    "got": "cmtq569ct0000p47y1k433twy",
     "pass": true
   },
   {
@@ -85,7 +85,7 @@
   },
   {
     "id": "PUB-3",
-    "desc": "GET resume step0 (con token) → sin PII del candidato (data-minimization)",
+    "desc": "GET resume step0 → sin PII del candidato (data-minimization)",
     "expected": "0 campos PII",
     "got": "leaked=[]",
     "pass": true

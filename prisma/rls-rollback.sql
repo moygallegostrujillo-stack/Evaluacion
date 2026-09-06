@@ -40,6 +40,7 @@ ALTER TABLE "EvaluationResponse" NO FORCE ROW LEVEL SECURITY;
 ALTER TABLE "EvaluationTemplate" NO FORCE ROW LEVEL SECURITY;
 ALTER TABLE "VacancyQuestion" NO FORCE ROW LEVEL SECURITY;
 ALTER TABLE "VacancyApplicationResponse" NO FORCE ROW LEVEL SECURITY;
+ALTER TABLE "CompanyPrivacyNotice" NO FORCE ROW LEVEL SECURITY;
 
 -- ────────────────────────────────────────────────────────────
 -- STEP 2: DROP all policies (idempotent)
@@ -114,6 +115,10 @@ DROP POLICY IF EXISTS "rls_vacappresponse_select" ON "VacancyApplicationResponse
 DROP POLICY IF EXISTS "rls_vacappresponse_insert" ON "VacancyApplicationResponse";
 DROP POLICY IF EXISTS "rls_vacappresponse_update" ON "VacancyApplicationResponse";
 DROP POLICY IF EXISTS "rls_vacappresponse_delete" ON "VacancyApplicationResponse";
+DROP POLICY IF EXISTS "rls_privnotice_select" ON "CompanyPrivacyNotice";
+DROP POLICY IF EXISTS "rls_privnotice_insert" ON "CompanyPrivacyNotice";
+DROP POLICY IF EXISTS "rls_privnotice_update" ON "CompanyPrivacyNotice";
+DROP POLICY IF EXISTS "rls_privnotice_delete" ON "CompanyPrivacyNotice";
 
 -- ────────────────────────────────────────────────────────────
 -- STEP 3: DISABLE ROW LEVEL SECURITY
@@ -133,6 +138,10 @@ ALTER TABLE "EvaluationResponse" DISABLE ROW LEVEL SECURITY;
 ALTER TABLE "EvaluationTemplate" DISABLE ROW LEVEL SECURITY;
 ALTER TABLE "VacancyQuestion" DISABLE ROW LEVEL SECURITY;
 ALTER TABLE "VacancyApplicationResponse" DISABLE ROW LEVEL SECURITY;
+-- PHASE 3.5-H (PARTE 16): CompanyPrivacyNotice joined the RLS set — its
+-- DISABLE must mirror the ENABLE in rls-policies.sql so a rollback leaves
+-- NO table RLS-enabled with zero policies (default-deny continuity trap).
+ALTER TABLE "CompanyPrivacyNotice" DISABLE ROW LEVEL SECURITY;
 
 -- ────────────────────────────────────────────────────────────
 -- STEP 4: Drop the tenant-context helper function

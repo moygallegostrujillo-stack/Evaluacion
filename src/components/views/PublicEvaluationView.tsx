@@ -228,7 +228,8 @@ export default function PublicEvaluationView() {
     try {
       // Always fetch questions fresh from the API using applicationId
       // The `data` param may come from advanceStep and won't have questions
-      const res = await apiFetch(`/api/public/apply?applicationId=${applicationId}`, { skipAuth: true })
+      // PHASE 3.5-H (VUL-H2): the resume GET now REQUIRES the HMAC token.
+      const res = await apiFetch(`/api/public/apply?applicationId=${applicationId}&token=${encodeURIComponent(getAppToken() || '')}`, { skipAuth: true })
       const sectionData = await res.json()
 
       // If API returned an error, skip this section
@@ -273,7 +274,8 @@ export default function PublicEvaluationView() {
     if (!applicationId) return
     setLoading(true)
     try {
-      const res = await apiFetch(`/api/public/apply?applicationId=${applicationId}`, { skipAuth: true })
+      // PHASE 3.5-H (VUL-H2): the resume GET now REQUIRES the HMAC token.
+      const res = await apiFetch(`/api/public/apply?applicationId=${applicationId}&token=${encodeURIComponent(getAppToken() || '')}`, { skipAuth: true })
       const data = await res.json()
       if (data.questions && data.questions.length > 0) {
         const sectionQuestions = data.questions.filter((q: QuestionData) => {
@@ -304,15 +306,24 @@ export default function PublicEvaluationView() {
   // Resume existing application
   // ============================================
   const resumeApplication = useCallback(async (appId: string) => {
+    // PHASE 3.5-H (VUL-H2): the resume GET requires the HMAC token issued at
+    // creation/resume time (the server no longer mints tokens on read).
+    // Without a stored token the candidate re-enters their data — the server
+    // verifies possession (name + phone) and issues a fresh token there.
+    const appToken = getAppToken()
+    if (!appToken) {
+      setStep('vacancy-info')
+      return
+    }
     try {
-      const res = await apiFetch(`/api/public/apply?applicationId=${appId}`, { skipAuth: true })
+      const res = await apiFetch(`/api/public/apply?applicationId=${appId}&token=${encodeURIComponent(appToken)}`, { skipAuth: true })
       const data = await res.json()
       if (data.error) {
         setStep('vacancy-info')
         return
       }
-      // D.2.9: every resume response carries a fresh HMAC token — persist it
-      // so subsequent answer/advance writes can present it.
+      // D.2.9/H: the server no longer returns tokens on GET (the client must
+      // already hold the verified one). Persist it if a future version does.
       saveAppToken(data.token)
       // Determine which step to resume to
       // API returns `step` not `currentStep`

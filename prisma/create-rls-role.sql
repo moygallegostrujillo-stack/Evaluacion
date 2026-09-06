@@ -55,6 +55,15 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
   GRANT USAGE, SELECT ON SEQUENCES TO evalhr_app;
 
+-- Step 6b (PHASE 3.5-H — PARTE 17): AUDIT LOG APPEND-ONLY BARRIER.
+-- The AuditLog is the tamper-evidence surface for impersonation, aggregate
+-- access and unauthorized attempts. evalhr_app keeps INSERT (it writes the
+-- events) + SELECT (verification queries), but loses UPDATE/DELETE so a
+-- compromised tenant connection cannot rewrite or erase history.
+-- evalhr_sa (create-evalhr-sa-role.sql) never writes AuditLog — the
+-- administrative connection only reads aggregates.
+REVOKE UPDATE, DELETE ON TABLE "AuditLog" FROM evalhr_app;
+
 -- Step 7: Verify the role does NOT have dangerous privileges
 SELECT rolname, rolsuper, rolbypassrls, rolcreatedb, rolcreaterole
 FROM pg_roles

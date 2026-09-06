@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getUnscopedClient } from '@/lib/rls'
 import { getAuthFromHeaders } from '@/lib/auth'
 import { generatePrivacyNoticeHtml, CURRENT_PRIVACY_VERSION } from '@/lib/privacy-notice'
+import { logAuditEvent } from '@/lib/audit'
 
 export async function GET(req: NextRequest) {
   try {
@@ -14,7 +15,17 @@ export async function GET(req: NextRequest) {
 
     // SUPER_ADMIN can see all companies with full data; others only see their own
     if (auth.role === 'SUPER_ADMIN') {
-      console.log('[AUDIT] SA viewing all companies aggregated by', auth.userId)
+      // PHASE 3.5-H (PARTE 6/8 classification — GLOBAL_BY_DESIGN): Company is
+      // the tenant ROOT (no companyId on itself, no candidate PII). The global
+      // list is a legitimate SA function, but it is still an access to global
+      // data — properly AuditLogged (replaces the previous console.log).
+      await logAuditEvent(req, {
+        actorId: auth.userId,
+        action: 'ACCESS',
+        resource: 'Company',
+        companyId: null,
+        details: { mode: 'GLOBAL_BY_DESIGN', operation: 'LIST_COMPANIES' },
+      })
       const companies = await db.company.findMany({
         where: { active: true },
         select: {

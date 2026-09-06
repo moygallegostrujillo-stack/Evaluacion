@@ -182,11 +182,14 @@ if (mode === 'full') {
   }
 
   // PUB-3: GET resume step 0 → NO PII
+  // PHASE 3.5-H (VUL-H2): the resume GET now REQUIRES the HMAC token issued
+  // at creation (the server no longer mints tokens on read). The intent of
+  // this check is unchanged: a token-authenticated resume must not leak PII.
   {
-    const r = await apiGet('', `/api/public/apply?applicationId=${fx.appFlow}`)
+    const r = await apiGet('', `/api/public/apply?applicationId=${fx.appFlow}&token=${encodeURIComponent(appToken)}`)
     const b: any = r.body
     const leaked = ['candidateName', 'candidateEmail', 'candidatePhone', 'candidateAge'].filter(k => b?.[k] !== undefined)
-    push('PUB-3', 'GET resume step0 → sin PII del candidato (data-minimization)', '0 campos PII', `leaked=[${leaked.join(',')}]`, r.status === 200 && leaked.length === 0)
+    push('PUB-3', 'GET resume step0 (con token) → sin PII del candidato (data-minimization)', '0 campos PII', `leaked=[${leaked.join(',')}]`, r.status === 200 && leaked.length === 0)
   }
 
   // PUB-4: answer WITHOUT token → 403 TOKEN_REQUIRED

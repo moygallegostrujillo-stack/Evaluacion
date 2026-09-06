@@ -386,3 +386,157 @@ export async function getAggregateCandidateMetrics(
 
   return { aggregated }
 }
+
+// ============================================
+// PHASE 3.5-H (VUL-H6) — SA GLOBAL DIRECTORIES
+// ============================================
+//
+// The G audit found SUPER_ADMIN global lists (users, interviews, vacancies,
+// positions ?all=true) reading through the SHARED TENANT client (unscoped /
+// isSuperAdmin-unfiltered). That was a fourth access channel violating the
+// D.2.8 design:
+//   TENANT            → evalhr_app + RLS
+//   SA IMPERSONATION  → evalhr_app + target tenant (audited)
+//   SA AGGREGATE      → admin-db + evalhr_sa (audited, fail-closed)
+// The functions below close those holes: every SA global read now goes
+// through THIS module — assertAggregateAuthority (SUPER_ADMIN only),
+// auditAggregateAccess (AuditLog mode='AGGREGATE', written BEFORE the read
+// so even fail-closed attempts leave evidence) and resolveAdminClient
+// (fail-closed without ADMIN_DATABASE_URL, never exposed to callers).
+//
+// PII note: the user/interview directories intentionally include contact
+// fields (email/phone/name). These are USER-MANAGEMENT and RECRUITMENT-
+// OVERSIGHT functions of the SA role — the same fields SA can obtain
+// per-tenant through impersonation, now on a single, always-audited
+// administrative channel. Vacancy/position catalogs contain no candidate
+// PII. Access is logged per invocation (actor, resource, operation, IP).
+
+/** SA AGGREGATE — global user directory (user-management function). */
+export async function getAggregateUserDirectory(
+  actor: AggregateActorContext
+): Promise<{ users: Array<Record<string, unknown>> }> {
+  assertAggregateAuthority(actor)
+  await auditAggregateAccess(actor, 'User', 'READ_DIRECTORY')
+
+  const admin = resolveAdminClient()
+
+  const users = await admin.user.findMany({
+    select: {
+      id: true, email: true, name: true, role: true,
+      phone: true, companyId: true, active: true,
+      consentGiven: true, consentDate: true,
+      createdAt: true,
+      company: { select: { id: true, name: true } },
+    },
+    orderBy: { name: 'asc' },
+  })
+
+  return { users }
+}
+
+/** SA AGGREGATE — global interview directory (recruitment oversight). */
+export async function getAggregateInterviewDirectory(
+  actor: AggregateActorContext
+): Promise<{ interviews: Array<Record<string, unknown>> }> {
+  assertAggregateAuthority(actor)
+  await auditAggregateAccess(actor, 'InterviewSchedule', 'READ_DIRECTORY')
+
+  const admin = resolveAdminClient()
+
+  const interviews = await admin.interviewSchedule.findMany({
+    orderBy: { scheduledAt: 'asc' },
+    include: {
+      candidate: {
+        select: { id: true, name: true, email: true, phone: true },
+      },
+      position: {
+        select: { id: true, title: true, category: true },
+      },
+    },
+  })
+
+  return { interviews }
+}
+
+/** SA AGGREGATE — global vacancy catalog (no candidate PII). */
+export async function getAggregateVacancyDirectory(
+  actor: AggregateActorContext
+): Promise<{ vacancies: Array<Record<string, unknown>> }> {
+  assertAggregateAuthority(actor)
+  await auditAggregateAccess(actor, 'Vacancy', 'READ_DIRECTORY')
+
+  const admin = resolveAdminClient()
+
+  const vacancies = await admin.vacancy.findMany({
+    include: {
+      questions: {
+        orderBy: { order: 'asc' },
+      },
+      _count: {
+        select: { applications: true },
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+  })
+
+  const serialized = vacancies.map((v) => ({
+    id: v.id,
+    title: v.title,
+    slug: v.slug,
+    description: v.description,
+    sector: v.sector,
+    status: v.status,
+    includePsicometrica: v.includePsicometrica,
+    includePsicologica: v.includePsicologica,
+    maxVideoSeconds: v.maxVideoSeconds,
+    companyId: v.companyId,
+    createdAt: v.createdAt,
+    updatedAt: v.updatedAt,
+    questions: v.questions.map((q) => ({
+      id: q.id,
+      text: q.text,
+      type: q.type,
+      options: q.options ? JSON.parse(q.options) : null,
+      correctAnswer: q.correctAnswer,
+      order: q.order,
+    })),
+    applicationCount: v._count.applications,
+  }))
+
+  return { vacancies: serialized }
+}
+
+/** SA AGGREGATE — global active-position catalog (no candidate PII). */
+export async function getAggregatePositionCatalog(
+  actor: AggregateActorContext
+): Promise<{ positions: Array<Record<string, unknown>> }> {
+  assertAggregateAuthority(actor)
+  await auditAggregateAccess(actor, 'Position', 'READ_CATALOG')
+
+  const admin = resolveAdminClient()
+
+  const positions = await admin.position.findMany({
+    where: { active: true, status: 'ACTIVE' },
+    orderBy: [{ sector: 'asc' }, { title: 'asc' }],
+    include: {
+      company: {
+        select: { id: true, name: true, sector: true },
+      },
+      evaluationTemplates: {
+        select: {
+          id: true,
+          name: true,
+          type: true,
+          order: true,
+          _count: { select: { questions: true } },
+        },
+        orderBy: { order: 'asc' },
+      },
+      _count: {
+        select: { sessions: true },
+      },
+    },
+  })
+
+  return { positions }
+}
