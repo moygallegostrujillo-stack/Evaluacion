@@ -37,8 +37,8 @@
   {
     "id": "I-6",
     "desc": "Create sin companyId → auto-inyecta companyId del contexto (invariante)",
-    "expected": "== compA (cmtmh7fry0000o029l4lq93kd)",
-    "got": "cmtmh7fry0000o029l4lq93kd",
+    "expected": "== compA (cmtq569ct0000p47y1k433twy)",
+    "got": "cmtq569ct0000p47y1k433twy",
     "pass": true
   },
   {

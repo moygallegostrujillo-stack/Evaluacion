@@ -3,7 +3,7 @@
     "id": "R1",
     "desc": "RH-A → resultId=Result A",
     "expected": "200 + Result A",
-    "got": "HTTP 200 {\"result\":{\"id\":\"cmtmdm74d000po0cbhtr9krlt\",\"sessionId\":\"cmtmdm74b000jo0cb758le64f\",\"candidateId\":\"cmtmdm7460009o0cbmxtgupov\",\"candidateName\":\"D26 Candidato A\",",
+    "got": "HTTP 200 {\"result\":{\"id\":\"cmtq4s80l000pp4cnsish9og9\",\"sessionId\":\"cmtq4s80j000jp4cnndmps02s\",\"candidateId\":\"cmtq4s80e0009p4cnyyml93rr\",\"candidateName\":\"D26 Candidato A\",",
     "pass": true
   },
   {
@@ -24,7 +24,7 @@
     "id": "R3b",
     "desc": "RH-A → ?sessionId=Session B (param not accepted as authority)",
     "expected": "ignored → only own tenant data",
-    "got": "HTTP 200 {\"results\":[{\"id\":\"cmtmdm74e000ro0cby83klkoy\",\"sessionId\":\"cmtmdm74b000lo0cbya5zeeuq\",\"candidateId\":\"cmtmdm748000bo0cbv6k0p3bd\",\"candidateName\":\"D26 Candidato A",
+    "got": "HTTP 200 {\"results\":[{\"id\":\"cmtq4s80n000rp4cnitzn2nvb\",\"sessionId\":\"cmtq4s80j000lp4cn0xrmubjt\",\"candidateId\":\"cmtq4s80f000bp4cnhqbn8hmx\",\"candidateName\":\"D26 Candidato A",
     "pass": true
   },
   {
@@ -38,21 +38,21 @@
     "id": "R5",
     "desc": "RH-A → ?companyId=B (spoofed tenant authority)",
     "expected": "ignored → only company A data",
-    "got": "HTTP 200 {\"results\":[{\"id\":\"cmtmdm74d000po0cbhtr9krlt\",\"sessionId\":\"cmtmdm74b000jo0cb758le64f\",\"candidateId\":\"cmtmdm7460009o0cbmxtgupov\",\"candidateName\":\"D26 Candidato A",
+    "got": "HTTP 200 {\"results\":[{\"id\":\"cmtq4s80l000pp4cnsish9og9\",\"sessionId\":\"cmtq4s80j000jp4cnndmps02s\",\"candidateId\":\"cmtq4s80e0009p4cnyyml93rr\",\"candidateName\":\"D26 Candidato A",
     "pass": true
   },
   {
     "id": "R6",
     "desc": "RH-A → ?companyId=B (impersonation attempt)",
     "expected": "ignored → only company A data",
-    "got": "HTTP 200 {\"results\":[{\"id\":\"cmtmdm74e000ro0cby83klkoy\",\"sessionId\":\"cmtmdm74b000lo0cbya5zeeuq\",\"candidateId\":\"cmtmdm748000bo0cbv6k0p3bd\",\"candidateName\":\"D26 Candidato A",
+    "got": "HTTP 200 {\"results\":[{\"id\":\"cmtq4s80n000rp4cnitzn2nvb\",\"sessionId\":\"cmtq4s80j000lp4cn0xrmubjt\",\"candidateId\":\"cmtq4s80f000bp4cnhqbn8hmx\",\"candidateName\":\"D26 Candidato A",
     "pass": true
   },
   {
     "id": "R7",
     "desc": "RH-B → resultId=Result B",
     "expected": "200 + Result B",
-    "got": "HTTP 200 {\"result\":{\"id\":\"cmtmdm74f000to0cbxk5vorhs\",\"sessionId\":\"cmtmdm74c000no0cbj71be0of\",\"candidateId\":\"cmtmdm748000do0cbnhfx41mz\",\"candidateName\":\"D26 Candidato B\",",
+    "got": "HTTP 200 {\"result\":{\"id\":\"cmtq4s80o000tp4cn93udn97o\",\"sessionId\":\"cmtq4s80k000np4cnzv6seu2g\",\"candidateId\":\"cmtq4s80g000dp4cneltvj4ba\",\"candidateName\":\"D26 Candidato B\",",
     "pass": true
   },
   {
@@ -115,7 +115,7 @@
     "id": "P4",
     "desc": "CAND-A → compareIds=ResA,ResA2",
     "expected": "only own (ResA) returned (VUL-02 fixed)",
-    "got": "HTTP 200 {\"comparison\":{\"candidates\":[{\"id\":\"cmtmdm74d000po0cbhtr9krlt\",\"candidateId\":\"cmtmdm7460009o0cbmxtgupov\",\"candidateName\":\"D26 Candidato A\",\"positionTitle\":\"D26 ",
+    "got": "HTTP 200 {\"comparison\":{\"candidates\":[{\"id\":\"cmtq4s80l000pp4cnsish9og9\",\"candidateId\":\"cmtq4s80e0009p4cnyyml93rr\",\"candidateName\":\"D26 Candidato A\",\"positionTitle\":\"D26 ",
     "pass": true
   },
   {
@@ -129,14 +129,14 @@
     "id": "P6",
     "desc": "CAND-B → resultId=App B (own vacancy result)",
     "expected": "200 + own result",
-    "got": "HTTP 200 {\"result\":{\"id\":\"cmtmdm74k0013o0cba2rg87m4\",\"sessionId\":\"cmtmdm74k0013o0cba2rg87m4\",\"candidateId\":\"cmtmdm748000do0cbnhfx41mz\",\"candidateName\":\"D26 Candidato B\",",
+    "got": "HTTP 200 {\"result\":{\"id\":\"cmtq4s80u0013p4cnx7l72oti\",\"sessionId\":\"cmtq4s80u0013p4cnx7l72oti\",\"candidateId\":\"cmtq4s80g000dp4cneltvj4ba\",\"candidateName\":\"D26 Candidato B\",",
     "pass": true
   },
   {
     "id": "P7",
     "desc": "CAND-A → resultId=Result A (own)",
     "expected": "200 + own result",
-    "got": "HTTP 200 {\"result\":{\"id\":\"cmtmdm74d000po0cbhtr9krlt\",\"sessionId\":\"cmtmdm74b000jo0cb758le64f\",\"candidateId\":\"cmtmdm7460009o0cbmxtgupov\",\"candidateName\":\"D26 Candidato A\",",
+    "got": "HTTP 200 {\"result\":{\"id\":\"cmtq4s80l000pp4cnsish9og9\",\"sessionId\":\"cmtq4s80j000jp4cnndmps02s\",\"candidateId\":\"cmtq4s80e0009p4cnyyml93rr\",\"candidateName\":\"D26 Candidato A\",",
     "pass": true
   },
   {
@@ -164,21 +164,21 @@
     "id": "RG-evaluations",
     "desc": "Regression: sessions list for candidate",
     "expected": "per contract",
-    "got": "HTTP 200 {\"sessions\":[{\"id\":\"cmtmdm74b000jo0cb758le64f\",\"candidateId\":\"cmtmdm7460009o0cbmxtgupov\",\"positionId",
+    "got": "HTTP 200 {\"sessions\":[{\"id\":\"cmtq4s80j000jp4cnndmps02s\",\"candidateId\":\"cmtq4s80e0009p4cnyyml93rr\",\"positionId",
     "pass": true
   },
   {
     "id": "RG-candidates",
     "desc": "Regression: candidates list",
     "expected": "per contract",
-    "got": "HTTP 200 {\"candidates\":[{\"id\":\"cmtmdm748000bo0cbv6k0p3bd\",\"email\":\"d26-cand-a2-1788491424080@test.local\",\"nam",
+    "got": "HTTP 200 {\"candidates\":[{\"id\":\"cmtq4s80f000bp4cnhqbn8hmx\",\"email\":\"d26-cand-a2-1788718453333@test.local\",\"nam",
     "pass": true
   },
   {
     "id": "RG-users",
     "desc": "Regression: users list",
     "expected": "per contract",
-    "got": "HTTP 200 {\"users\":[{\"id\":\"cmtmdm7460009o0cbmxtgupov\",\"email\":\"d26-cand-a-1788491424080@test.local\",\"name\":\"D2",
+    "got": "HTTP 200 {\"users\":[{\"id\":\"cmtq4s80e0009p4cnyyml93rr\",\"email\":\"d26-cand-a-1788718453333@test.local\",\"name\":\"D2",
     "pass": true
   },
   {
@@ -192,7 +192,7 @@
     "id": "RG-positions",
     "desc": "Regression: positions list",
     "expected": "per contract",
-    "got": "HTTP 200 {\"positions\":[{\"id\":\"cmtmdm749000fo0cbv83ndrbd\",\"title\":\"D26 Mesero A 1788491424080\",\"sector\":\"RESTA",
+    "got": "HTTP 200 {\"positions\":[{\"id\":\"cmtq4s80h000fp4cnw98ud8ks\",\"title\":\"D26 Mesero A 1788718453333\",\"sector\":\"RESTA",
     "pass": true
   },
   {
@@ -220,7 +220,7 @@
     "id": "RG-vacancies",
     "desc": "Regression: vacancies list",
     "expected": "per contract",
-    "got": "HTTP 200 {\"vacancies\":[{\"id\":\"cmtmdm74h000vo0cbi6nyvdig\",\"title\":\"D26 Vacante A 1788491424080\",\"slug\":\"d26-va",
+    "got": "HTTP 200 {\"vacancies\":[{\"id\":\"cmtq4s80p000vp4cnxzmrkxda\",\"title\":\"D26 Vacante A 1788718453333\",\"slug\":\"d26-va",
     "pass": true
   },
   {
@@ -234,28 +234,28 @@
     "id": "RG-login",
     "desc": "Regression: login RH-A",
     "expected": "per contract",
-    "got": "HTTP 200 {\"user\":{\"id\":\"cmtmdm7430003o0cb0abzklv1\",\"email\":\"d26-rh-a-1788491424080@test.local\",\"name\":\"D26 RH",
+    "got": "HTTP 200 {\"user\":{\"id\":\"cmtq4s80a0003p4cn5hpysud8\",\"email\":\"d26-rh-a-1788718453333@test.local\",\"name\":\"D26 RH",
     "pass": true
   },
   {
     "id": "RG-sa-aggregate-results",
     "desc": "Regression: SA aggregate mode",
     "expected": "per contract",
-    "got": "HTTP 200 {\"aggregated\":[{\"companyId\":\"cmtmdm7410000o0cbnqjy3n92\",\"companyName\":\"D26 Empresa A 1788491424080\",",
-    "pass": true
+    "got": "HTTP 500 {\"error\":\"Error fetching results\"}",
+    "pass": false
   },
   {
     "id": "RG-sa-aggregate-candidates",
     "desc": "Regression: SA aggregate candidates",
     "expected": "per contract",
-    "got": "HTTP 200 {\"aggregated\":[{\"companyId\":\"cmtmdm7410000o0cbnqjy3n92\",\"companyName\":\"D26 Empresa A 1788491424080\",",
-    "pass": true
+    "got": "HTTP 500 {\"error\":\"Error fetching candidates\"}",
+    "pass": false
   },
   {
     "id": "RG-sa-impersonation-positions",
     "desc": "Regression: SA impersonation positions",
     "expected": "per contract",
-    "got": "HTTP 200 {\"positions\":[{\"id\":\"cmtmdm749000fo0cbv83ndrbd\",\"title\":\"D26 Mesero A 1788491424080\",\"sector\":\"RESTA",
+    "got": "HTTP 200 {\"positions\":[{\"id\":\"cmtq4s80h000fp4cnw98ud8ks\",\"title\":\"D26 Mesero A 1788718453333\",\"sector\":\"RESTA",
     "pass": true
   }
 ]

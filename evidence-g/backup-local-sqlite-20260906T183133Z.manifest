@@ -1,0 +1,21 @@
+timestamp_utc: 20260906T183133Z
+hash_source: sha256 (see .sha256)
+scope: LOCAL DEV SQLITE ONLY — NOT the Supabase staging backup (BLOCKED: no credentials)
+ArcoRequest: 0
+AuditLog: 24
+CandidateInvitation: 0
+Company: 8
+CompanyPrivacyNotice: 0
+ConsentLog: 0
+EvaluationResponse: 3
+EvaluationResult: 3
+EvaluationSession: 6
+EvaluationTemplate: 6
+InterviewSchedule: 0
+Position: 5
+Question: 6
+User: 9
+Vacancy: 5
+VacancyApplication: 7
+VacancyApplicationResponse: 1
+VacancyQuestion: 0
