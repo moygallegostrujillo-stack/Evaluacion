@@ -9,8 +9,16 @@
  * that the RLS policies use to filter rows by the current tenant.
  *
  * Key design decisions:
- * 1. Uses SET LOCAL (transaction-scoped) — no connection contamination
- * 2. Fail-closed: if app.current_company_id is not set, policies deny ALL rows
+ * 1. Uses `SELECT set_config('app.current_company_id', $1, true)` — the
+ *    PostgreSQL-supported, parameter-bound equivalent of SET LOCAL
+ *    (is_local = true → transaction-scoped, auto-cleared on COMMIT/ROLLBACK;
+ *    no connection contamination under PgBouncer/Supavisor transaction pooling).
+ *    PHASE 3.5-I.1: the former `SET LOCAL app.current_company_id = $1` was
+ *    removed — PostgreSQL utility statements cannot take bind parameters, so
+ *    that statement failed at runtime (latent defect documented in 3.5-G M
+ *    finding and 3.5-H GO-CONDICIONAL #3).
+ * 2. Fail-closed: an empty/missing companyId is rejected BEFORE any query;
+ *    if app.current_company_id is not set, policies deny ALL rows
  *    (the evalhr_current_tenant() function returns '__DENIED__')
  * 3. D.2.7 DECISION (closed in D.2.8) — SA AGGREGATE does NOT use a GUC
  *    bypass:
@@ -55,8 +63,26 @@ export interface RLSSessionConfig {
 /**
  * Set the RLS session variables within a Prisma transaction.
  *
- * Uses SET LOCAL (transaction-scoped) to ensure no connection
- * contamination when using connection pooling (PgBouncer).
+ * PHASE 3.5-I.1: uses the ONLY PostgreSQL-correct mechanism for a
+ * parameterized, transaction-scoped GUC assignment:
+ *
+ *     SELECT set_config('app.current_company_id', $1, true)
+ *
+ *   - Parameter-bound ($1): the tenant id never enters the SQL text.
+ *   - is_local = true: scope is the current transaction — automatically
+ *     cleared at COMMIT/ROLLBACK (same semantics as SET LOCAL), so pooled
+ *     connections (PgBouncer/Supavisor transaction mode) are never
+ *     contaminated across requests.
+ *   - NO `SET SESSION`, NO module/global state, NO `app.is_super_admin`
+ *     (D.2.7/D.2.8: no bypass GUC exists anywhere).
+ *
+ * Fail-closed guarantees:
+ *   1. An empty/blank companyId throws BEFORE any statement runs.
+ *   2. The function verifies set_config's return value (set_config returns
+ *      the new setting); any mismatch/missing result throws instead of
+ *      silently continuing without tenant context.
+ *   3. If this function is not called inside a transaction (or fails), the
+ *      policies' evalhr_current_tenant() returns '__DENIED__' → zero rows.
  *
  * IMPORTANT: This must be called inside a db.$transaction() callback.
  */
@@ -64,10 +90,33 @@ export async function setRLSSession(
   tx: Prisma.TransactionClient,
   config: RLSSessionConfig
 ): Promise<void> {
-  // Set the company ID (used by evalhr_current_tenant() function).
-  // D.2.7/D.2.8: NO app.is_super_admin GUC exists anywhere — the
-  // fail-closed policies can never be bypassed through a session flag.
-  await tx.$executeRaw`SET LOCAL app.current_company_id = ${config.companyId}`
+  const companyId = config.companyId
+
+  // Fail-closed gate 1: a tenant scope is mandatory — never set an empty GUC.
+  if (typeof companyId !== 'string' || companyId.trim().length === 0) {
+    throw new Error(
+      'RLS session violation: app.current_company_id requires a non-empty companyId'
+    )
+  }
+
+  // Parameter-bound, transaction-scoped GUC set (see docstring). The GUC name
+  // is a fixed literal; ONLY the tenant value is a bind parameter ($1).
+  const result = await tx.$queryRaw<Array<{ set_config: string }>>`
+    SELECT set_config('app.current_company_id', ${companyId}, true)
+  `
+
+  // Fail-closed gate 2: set_config returns the value it stored. Anything
+  // other than an exact echo means the session state is not what the RLS
+  // policies expect — abort the transaction instead of running unscoped.
+  if (
+    !Array.isArray(result) ||
+    result.length === 0 ||
+    result[0]?.set_config !== companyId
+  ) {
+    throw new Error(
+      'RLS session violation: set_config did not confirm app.current_company_id — transaction aborted (fail-closed)'
+    )
+  }
 }
 
 /**
@@ -77,10 +126,10 @@ export async function setRLSSession(
  * the operation in a transaction and sets the session variables
  * before executing your callback.
  *
- * The session variables are LOCAL to the transaction, so they:
- * - Are automatically cleared on COMMIT or ROLLBACK
- * - Do NOT contaminate other requests using the same pooled connection
- * - Work correctly with PgBouncer in transaction mode
+ * The tenant scope is transaction-local (set_config is_local=true), so it:
+ * - Is automatically cleared on COMMIT or ROLLBACK
+ * - Does NOT contaminate other requests using the same pooled connection
+ * - Works correctly with PgBouncer/Supavisor in transaction mode
  */
 export async function withRLSTransaction<T>(
   config: RLSSessionConfig,

@@ -189,7 +189,8 @@ END $$;
 --   AND c.relname IN ('Position','CandidateInvitation','EvaluationSession',
 --     'EvaluationResult','InterviewSchedule','Vacancy','VacancyApplication',
 --     'ArcoRequest','User','Question','EvaluationResponse',
---     'EvaluationTemplate','VacancyQuestion','VacancyApplicationResponse')
+--     'EvaluationTemplate','VacancyQuestion','VacancyApplicationResponse',
+--     'CompanyPrivacyNotice')
 -- ORDER BY c.relname;
 --
 -- Expected: rls_enabled = false, rls_forced = false on every row.

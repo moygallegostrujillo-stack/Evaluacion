@@ -33,8 +33,11 @@
 -- How it works:
 --   1. FORCE RLS on all tenant-scoped tables (even the table owner
 --      cannot bypass; only a role with BYPASSRLS — evalhr_sa — can).
---   2. App (evalhr_app) sets app.current_company_id via SET LOCAL in
---      each transaction (src/lib/db-rls-session.ts).
+--   2. App (evalhr_app) sets app.current_company_id via
+--      SELECT set_config('app.current_company_id', $1, true) — parameter-
+--      bound and transaction-local — in each transaction
+--      (src/lib/db-rls-session.ts, PHASE 3.5-I.1; the former
+--      "SET LOCAL ... = $1" could never accept a bind parameter).
 --   3. Policies check: companyId = evalhr_current_tenant().
 --   4. If app.current_company_id is empty/missing → '__DENIED__' →
 --      ZERO rows (fail-closed).
@@ -543,7 +546,7 @@ CREATE POLICY "rls_privnotice_delete" ON "CompanyPrivacyNotice" FOR DELETE USING
 --     'EvaluationResult', 'InterviewSchedule', 'Vacancy',
 --     'VacancyApplication', 'ArcoRequest', 'User', 'Question',
 --     'EvaluationResponse', 'EvaluationTemplate', 'VacancyQuestion',
---     'VacancyApplicationResponse'
+--     'VacancyApplicationResponse', 'CompanyPrivacyNotice'
 --   )
 -- ORDER BY c.relname;
 --

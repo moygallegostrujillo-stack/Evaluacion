@@ -420,8 +420,9 @@ export function verifyTenantOwnership(
  * Get the unscoped (raw) Prisma client.
  *
  * PHASE 3.5-B.3 WARNING: Once DB-level RLS is activated in production,
- * this client will be subject to RLS policies. If no SET LOCAL
- * app.current_company_id is executed, the fail-closed function
+ * this client will be subject to RLS policies. If no
+ * set_config('app.current_company_id', …, true) is executed (see
+ * src/lib/db-rls-session.ts), the fail-closed function
  * evalhr_current_tenant() returns '__DENIED__' and ALL tenant-scoped
  * rows will be invisible.
  *
@@ -441,7 +442,8 @@ export function verifyTenantOwnership(
  *     DB-verified rows (e.g. session.companyId), never from client input
  *   - Migration/seed scripts (run as postgres superuser, not evalhr_app)
  *
- * But UNSAFE for regular tenant operations without SET LOCAL context.
+ * But UNSAFE for regular tenant operations without a transaction-local
+ * tenant GUC (set_config, see db-rls-session.ts).
  * Use createRLSClient() instead, which sets the app-level extension.
  *
  * ⚠️ DO NOT use this for regular API operations — use createRLSClient() instead.
