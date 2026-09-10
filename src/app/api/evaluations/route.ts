@@ -2,8 +2,128 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createRLSClient, getUnscopedClient } from '@/lib/rls'
 import { getAuthFromHeaders } from '@/lib/auth'
 import { generateTemplatesForPosition } from '@/lib/generate-templates'
+import { KnowledgeVersioningError } from '@/lib/knowledge-versioning'
+import {
+  scoreCanonicalAdministration,
+  writeKnowledgeResult,
+  resolveCanonicalKnowledgeAssessment,
+  freezeAdministrationForCandidate,
+  jobFromPosition,
+} from '@/lib/knowledge-canonical'
 import { logUnauthorizedAccess } from '@/lib/audit'
 import { needsReconsent } from '@/lib/consent-version'
+
+// ============================================
+// A-03.5 — CANONICAL KNOWLEDGE SERVING HELPERS
+// The internal channel (Position) uses the SAME canonical model as the
+// public channel. When a session has a KnowledgeAdministration (frozen at
+// 'start'), the CONOCIMIENTOS step is served from the FROZEN item set —
+// the live bank is never consulted for a versioned session.
+// ============================================
+
+interface FrozenServedQuestion {
+  id: string
+  text: string
+  type: string
+  options: string[]
+  category: 'KNOWLEDGE'
+  order: number
+  reverseScored: boolean
+  isCustom: boolean
+}
+
+/**
+ * Load the frozen knowledge item set of the session's canonical
+ * administration. Returns null when the session has no administration
+ * (legacy/pre-canonical session) — those keep the historical behavior.
+ * correctAnswer is NEVER included (PASO 9 — the key is server-only).
+ */
+async function loadFrozenKnowledgeQuestions(
+  db: ReturnType<typeof createRLSClient>['client'] | ReturnType<typeof getUnscopedClient>,
+  sessionId: string
+): Promise<FrozenServedQuestion[] | null> {
+  const administration = await db.knowledgeAdministration.findUnique({
+    where: { evaluationSessionId: sessionId },
+  })
+  if (!administration) return null
+
+  const items = await db.knowledgeAssessmentItem.findMany({
+    where: { assessmentId: administration.assessmentId },
+    orderBy: { order: 'asc' },
+  })
+  if (items.length === 0) return null
+
+  return items.map((item) => {
+    let snap: { text?: string; options?: string[]; type?: string } = {}
+    try {
+      snap = JSON.parse(item.questionSnapshot)
+    } catch {
+      snap = {}
+    }
+    return {
+      id: item.itemId,
+      text: snap.text ?? '',
+      type: snap.type ?? 'MULTIPLE_CHOICE',
+      options: Array.isArray(snap.options) ? snap.options : [],
+      category: 'KNOWLEDGE' as const,
+      order: item.order,
+      reverseScored: false,
+      isCustom: false,
+    }
+  })
+}
+
+/**
+ * Serialize templates for the CANDIDATE. A-03.5 (PASO 9): the correctAnswer
+ * key is NEVER serialized — it is protected scoring material resolved
+ * server-side. The knowledge template of a versioned session is replaced by
+ * the frozen item set (same item ids/order for the answer join).
+ */
+function serializeTemplatesForCandidate(
+  templates: Array<{
+    id: string
+    name: string
+    type: string
+    order: number
+    questions: Array<{
+      id: string
+      text: string
+      type: string
+      options: string | null
+      category: string
+      order: number
+      reverseScored: boolean
+      isCustom: boolean
+    }>
+  }>,
+  parseOptions: (options: string | null | undefined) => string[] | undefined,
+  frozenKnowledgeQuestions: FrozenServedQuestion[] | null
+) {
+  return templates.map((t) => {
+    const useFrozen = t.type === 'CONOCIMIENTOS' && frozenKnowledgeQuestions !== null
+    const questions = useFrozen
+      ? frozenKnowledgeQuestions!
+      : t.questions.map((q) => ({
+          id: q.id,
+          text: q.text,
+          type: q.type,
+          options: parseOptions(q.options),
+          category: q.category,
+          order: q.order,
+          reverseScored: q.reverseScored,
+          isCustom: q.isCustom,
+          // correctAnswer deliberately NOT serialized (A-03.5 PASO 9).
+        }))
+    return {
+      id: t.id,
+      name: t.name,
+      type: t.type,
+      order: t.order,
+      questions,
+      questionCount: questions.length,
+    }
+  })
+}
 
 // ============================================
 // SCORING ALGORITHM
@@ -494,7 +614,8 @@ export async function GET(req: NextRequest) {
             order: q.order,
             reverseScored: q.reverseScored,
             isCustom: q.isCustom,
-            correctAnswer: q.correctAnswer,
+            // A-03.5 PASO 9: correctAnswer NEVER serialized to any client of
+            // this route (protected scoring material, resolved server-side).
           })),
           questionCount: t.questions.length,
         })),
@@ -583,24 +704,10 @@ export async function GET(req: NextRequest) {
       }
 
       // Serialize templates with parsed options
-      const serializedTemplates = templates.map((t) => ({
-        id: t.id,
-        name: t.name,
-        type: t.type,
-        order: t.order,
-        questions: t.questions.map((q) => ({
-          id: q.id,
-          text: q.text,
-          type: q.type,
-          options: parseOptions(q.options),
-          category: q.category,
-          order: q.order,
-          reverseScored: q.reverseScored,
-          isCustom: q.isCustom,
-          correctAnswer: q.correctAnswer,
-        })),
-        questionCount: t.questions.length,
-      }))
+      // A-03.5 (PASO 7/9): a session with a canonical administration is served
+      // the FROZEN knowledge item set; correctAnswer is never serialized.
+      const frozenKnowledgeQuestions = await loadFrozenKnowledgeQuestions(rlsDb, sessionId)
+      const serializedTemplates = serializeTemplatesForCandidate(templates, parseOptions, frozenKnowledgeQuestions)
 
       // Current step template (1-indexed: step 1 = first template, etc.)
       const currentTemplateIndex = session.currentStep - 1
@@ -876,16 +983,6 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Session already completed' }, { status: 400 })
       }
 
-      const updatedSession = await rlsDb.evaluationSession.update({
-        where: { id: sessionId },
-        data: {
-          status: 'IN_PROGRESS',
-          startedAt: session.startedAt || new Date(),
-          currentStep: 1,
-          currentQuestionIndex: 0,
-        },
-      })
-
       // Get first template questions
       let templates = await rlsDb.evaluationTemplate.findMany({
         where: { positionId: session.positionId, active: true },
@@ -927,6 +1024,82 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      // ── A-03.5 (PASO 7/8): CANONICAL FREEZE for the internal channel. ──
+      // The internal flow resolves the SAME canonical chain as the public
+      // flow: job(position) → blueprint → requirements → assessment ACTIVE
+      // → itemVersions → KnowledgeAdministration. This happens ONCE, when
+      // the session starts; a session that already has an administration
+      // keeps it (the candidate continues with the frozen version even if
+      // the bank changed meanwhile — cross-channel rule, PASO 14/16).
+      // Fail-closed: if the chain cannot be determined, the transaction
+      // rolls back and the session is NOT started.
+      let administrationId: string | null = null
+      try {
+        // PASO 14 (concurrency): the freeze transaction is retried on SQLite
+        // contention — the loser re-reads the winner's published version.
+        for (let attempt = 0; ; attempt++) {
+          try {
+            const frozen = await unscopedDb.$transaction(async (tx) => {
+              const existing = await tx.knowledgeAdministration.findUnique({
+                where: { evaluationSessionId: sessionId },
+              })
+              if (existing) {
+                return { id: existing.id, created: false }
+              }
+
+              const resolution = await resolveCanonicalKnowledgeAssessment(tx, jobFromPosition({
+                id: session.positionId,
+                companyId: session.companyId,
+              }))
+
+              if (resolution.status === 'VERSIONED') {
+                const administration = await freezeAdministrationForCandidate(tx, {
+                  channel: 'INTERNAL_POSITION',
+                  companyId: session.companyId,
+                  assessmentId: resolution.assessment.id,
+                  assessmentVersion: resolution.assessment.version,
+                  blueprintId: resolution.blueprintId,
+                  blueprintVersion: resolution.blueprintVersion ?? '',
+                  scoringVersion: resolution.assessment.scoringVersion,
+                  itemCount: resolution.assessment.itemCount,
+                  sessionId,
+                })
+                return { id: administration.id, created: true }
+              }
+              return { id: null, created: false }
+            }, { timeout: 20000, maxWait: 10000 })
+            administrationId = frozen.id
+            break
+          } catch (freezeErr) {
+            const { isRetryableFreezeError } = await import('@/lib/knowledge-canonical')
+            if (attempt < 3 && isRetryableFreezeError(freezeErr)) {
+              await new Promise((r) => setTimeout(r, 15 + Math.random() * 35))
+              continue
+            }
+            throw freezeErr
+          }
+        }
+      } catch (freezeError) {
+        if (freezeError instanceof KnowledgeVersioningError) {
+          console.error(`[A-03.5] ${freezeError.code} during internal freeze: ${freezeError.message}`)
+          return NextResponse.json(
+            { error: 'No fue posible iniciar la evaluación', code: freezeError.code },
+            { status: 500 }
+          )
+        }
+        throw freezeError
+      }
+
+      const updatedSession = await rlsDb.evaluationSession.update({
+        where: { id: sessionId },
+        data: {
+          status: 'IN_PROGRESS',
+          startedAt: session.startedAt || new Date(),
+          currentStep: 1,
+          currentQuestionIndex: 0,
+        },
+      })
+
       // Helper to parse options JSON string into array
       const parseOptions = (options: string | null | undefined): string[] | undefined => {
         if (!options) return undefined
@@ -939,24 +1112,12 @@ export async function POST(req: NextRequest) {
       }
 
       // Serialize templates with parsed options
-      const serializedTemplates = templates.map((t) => ({
-        id: t.id,
-        name: t.name,
-        type: t.type,
-        order: t.order,
-        questions: t.questions.map((q) => ({
-          id: q.id,
-          text: q.text,
-          type: q.type,
-          options: parseOptions(q.options),
-          category: q.category,
-          order: q.order,
-          reverseScored: q.reverseScored,
-          isCustom: q.isCustom,
-          correctAnswer: q.correctAnswer,
-        })),
-        questionCount: t.questions.length,
-      }))
+      // A-03.5 (PASO 7/9): frozen knowledge set for versioned sessions;
+      // correctAnswer never serialized.
+      const frozenKnowledgeQuestions = administrationId
+        ? await loadFrozenKnowledgeQuestions(rlsDb, sessionId)
+        : null
+      const serializedTemplates = serializeTemplatesForCandidate(templates, parseOptions, frozenKnowledgeQuestions)
 
       return NextResponse.json({
         session: updatedSession,
@@ -976,6 +1137,44 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'questionId and value are required' }, { status: 400 })
       }
 
+      // ── A-03.5 (PASO 10/17): knowledge answers are validated against the
+      // FROZEN administration. A session with a canonical administration can
+      // only answer items that belong to it (fail-closed 403 otherwise);
+      // valid knowledge answers are STAMPED with the administration id
+      // (server-side authority — the client can never supply it). ──
+      let knowledgeStamp: string | null = null
+      const administration = await rlsDb.knowledgeAdministration.findUnique({
+        where: { evaluationSessionId: sessionId },
+      })
+      if (administration) {
+        const frozenItem = await rlsDb.knowledgeAssessmentItem.findFirst({
+          where: { assessmentId: administration.assessmentId, itemId: questionId },
+        })
+        if (frozenItem) {
+          knowledgeStamp = administration.id
+        } else {
+          // Not part of the frozen set — reject only when it is a knowledge
+          // question (answers to other sections flow through unchanged).
+          const bankQuestion = await unscopedDb.question.findUnique({
+            where: { id: questionId },
+            select: { category: true, evaluationTemplate: { select: { type: true } } },
+          })
+          if (
+            bankQuestion &&
+            (bankQuestion.category === 'KNOWLEDGE' ||
+              bankQuestion.evaluationTemplate?.type === 'CONOCIMIENTOS')
+          ) {
+            console.warn(
+              `[SECURITY][A-03.5] answer: knowledge item "${questionId}" is outside the frozen administration of session ${sessionId}`
+            )
+            return NextResponse.json(
+              { error: 'Solicitud inválida', code: 'ITEM_NOT_IN_ADMINISTRATION' },
+              { status: 403 }
+            )
+          }
+        }
+      }
+
       // Upsert the response
       const response = await rlsDb.evaluationResponse.upsert({
         where: {
@@ -987,6 +1186,8 @@ export async function POST(req: NextRequest) {
         update: {
           value: String(value),
           numericValue: numericValue || null,
+          // A-03.5: re-answers keep the administration binding.
+          ...(knowledgeStamp ? { knowledgeAdministrationId: knowledgeStamp } : {}),
         },
         create: {
           sessionId,
@@ -996,6 +1197,8 @@ export async function POST(req: NextRequest) {
           // PARTE 9/10 (D.2.9): tenant invariant — derived from the verified
           // session row (its companyId was checked against auth earlier).
           companyId: session.companyId,
+          // A-03.5: canonical administration binding (server-derived).
+          ...(knowledgeStamp ? { knowledgeAdministrationId: knowledgeStamp } : {}),
         },
       })
 
@@ -1084,24 +1287,10 @@ export async function POST(req: NextRequest) {
       }
 
       // Serialize templates with parsed options
-      const serializedTemplates = templates.map((t) => ({
-        id: t.id,
-        name: t.name,
-        type: t.type,
-        order: t.order,
-        questions: t.questions.map((q) => ({
-          id: q.id,
-          text: q.text,
-          type: q.type,
-          options: parseOptions(q.options),
-          category: q.category,
-          order: q.order,
-          reverseScored: q.reverseScored,
-          isCustom: q.isCustom,
-          correctAnswer: q.correctAnswer,
-        })),
-        questionCount: t.questions.length,
-      }))
+      // A-03.5 (PASO 7/9): frozen knowledge set for versioned sessions;
+      // correctAnswer never serialized.
+      const frozenKnowledgeQuestions = await loadFrozenKnowledgeQuestions(rlsDb, sessionId)
+      const serializedTemplates = serializeTemplatesForCandidate(templates, parseOptions, frozenKnowledgeQuestions)
 
       const nextStep = session.currentStep + 1
 
@@ -1174,6 +1363,35 @@ async function completeEvaluation(
     position.hasKnowledgeTest
   )
 
+  // ── A-03.5 (PASO 10/11): CANONICAL KNOWLEDGE SCORING for versioned
+  // sessions. The knowledge dimension is scored by the SINGLE canonical
+  // engine against the FROZEN administration (the live bank and its mutable
+  // keys are never consulted) and the canonical KnowledgeResult is recorded.
+  // The knowledgeScore stays a separate evidence datum: it feeds overallScore
+  // exactly as before (no formula change), and the KnowledgeResult row keeps
+  // the evidence status (VALID/LIMITED/INSUFFICIENT) apart from the global
+  // score. Legacy sessions without an administration keep the historical
+  // path above (no silent migration, no recalculation). ──
+  let canonicalKnowledge: Awaited<ReturnType<typeof scoreCanonicalAdministration>> | null = null
+  const administration = await rlsDb.knowledgeAdministration.findUnique({
+    where: { evaluationSessionId: session!.id },
+  })
+  if (administration) {
+    try {
+      canonicalKnowledge = await scoreCanonicalAdministration(rlsDb, administration.id)
+      scores.knowledgeScore = canonicalKnowledge.knowledgeScore
+    } catch (scoringError) {
+      if (scoringError instanceof KnowledgeVersioningError) {
+        console.error(`[A-03.5] ${scoringError.code} during internal scoring: ${scoringError.message}`)
+        return NextResponse.json(
+          { error: 'No fue posible completar la evaluación', code: scoringError.code },
+          { status: 500 }
+        )
+      }
+      throw scoringError
+    }
+  }
+
   // PHASE 3.5-B.2 (B7): Defense-in-depth check.
   // The caller (POST handler) MUST verify ownership before calling this function
   // (session.companyId === auth.companyId for non-SA, checked at lines 738-742).
@@ -1234,6 +1452,21 @@ async function completeEvaluation(
       completedAt: new Date(),
     },
   })
+
+  // ── A-03.5 (PASO 8/10/11): record the canonical KnowledgeResult and close
+  // the administration. The KnowledgeResult is the SEPARATE knowledge
+  // evidence record (never merged into overallScore by this phase). ──
+  if (canonicalKnowledge && administration) {
+    try {
+      await writeKnowledgeResult(unscopedDb, administration.id, canonicalKnowledge)
+      await unscopedDb.knowledgeAdministration.update({
+        where: { id: administration.id },
+        data: { status: 'COMPLETED', completedAt: new Date() },
+      })
+    } catch (resultError) {
+      console.error('[A-03.5] Error writing KnowledgeResult:', resultError)
+    }
+  }
 
   return NextResponse.json({
     session: updatedSession,

@@ -41,6 +41,8 @@ export const KNOWLEDGE_PUBLISH_AUTHORITY = 'SYSTEM:PUBLIC_APPLY_FREEZE'
 /**
  * Governance fields a candidate client must NEVER send. Presence of any of
  * these in a public body is treated as a manipulation attempt (PASO 10).
+ * A-03.5 extends the list with the canonical-model authorities: the client
+ * never supplies blueprint/requirement/administration/result identities.
  */
 export const KNOWLEDGE_CLIENT_DENYLIST = [
   'assessmentVersion',
@@ -54,6 +56,18 @@ export const KNOWLEDGE_CLIENT_DENYLIST = [
   'correctAnswerSnapshot',
   'questionSnapshot',
   'knowledgeVersioningStatus',
+  // A-03.5 canonical-model authorities (server-only):
+  'blueprintId',
+  'knowledgeBlueprintId',
+  'requirementId',
+  'knowledgeRequirementId',
+  'itemVersionId',
+  'knowledgeItemVersionId',
+  'knowledgeAdministrationId',
+  'knowledgeAdministration',
+  'knowledgeResultId',
+  'evidenceStatus',
+  'canonicalItemVersion',
 ] as const
 
 export class KnowledgeVersioningError extends Error {
@@ -218,135 +232,29 @@ export interface FrozenAssessment {
   published: boolean // true when a NEW version was created by this call
 }
 
+/**
+ * A-03.4 compat wrapper — publication now flows through the SINGLE canonical
+ * engine (src/lib/knowledge-canonical.ts). The returned shape is preserved
+ * for existing callers; new code must call resolveCanonicalKnowledgeAssessment.
+ */
 export async function publishAssessmentForBank(
   db: DbClient,
   vacancy: { id: string; companyId: string }
 ): Promise<{ assessment: FrozenAssessment; bank: ResolvedBank }> {
-  const bank = await resolveKnowledgeBank(db, vacancy)
-
-  // No knowledge items → no administration to freeze (NOT_APPLICABLE).
-  if (bank.items.length === 0) {
-    return {
-      assessment: {
-        id: '',
-        version: 0,
-        blueprintVersion: '',
-        scoringVersion: KNOWLEDGE_SCORING_VERSION,
-        contentHash: '',
-        itemCount: 0,
-        status: 'NOT_APPLICABLE',
-        published: false,
-      },
-      bank,
-    }
-  }
-
-  const contentHash = canonicalBankHash(bank.items)
-
-  const latest = await db.knowledgeAssessment.findFirst({
-    where: { vacancyId: vacancy.id },
-    orderBy: { version: 'desc' },
-    include: { items: true },
-  })
-
-  // Bank unchanged since the latest version → reuse it (resolve ONCE).
-  if (latest && latest.contentHash === contentHash) {
-    return {
-      assessment: {
-        id: latest.id,
-        version: latest.version,
-        blueprintVersion: latest.blueprintVersion,
-        scoringVersion: latest.scoringVersion,
-        contentHash: latest.contentHash,
-        itemCount: latest.itemCount,
-        status: latest.status,
-        published: false,
-      },
-      bank,
-    }
-  }
-
-  // Bank changed (or first administration) → publish next version.
-  const nextVersion = (latest?.version ?? 0) + 1
-
-  // itemVersion bump rule (PASO 6/7): an item whose question/options/key
-  // changed relative to the LATEST frozen generation gets itemVersion+1.
-  const prevItemsByItemId = new Map<string, { itemVersion: number; hash: string }>()
-  for (const prev of latest?.items ?? []) {
-    const snap = safeParseQuestionSnapshot(prev.questionSnapshot)
-    const hash = crypto
-      .createHash('sha256')
-      .update(
-        [
-          snap?.text ?? '',
-          (snap?.options ?? []).join('\u0000'),
-          prev.correctAnswerSnapshot === null ? 'NO_KEY' : String(prev.correctAnswerSnapshot),
-        ].join('\u0001')
-      )
-      .digest('hex')
-    prevItemsByItemId.set(prev.itemId, { itemVersion: prev.itemVersion, hash })
-  }
-
-  await db.knowledgeAssessment.updateMany({
-    where: { vacancyId: vacancy.id, status: 'ACTIVE' },
-    data: { status: 'RETIRED', retiredAt: new Date() },
-  })
-
-  const created = await db.knowledgeAssessment.create({
-    data: {
-      vacancyId: vacancy.id,
-      companyId: vacancy.companyId,
-      version: nextVersion,
-      blueprintVersion: `BP-v${nextVersion}`,
-      scoringVersion: KNOWLEDGE_SCORING_VERSION,
-      status: 'ACTIVE',
-      contentHash,
-      itemCount: bank.items.length,
-      publishSource: latest ? 'SYSTEM_ON_BANK_CHANGE' : 'SYSTEM_BOOTSTRAP',
-      publishedBy: KNOWLEDGE_PUBLISH_AUTHORITY,
-      publishedAt: new Date(),
-      items: {
-        create: bank.items.map((item) => {
-          const itemHash = crypto
-            .createHash('sha256')
-            .update(
-              [
-                item.text,
-                item.options.join('\u0000'),
-                item.correctAnswer === null ? 'NO_KEY' : String(item.correctAnswer),
-              ].join('\u0001')
-            )
-            .digest('hex')
-          const prev = prevItemsByItemId.get(item.itemId)
-          return {
-            itemId: item.itemId,
-            itemType: item.itemType,
-            itemVersion: prev ? (prev.hash === itemHash ? prev.itemVersion : prev.itemVersion + 1) : 1,
-            order: item.order,
-            questionSnapshot: JSON.stringify({ text: item.text, options: item.options, type: item.type }),
-            correctAnswerSnapshot: item.correctAnswer,
-            hasKey: item.correctAnswer !== null,
-            difficulty: 'UNKNOWN', // never invented (KD rules)
-            source: bank.source,
-          }
-        }),
-      },
-    },
-    include: { items: true },
-  })
-
+  const { resolveCanonicalKnowledgeAssessment, jobFromVacancy } = await import('./knowledge-canonical')
+  const resolution = await resolveCanonicalKnowledgeAssessment(db, jobFromVacancy(vacancy))
   return {
     assessment: {
-      id: created.id,
-      version: created.version,
-      blueprintVersion: created.blueprintVersion,
-      scoringVersion: created.scoringVersion,
-      contentHash: created.contentHash,
-      itemCount: created.itemCount,
-      status: created.status,
-      published: true,
+      id: resolution.assessment.id,
+      version: resolution.assessment.version,
+      blueprintVersion: resolution.assessment.blueprintVersion,
+      scoringVersion: resolution.assessment.scoringVersion,
+      contentHash: resolution.assessment.contentHash,
+      itemCount: resolution.assessment.itemCount,
+      status: resolution.assessment.status,
+      published: resolution.assessment.published,
     },
-    bank,
+    bank: resolution.bank,
   }
 }
 
@@ -370,6 +278,7 @@ export interface KnowledgeFreeze {
   assessmentVersion: number | null
   blueprintVersion: string | null
   scoringVersion: string | null
+  administrationId?: string | null
 }
 
 export async function freezeKnowledgeForApplication(
@@ -377,9 +286,12 @@ export async function freezeKnowledgeForApplication(
   applicationId: string,
   vacancy: { id: string; companyId: string }
 ): Promise<KnowledgeFreeze> {
-  const { assessment } = await publishAssessmentForBank(db, vacancy)
+  const { resolveCanonicalKnowledgeAssessment, freezeAdministrationForCandidate, jobFromVacancy } =
+    await import('./knowledge-canonical')
 
-  if (assessment.status === 'NOT_APPLICABLE') {
+  const resolution = await resolveCanonicalKnowledgeAssessment(db, jobFromVacancy(vacancy))
+
+  if (resolution.status === 'NOT_APPLICABLE') {
     await db.vacancyApplication.update({
       where: { id: applicationId },
       data: { knowledgeVersioningStatus: 'NOT_APPLICABLE' },
@@ -393,13 +305,26 @@ export async function freezeKnowledgeForApplication(
     }
   }
 
+  // A-03.5: the administration is a REAL entity bound to the application.
+  const administration = await freezeAdministrationForCandidate(db, {
+    channel: 'PUBLIC_VACANCY',
+    companyId: vacancy.companyId,
+    assessmentId: resolution.assessment.id,
+    assessmentVersion: resolution.assessment.version,
+    blueprintId: resolution.blueprintId,
+    blueprintVersion: resolution.blueprintVersion ?? '',
+    scoringVersion: resolution.assessment.scoringVersion,
+    itemCount: resolution.assessment.itemCount,
+    applicationId,
+  })
+
   await db.vacancyApplication.update({
     where: { id: applicationId },
     data: {
-      knowledgeAssessmentId: assessment.id,
-      knowledgeAssessmentVersion: assessment.version,
-      knowledgeBlueprintVersion: assessment.blueprintVersion,
-      knowledgeScoringVersion: assessment.scoringVersion,
+      knowledgeAssessmentId: resolution.assessment.id,
+      knowledgeAssessmentVersion: resolution.assessment.version,
+      knowledgeBlueprintVersion: resolution.assessment.blueprintVersion,
+      knowledgeScoringVersion: resolution.assessment.scoringVersion,
       knowledgeFrozenAt: new Date(),
       knowledgeVersioningStatus: 'VERSIONED',
     },
@@ -407,10 +332,11 @@ export async function freezeKnowledgeForApplication(
 
   return {
     status: 'VERSIONED',
-    assessmentId: assessment.id,
-    assessmentVersion: assessment.version,
-    blueprintVersion: assessment.blueprintVersion,
-    scoringVersion: assessment.scoringVersion,
+    assessmentId: resolution.assessment.id,
+    assessmentVersion: resolution.assessment.version,
+    blueprintVersion: resolution.assessment.blueprintVersion,
+    scoringVersion: resolution.assessment.scoringVersion,
+    administrationId: administration.id,
   }
 }
 

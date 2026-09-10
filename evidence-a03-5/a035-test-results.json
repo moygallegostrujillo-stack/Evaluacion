@@ -1,0 +1,408 @@
+{
+  "phase": "A-03.5",
+  "timestamp": "2026-09-10T20:32:38.800Z",
+  "total": 57,
+  "passed": 57,
+  "failed": 0,
+  "results": [
+    {
+      "id": "CAN-0",
+      "desc": "public start succeeds",
+      "expected": "200",
+      "got": "200",
+      "pass": true
+    },
+    {
+      "id": "CAN-1",
+      "desc": "KnowledgeBlueprint exists and is linked to the JOB (vacancyId + jobType=VACANCY + BP-v1)",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "CAN-2",
+      "desc": "KnowledgeRequirements linked to blueprint with full metadata (domain/subdomain/description/importance/source/rationale/version/status)",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "CAN-3",
+      "desc": "KnowledgeItemVersions resolve requirementId+itemId+itemVersion with content + protected key",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "CAN-4",
+      "desc": "KnowledgeAssessment linked to job + blueprint (jobType=VACANCY, blueprintId set, KA-v1, publishedBy SYSTEM)",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "CAN-5",
+      "desc": "KnowledgeAssessmentItem rows carry canonical links (requirementId + itemVersionId)",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "CAN-6",
+      "desc": "KnowledgeAdministration frozen (channel PUBLIC_VACANCY, bound to application+assessment, versions denormalized)",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "CAN-7",
+      "desc": "Application freeze fields intact + classified KA-V1+",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "SEC-1a",
+      "desc": "client sending blueprintId rejected",
+      "expected": "403",
+      "got": "403",
+      "pass": true
+    },
+    {
+      "id": "SEC-1b",
+      "desc": "client sending requirementId rejected",
+      "expected": "403",
+      "got": "403",
+      "pass": true
+    },
+    {
+      "id": "SEC-1c",
+      "desc": "client sending knowledgeAdministrationId rejected",
+      "expected": "403",
+      "got": "403",
+      "pass": true
+    },
+    {
+      "id": "SEC-1d",
+      "desc": "client sending evidenceStatus rejected",
+      "expected": "403",
+      "got": "403",
+      "pass": true
+    },
+    {
+      "id": "SEC-2",
+      "desc": "public candidate payload contains NO correctAnswer and NO governance fields",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "SEC-3",
+      "desc": "knowledge response stamped server-side with knowledgeAdministrationId",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "INT-0a",
+      "desc": "internal create-session",
+      "expected": "201",
+      "got": "201",
+      "pass": true
+    },
+    {
+      "id": "INT-0b",
+      "desc": "internal start",
+      "expected": "200",
+      "got": "200",
+      "pass": true
+    },
+    {
+      "id": "INT-1",
+      "desc": "internal start froze a canonical administration (channel INTERNAL_POSITION, bound to session)",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "INT-2",
+      "desc": "internal knowledge step served FROZEN (10 items, no correctAnswer anywhere in candidate payload)",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "INT-3a",
+      "desc": "internal answer accepted",
+      "expected": "200",
+      "got": "200",
+      "pass": true
+    },
+    {
+      "id": "INT-3b",
+      "desc": "internal knowledge answer stamped with administration id",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "INT-4",
+      "desc": "internal answer to item OUTSIDE the frozen administration rejected (403 ITEM_NOT_IN_ADMINISTRATION)",
+      "expected": "403",
+      "got": "403",
+      "pass": true
+    },
+    {
+      "id": "XFLOW-0b",
+      "desc": "internal twin start",
+      "expected": "200",
+      "got": "200",
+      "pass": true
+    },
+    {
+      "id": "XFLOW-0a",
+      "desc": "public twin start",
+      "expected": "200",
+      "got": "200",
+      "pass": true
+    },
+    {
+      "id": "XFLOW-1",
+      "desc": "cross-flow: SAME requirements (structure equality across channels)",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "XFLOW-2",
+      "desc": "cross-flow: SAME itemVersions content (question|options|key) and SAME itemVersion numbers",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "XFLOW-3",
+      "desc": "cross-flow: SAME scoringVersion — the channel cannot change the instrument",
+      "expected": "PUB-KS-v1",
+      "got": "PUB-KS-v1",
+      "pass": true
+    },
+    {
+      "id": "CONC-1",
+      "desc": "4 parallel public starts → ALL frozen to the SAME assessment version (no v1/v2 mix)",
+      "expected": "4/4 starts, versions=1",
+      "got": "4/4 starts, versions=1",
+      "pass": true
+    },
+    {
+      "id": "CHG-1",
+      "desc": "candidate A frozen on v1; candidate B frozen on a NEWER version after the bank change",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "CHG-2",
+      "desc": "A completes scored with v1 key (cq1=0 correct) → 100",
+      "expected": "100",
+      "got": "100",
+      "pass": true
+    },
+    {
+      "id": "CHG-3",
+      "desc": "B completes scored with v2 key (cq1=1 correct) → 100",
+      "expected": "100",
+      "got": "100",
+      "pass": true
+    },
+    {
+      "id": "CHG-4",
+      "desc": "KnowledgeResults recorded with VALID evidence and correct scoringVersion",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "CHG-5",
+      "desc": "key change produced a NEW itemVersion for cq1 (v1 edition key=0, v2 edition key=1)",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "CHG-6",
+      "desc": "content-unchanged item KEEPS its itemVersion (edition reuse, lineage preserved)",
+      "expected": "1",
+      "got": "1",
+      "pass": true
+    },
+    {
+      "id": "CHG-7",
+      "desc": "key-only change does NOT bump the blueprint (structure hash unchanged — keys are scoring material, not structure)",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "CHG-8",
+      "desc": "candidate C (post-second-change) gets v3 whose cq3 edition carries the NEW key (3)",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "INTG-1",
+      "desc": "NO canonical assessment contains items without requirement (requirementId+itemVersionId always set)",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "INTG-2",
+      "desc": "assessment NEVER belongs to another job than its blueprint (job↔blueprint binding)",
+      "expected": "0",
+      "got": "0",
+      "pass": true
+    },
+    {
+      "id": "INTG-3",
+      "desc": "itemVersion NEVER changes requirement after publication (frozen lineage)",
+      "expected": "0",
+      "got": "0",
+      "pass": true
+    },
+    {
+      "id": "SCORE-1",
+      "desc": "keyless administration → knowledgeScore null (INSUFFICIENT), evidenceStatus INSUFFICIENT, NEVER 0",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "SCORE-2",
+      "desc": "internal completion → EvaluationResult with canonical knowledgeScore=100 (all keyed correct) + VALID evidence",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "SCORE-3",
+      "desc": "internal KnowledgeResult VALID/COMPLETE_KEYED, administration COMPLETED",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "SCORE-1b",
+      "desc": "vacAll knowledge step completed with NO answers → knowledgeScore null (INSUFFICIENT ≠ 0)",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "SCORE-4",
+      "desc": "INSUFFICIENT knowledge does NOT drag overallScore (formula 0.30/0.30/0.40, unchanged)",
+      "expected": "61.17",
+      "got": "61.17",
+      "pass": true
+    },
+    {
+      "id": "REC-1",
+      "desc": "bank mutation published a NEW generation (assessment RETIRED + NEW blueprint for new administrations)",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "REC-2",
+      "desc": "the historical blueprint is retired but its rows are intact (no silent migration)",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "REC-3",
+      "desc": "historical result rebuilt from frozen chain equals the original (100 — despite live bank mutations)",
+      "expected": "100",
+      "got": "100",
+      "pass": true
+    },
+    {
+      "id": "REC-4",
+      "desc": "stored KnowledgeResult untouched by bank mutations",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "LEG-1",
+      "desc": "pre-A-03.4 row (no freeze fields) classifies LEGACY",
+      "expected": "LEGACY",
+      "got": "LEGACY",
+      "pass": true
+    },
+    {
+      "id": "LEG-2",
+      "desc": "A-03.4-era versioned row classifies KA-V1+",
+      "expected": "KA-V1+",
+      "got": "KA-V1+",
+      "pass": true
+    },
+    {
+      "id": "LEG-3",
+      "desc": "contradictory row (VERSIONED without assessment) classifies UNKNOWN — never silently migrated",
+      "expected": "UNKNOWN",
+      "got": "UNKNOWN",
+      "pass": true
+    },
+    {
+      "id": "LEG-4",
+      "desc": "internal session without administration classifies LEGACY (pre-canonical)",
+      "expected": "LEGACY",
+      "got": "LEGACY",
+      "pass": true
+    },
+    {
+      "id": "REG-1",
+      "desc": "IPIP identical (Big Five scores match the unchanged A-03.4 formula for the given answers)",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "REG-2",
+      "desc": "psychological identical (Stress/Empathy/Adaptability/Leadership/Teamwork match the unchanged formula)",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "REG-3",
+      "desc": "integrity identical (matches the unchanged formula for the given answers)",
+      "expected": "47.92",
+      "got": "47.92",
+      "pass": true
+    },
+    {
+      "id": "REG-4",
+      "desc": "recommendations unchanged (PERFIL_PARCIAL guidance when knowledge is INSUFFICIENT)",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "REG-5",
+      "desc": "canonical internal overallScore — formula unchanged: 0.25*psico + 0.25*psych + 0.15*integrity + 0.35*knowledge",
+      "expected": "77.19",
+      "got": "77.19",
+      "pass": true
+    },
+    {
+      "id": "REG-6",
+      "desc": "ALL pre-existing (A-03.4-era and legacy) rows UNTOUCHED by this phase",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    }
+  ]
+}

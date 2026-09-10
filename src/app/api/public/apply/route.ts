@@ -4,9 +4,12 @@ import { generatePublicToken, verifyPublicToken } from '@/lib/public-token'
 import {
   KnowledgeVersioningError,
   findClientGovernanceField,
-  publishAssessmentForBank,
-  scoreKnowledgeFromFrozenAdministration,
+  freezeKnowledgeForApplication,
 } from '@/lib/knowledge-versioning'
+import {
+  scoreCanonicalAdministration,
+  writeKnowledgeResult,
+} from '@/lib/knowledge-canonical'
 
 const db = getUnscopedClient()
 
@@ -1203,64 +1206,60 @@ export async function POST(req: NextRequest) {
       // After data, check which steps are included
       // Steps: 0=data, 1=psicometrica, 2=psicologica, 3=integridad, 4=conocimientos, 5=done
 
-      // ── A-03.4 (PASO 2/4/8): resolve the knowledge version ONCE and freeze
-      // it in the SAME transaction that creates the application. ──
-      // The active version is resolved exactly one time here; every later
-      // request (answer/advance) uses the frozen administration. If the
-      // version chain cannot be determined, the error propagates, the
-      // transaction rolls back and NO partially-versioned evaluation exists.
+      // ── A-03.5 (PASO 7/8): CANONICAL FREEZE — the public flow no longer
+      // builds a parallel blueprint. Inside the SAME transaction that creates
+      // the application, the canonical chain is resolved EXACTLY ONCE:
+      //
+      //   job(vacancy) → KnowledgeBlueprint → KnowledgeRequirement
+      //     → KnowledgeAssessment ACTIVE → itemVersions
+      //       → KnowledgeAdministration (WHAT the candidate received)
+ //         → frozen on VacancyApplication (A-03.4 compat fields)
+      //
+      // Later requests (answer/advance) NEVER re-read the live bank. If the
+      // chain cannot be determined, the error propagates, the transaction
+      // rolls back and NO partially-versioned evaluation exists (fail-closed).
       let application
       try {
-        application = await db.$transaction(async (tx) => {
-          const { assessment } = await publishAssessmentForBank(tx, vacancy)
+        // PASO 14 (concurrency): parallel freezes on the same bank can hit
+        // SQLite write contention. The whole freeze transaction is retried:
+        // the loser re-reads the winner's published version and reuses it —
+        // every concurrent candidate ends on the SAME published version.
+        for (let attempt = 0; ; attempt++) {
+          try {
+            application = await db.$transaction(async (tx) => {
+              const created = await tx.vacancyApplication.create({
+                data: {
+                  vacancyId: vacancy.id,
+                  companyId: vacancy.companyId,
+                  candidateName: name,
+                  candidateEmail: email,
+                  candidatePhone: phone || null,
+                  candidateAge: age || null,
+                  status: 'IN_PROGRESS',
+                  currentStep: firstStep,
+                  startedAt: new Date(),
+                },
+              })
 
-          const knowledgeFreeze: {
-            knowledgeAssessmentId: string | null
-            knowledgeAssessmentVersion: number | null
-            knowledgeBlueprintVersion: string | null
-            knowledgeScoringVersion: string | null
-            knowledgeFrozenAt: Date | null
-            knowledgeVersioningStatus: string
-          } =
-            assessment.status === 'NOT_APPLICABLE'
-              ? {
-                  knowledgeAssessmentId: null,
-                  knowledgeAssessmentVersion: null,
-                  knowledgeBlueprintVersion: null,
-                  knowledgeScoringVersion: assessment.scoringVersion,
-                  knowledgeFrozenAt: null,
-                  knowledgeVersioningStatus: 'NOT_APPLICABLE',
-                }
-              : {
-                  knowledgeAssessmentId: assessment.id,
-                  knowledgeAssessmentVersion: assessment.version,
-                  knowledgeBlueprintVersion: assessment.blueprintVersion,
-                  knowledgeScoringVersion: assessment.scoringVersion,
-                  knowledgeFrozenAt: new Date(),
-                  knowledgeVersioningStatus: 'VERSIONED',
-                }
+              await freezeKnowledgeForApplication(tx, created.id, vacancy)
 
-          return tx.vacancyApplication.create({
-            data: {
-              vacancyId: vacancy.id,
-              companyId: vacancy.companyId,
-              candidateName: name,
-              candidateEmail: email,
-              candidatePhone: phone || null,
-              candidateAge: age || null,
-              status: 'IN_PROGRESS',
-              currentStep: firstStep,
-              startedAt: new Date(),
-              // A-03.4: frozen knowledge version chain (server authority)
-              ...knowledgeFreeze,
-            },
-          })
-        })
+              return created
+            }, { timeout: 20000, maxWait: 10000 })
+            break
+          } catch (freezeErr) {
+            const { isRetryableFreezeError } = await import('@/lib/knowledge-canonical')
+            if (attempt < 3 && isRetryableFreezeError(freezeErr)) {
+              await new Promise((r) => setTimeout(r, 15 + Math.random() * 35))
+              continue
+            }
+            throw freezeErr
+          }
+        }
       } catch (versioningError) {
         if (versioningError instanceof KnowledgeVersioningError) {
-          // PASO 8 — fail closed: INTERNAL_ERROR / CONFIGURATION_ERROR and no
+          // Fail-closed: CONFIGURATION_ERROR / INTERNAL_ERROR and no
           // partially-versioned administration was created (rollback).
-          console.error(`[A-03.4] ${versioningError.code}: ${versioningError.message}`)
+          console.error(`[A-03.5] ${versioningError.code}: ${versioningError.message}`)
           return NextResponse.json(
             { error: 'No fue posible iniciar la evaluación', code: versioningError.code },
             { status: 500 }
@@ -1319,11 +1318,15 @@ export async function POST(req: NextRequest) {
       // The version, key and snapshot are derived SERVER-SIDE from the frozen
       // assessment — never from client input. An answer referencing an item
       // outside the frozen administration is rejected (fail-closed).
+      // A-03.5: the response is also STAMPED with the canonical
+      // KnowledgeAdministration id (the formal record of what the candidate
+      // received) — the id is resolved server-side, never client-supplied.
       let knowledgeSnapshotData: {
         itemVersion: number
         questionSnapshot: string
         correctAnswerSnapshot: number | null
         scoringVersionSnapshot: string
+        knowledgeAdministrationId: string
       } | null = null
 
       if (
@@ -1349,12 +1352,29 @@ export async function POST(req: NextRequest) {
           )
         }
 
+        const administration = await db.knowledgeAdministration.findUnique({
+          where: { vacancyApplicationId: applicationId },
+          select: { id: true },
+        })
+        if (!administration) {
+          // Fail-closed: a VERSIONED application without its canonical
+          // administration entity must not accept knowledge answers.
+          console.error(
+            `[A-03.5] CONFIGURATION_ERROR: application ${applicationId} has no canonical administration`
+          )
+          return NextResponse.json(
+            { error: 'Internal server error', code: 'CONFIGURATION_ERROR' },
+            { status: 500 }
+          )
+        }
+
         knowledgeSnapshotData = {
           itemVersion: frozenItem.itemVersion,
           questionSnapshot: frozenItem.questionSnapshot,
           correctAnswerSnapshot: frozenItem.correctAnswerSnapshot, // server-only; never returned to client
           scoringVersionSnapshot:
             application.knowledgeScoringVersion || 'PUB-KS-v1',
+          knowledgeAdministrationId: administration.id,
         }
       }
 
@@ -1439,25 +1459,40 @@ export async function POST(req: NextRequest) {
       const vacancy = application.vacancy
 
       // Calculate scores for the completed step
-      // ── A-03.4 (PASO 4): completedStep=4 for a VERSIONED administration is
-      // scored EXCLUSIVELY against the frozen version (the live bank is never
-      // consulted at scoring time). Legacy rows keep the historical path. ──
+      // ── A-03.5 (PASO 4/10): completedStep=4 for a VERSIONED administration is
+      // scored by the SINGLE canonical engine against the frozen version AND
+      // produces the canonical KnowledgeResult (evidence status; INSUFFICIENT
+      // ≠ 0; explicitly separate from overallScore). Legacy rows keep the
+      // historical path. ──
       let stepScores: Record<string, unknown> | null = null
       let knowledgeVersionedScoring = false
 
       if (completedStep === 4 && application.knowledgeVersioningStatus === 'VERSIONED') {
         try {
-          const frozen = await scoreKnowledgeFromFrozenAdministration(db, {
-            id: application.id,
-            knowledgeAssessmentId: application.knowledgeAssessmentId,
-            knowledgeScoringVersion: application.knowledgeScoringVersion,
+          const administration = await db.knowledgeAdministration.findUnique({
+            where: { vacancyApplicationId: application.id },
           })
-          stepScores = { knowledgeScore: frozen.knowledgeScore }
+          if (!administration) {
+            throw new KnowledgeVersioningError(
+              'CONFIGURATION_ERROR',
+              'VERSIONED application has no canonical administration'
+            )
+          }
+          const canonical = await scoreCanonicalAdministration(db, administration.id)
+          stepScores = { knowledgeScore: canonical.knowledgeScore }
           knowledgeVersionedScoring = true
+
+          // A-03.5 PASO 8/10/11: the administration completes and its
+          // KnowledgeResult is recorded (never merged into overallScore).
+          await writeKnowledgeResult(db, administration.id, canonical)
+          await db.knowledgeAdministration.update({
+            where: { id: administration.id },
+            data: { status: 'COMPLETED', completedAt: new Date() },
+          })
         } catch (scoringError) {
           if (scoringError instanceof KnowledgeVersioningError) {
-            // PASO 8 — fail closed: do not advance/score a corrupted administration.
-            console.error(`[A-03.4] ${scoringError.code} during scoring: ${scoringError.message}`)
+            // Fail-closed: do not advance/score a corrupted administration.
+            console.error(`[A-03.5] ${scoringError.code} during scoring: ${scoringError.message}`)
             return NextResponse.json(
               { error: 'No fue posible completar la evaluación', code: scoringError.code },
               { status: 500 }

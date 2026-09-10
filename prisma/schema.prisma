@@ -37,6 +37,10 @@ model Company {
   vacancyQuestions    VacancyQuestion[]
   vacancyApplicationResponses VacancyApplicationResponse[]
   knowledgeAssessments KnowledgeAssessment[] // A-03.4: knowledge versioning (tenant scope)
+  // A-03.5: canonical knowledge model backrelations (tenant scope)
+  knowledgeBlueprints     KnowledgeBlueprint[]
+  knowledgeAdministrations KnowledgeAdministration[]
+  knowledgeResults         KnowledgeResult[]
 }
 
 model User {
@@ -134,6 +138,8 @@ model Position {
   sessions            EvaluationSession[]
   results             EvaluationResult[]
   interviews          InterviewSchedule[]
+  // A-03.5: canonical knowledge assessments frozen for this position (internal channel)
+  knowledgeAssessments KnowledgeAssessment[]
 }
 
 model EvaluationTemplate {
@@ -213,6 +219,9 @@ model EvaluationSession {
   position  Position            @relation(fields: [positionId], references: [id])
   responses EvaluationResponse[]
   result    EvaluationResult?
+
+  // ── A-03.5: canonical knowledge administration frozen at evaluation start ──
+  knowledgeAdministration KnowledgeAdministration? @relation("AdminSession")
 }
 
 model EvaluationResponse {
@@ -229,6 +238,10 @@ model EvaluationResponse {
   session  EvaluationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   question Question          @relation(fields: [questionId], references: [id])
   company  Company           @relation(fields: [companyId], references: [id])
+
+  // ── A-03.5: when the answer belongs to a canonical knowledge administration,
+  // the server stamps the administration id (never client-supplied). ──
+  knowledgeAdministrationId String?
 
   @@unique([sessionId, questionId])
   @@index([companyId])
@@ -336,6 +349,10 @@ model VacancyQuestion {
   company    Company                       @relation(fields: [companyId], references: [id])
   responses  VacancyApplicationResponse[]
 
+  // ── A-03.5: provenance of bank rows. AI can only create AI_DRAFT rows;
+  // RH creates RH_MANUAL rows; null = pre-A-03.5 (unknown/manual). ──
+  origin String? // RH_MANUAL | AI_DRAFT
+
   @@index([companyId])
 }
 
@@ -405,6 +422,10 @@ model VacancyApplication {
 
   knowledgeAssessment KnowledgeAssessment? @relation(fields: [knowledgeAssessmentId], references: [id], onDelete: Restrict)
 
+  // ── A-03.5: canonical KnowledgeAdministration (formal entity for what the
+  // candidate received). One administration per application. ──
+  knowledgeAdministration KnowledgeAdministration? @relation("AdminApplication")
+
   @@index([knowledgeAssessmentId])
 }
 
@@ -425,6 +446,10 @@ model VacancyApplicationResponse {
   vacancyQuestion VacancyQuestion?   @relation(fields: [vacancyQuestionId], references: [id])
   company         Company            @relation(fields: [companyId], references: [id])
 
+  // ── A-03.5: administration linkage (server-stamped on knowledge answers) ──
+  knowledgeAdministrationId String?
+  knowledgeAdministration   KnowledgeAdministration? @relation(fields: [knowledgeAdministrationId], references: [id])
+
   // ── A-03.4: per-response KNOWLEDGE SNAPSHOT (server-derived, never client-sent) ──
   // Allows historical result reconstruction: Response → frozen key → score.
   // correctAnswerSnapshot is stored server-side ONLY — it is NEVER sent to the
@@ -438,43 +463,69 @@ model VacancyApplicationResponse {
 }
 
 // ══════════════════════════════════════════════════════════════════
-// A-03.4 — KNOWLEDGE VERSIONING (public vacancy flow)
+// A-03.4 / A-03.5 — KNOWLEDGE VERSIONING (canonical model)
 // ══════════════════════════════════════════════════════════════════
-// KnowledgeAssessment = ONE frozen administration version of the knowledge
-// bank for a vacancy. When the bank changes, the next evaluation start
-// publishes a NEW version; administrations already frozen keep their version
-// (candidate continues with KA-v1 even after KA-v2 is published).
-// The blueprint of a public administration IS the frozen ordered item set,
-// co-versioned 1:1 with the assessment (blueprintVersion = BP-v{version}).
+// A-03.5 CANONICAL CHAIN (both internal and public flows):
+//
+//   JOB (Position | Vacancy)
+//     → KnowledgeBlueprint        (jobId + blueprintVersion)
+//       → KnowledgeRequirement    (blueprintId; domain/subdomain/importance)
+//         → KnowledgeItemVersion  (requirementId + itemId + itemVersion;
+//                                  question/options/correctAnswer protected)
+//           → KnowledgeAssessment (jobId + blueprintId + assessmentVersion
+//                                  + scoringVersion, published by SYSTEM only)
+//             → KnowledgeAssessmentItem (frozen administration copy)
+//               → KnowledgeAdministration (candidate/application binding)
+//                 → Response (+ server snapshots)
+//                   → KnowledgeResult (INSUFFICIENT ≠ 0; separate from
+//                                      overallScore)
+//
+// A-03.4 rows keep vacancyId and a null blueprintId: they are classified
+// KA-V1+ PRE-CANONICAL and are NEVER migrated or reinterpreted.
 model KnowledgeAssessment {
   id               String    @id @default(cuid())
-  vacancyId        String
+  // A-03.5: job generalization — a knowledge assessment belongs to ONE job.
+  // Legacy A-03.4 rows have jobType='VACANCY' + vacancyId set + positionId null.
+  jobType          String    @default("VACANCY") // VACANCY (public) | POSITION (internal)
+  vacancyId        String?
+  positionId       String?
   companyId        String
   version          Int       // assessmentVersion: KA-v{version} (1, 2, 3…)
+  // A-03.5: canonical blueprint backing this assessment. Null ONLY on
+  // pre-canonical (A-03.4) rows — new publications ALWAYS link a blueprint.
+  blueprintId      String?
   blueprintVersion String    // co-versioned blueprint (BP-v{version})
   scoringVersion   String    // frozen scoring rules id (e.g. PUB-KS-v1)
   status           String    @default("ACTIVE") // ACTIVE | RETIRED (latest = ACTIVE; superseded = RETIRED)
   contentHash      String    // canonical hash of the bank state at publish time
   itemCount        Int       @default(0)
-  publishSource    String    @default("SYSTEM_BOOTSTRAP") // SYSTEM_BOOTSTRAP | SYSTEM_ON_BANK_CHANGE
-  publishedBy      String    // 'SYSTEM:PUBLIC_APPLY_FREEZE' — server authority. AI has NO publish authority.
+  publishSource    String    @default("SYSTEM_BOOTSTRAP") // SYSTEM_BOOTSTRAP | SYSTEM_ON_BANK_CHANGE | SYSTEM_ON_CANONICAL_MIGRATION
+  publishedBy      String    // 'SYSTEM:KNOWLEDGE_FREEZE' — server authority. AI has NO publish authority.
   publishedAt      DateTime  @default(now())
   retiredAt        DateTime?
   createdAt        DateTime  @default(now())
 
-  vacancy      Vacancy                   @relation(fields: [vacancyId], references: [id])
+  vacancy      Vacancy?                  @relation(fields: [vacancyId], references: [id])
+  position     Position?                 @relation(fields: [positionId], references: [id])
+  blueprint    KnowledgeBlueprint?       @relation(fields: [blueprintId], references: [id])
   company      Company                   @relation(fields: [companyId], references: [id])
   items        KnowledgeAssessmentItem[]
+  administrations KnowledgeAdministration[]
   applications VacancyApplication[]
 
   @@unique([vacancyId, version])
-  @@index([vacancyId, status])
-  @@index([companyId])
+  @@unique([positionId, version])
+  @@index([companyId, status])
+  @@index([blueprintId])
 }
 
 // One frozen item inside a KnowledgeAssessment version.
 // questionSnapshot/correctAnswerSnapshot freeze question text, options and key.
 // Editing the bank NEVER touches these rows (immutable after creation).
+// A-03.5: each administered item RESOLVES the canonical chain
+// (requirementId → KnowledgeRequirement, itemVersionId → KnowledgeItemVersion).
+// Both links are nullable ONLY for pre-canonical A-03.4 rows; every new
+// publication sets both (fail-closed — see knowledge-versioning.ts).
 model KnowledgeAssessmentItem {
   id                    String             @id @default(cuid())
   assessmentId          String
@@ -487,12 +538,159 @@ model KnowledgeAssessmentItem {
   hasKey                Boolean            @default(false)
   difficulty            String             @default("UNKNOWN") // never invented (KD rules)
   source                String             // VACANCY_BANK | TEMPLATE_BANK (origin of the item)
+  // A-03.5 canonical resolution links
+  requirementId         String?            // → KnowledgeRequirement (null only on pre-canonical rows)
+  itemVersionId         String?            // → KnowledgeItemVersion (null only on pre-canonical rows)
   createdAt             DateTime           @default(now())
 
   assessment KnowledgeAssessment @relation(fields: [assessmentId], references: [id], onDelete: Restrict)
+  requirement        KnowledgeRequirement?    @relation(fields: [requirementId], references: [id])
+  canonicalItemVersion KnowledgeItemVersion?  @relation(fields: [itemVersionId], references: [id])
 
   @@unique([assessmentId, itemId])
   @@index([assessmentId])
+  @@index([requirementId])
+}
+
+// ══════════════════════════════════════════════════════════════════
+// A-03.5 — CANONICAL KNOWLEDGE MODEL ENTITIES
+// ══════════════════════════════════════════════════════════════════
+
+// KnowledgeBlueprint — the job-specific knowledge structure. It contains ONLY
+// knowledge relevant to the job. The global Question.category is NEVER used as
+// a blueprint substitute (PASO 3). One ACTIVE blueprint per job at a time.
+model KnowledgeBlueprint {
+  id               String   @id @default(cuid()) // blueprintId
+  jobId            String   // Position.id (POSITION) or Vacancy.id (VACANCY)
+  jobType          String   // POSITION | VACANCY
+  companyId        String
+  blueprintVersion String   // BP-v{n}
+  status           String   @default("ACTIVE") // ACTIVE | RETIRED (latest per job = ACTIVE)
+  contentHash      String   // canonical hash of the requirement structure
+  derivedFrom      String   @default("SYSTEM:CANONICAL_DERIVATION")
+  createdAt        DateTime @default(now())
+
+  company      Company                @relation(fields: [companyId], references: [id])
+  requirements KnowledgeRequirement[]
+  assessments  KnowledgeAssessment[]
+  administrations KnowledgeAdministration[]
+
+  @@unique([jobId, jobType, blueprintVersion])
+  @@index([jobId, jobType, status])
+  @@index([companyId])
+}
+
+// KnowledgeRequirement — a knowledge the job requires, verified by items.
+// Every administered question MUST belong to a requirement (PASO 4/17).
+// APPROVED status is only granted through SYSTEM publication; AI can only
+// ever produce DRAFT content and has no approval authority (PASO 13).
+model KnowledgeRequirement {
+  id            String   @id @default(cuid()) // requirementId
+  blueprintId   String
+  domain        String   @default("KNOWLEDGE")
+  subdomain     String   @default("GENERAL")
+  description   String
+  importance    String   @default("REQUIRED") // REQUIRED | OPTIONAL — no weights, no scoring impact
+  source        String   @default("SYSTEM_DERIVED") // SYSTEM_DERIVED | AI_DRAFT_ORIGIN | HUMAN
+  rationale     String?
+  sourceItemId  String?  // bank row this requirement verifies (canonical 1:1 derivation)
+  version       Int      @default(1)
+  status        String   @default("APPROVED") // DRAFT | APPROVED | RETIRED — APPROVED only via SYSTEM publication
+  createdAt     DateTime @default(now())
+
+  blueprint KnowledgeBlueprint     @relation(fields: [blueprintId], references: [id], onDelete: Restrict)
+  items     KnowledgeItemVersion[]
+  assessmentItems KnowledgeAssessmentItem[]
+
+  @@index([blueprintId])
+}
+
+// KnowledgeItemVersion — the canonical, versioned content of an administered
+// item. Immutable once APPROVED: content changes publish a NEW itemVersion.
+// correctAnswer is PROTECTED scoring material — it is never serialized to any
+// candidate client (PASO 9). Inspectable only server-side.
+model KnowledgeItemVersion {
+  id            String   @id @default(cuid())
+  requirementId String
+  itemId        String   // source bank row: VacancyQuestion.id | Question.id
+  itemType      String   // VACANCY_QUESTION | TEMPLATE_QUESTION
+  itemVersion   Int      @default(1) // bumps when question/options/correctAnswer change
+  question      String
+  options       String   // JSON array of option strings
+  correctAnswer Int?     // PROTECTED (0-based key); null = no valid key (not scorable, K-INS)
+  hasKey        Boolean  @default(false)
+  source        String   // VACANCY_BANK | TEMPLATE_BANK | AI_DRAFT
+  rationale     String?
+  difficulty    String   @default("UNKNOWN") // never invented (KD rules)
+  status        String   @default("APPROVED") // DRAFT | APPROVED | RETIRED
+  createdAt     DateTime @default(now())
+
+  requirement     KnowledgeRequirement      @relation(fields: [requirementId], references: [id], onDelete: Restrict)
+  assessmentItems KnowledgeAssessmentItem[]
+
+  @@unique([itemId, itemVersion])
+  @@index([requirementId])
+}
+
+// KnowledgeAdministration — WHAT a specific candidate received, as a first-
+// class entity (PASO 8). Frozen at evaluation start for BOTH channels:
+// PUBLIC_VACANCY (VacancyApplication) and INTERNAL_POSITION (EvaluationSession).
+// Exactly one administration per application/session (enforced by unique FKs).
+model KnowledgeAdministration {
+  id                   String    @id @default(cuid())
+  channel              String    // PUBLIC_VACANCY | INTERNAL_POSITION
+  companyId            String
+  assessmentId         String
+  assessmentVersion    Int       // denormalized from assessment (KA-v{n}) — frozen copy
+  blueprintId          String?
+  blueprintVersion     String    // denormalized BP-v{n} — frozen copy
+  scoringVersion       String    // denormalized PUB-KS-v{n} — frozen copy
+  itemCount            Int
+  status               String    @default("FROZEN") // FROZEN | COMPLETED
+  frozenAt             DateTime  @default(now())
+  completedAt          DateTime?
+  vacancyApplicationId String?   // channel=PUBLIC_VACANCY
+  evaluationSessionId  String?   // channel=INTERNAL_POSITION
+  createdAt            DateTime  @default(now())
+
+  assessment         KnowledgeAssessment @relation(fields: [assessmentId], references: [id], onDelete: Restrict)
+  blueprint          KnowledgeBlueprint? @relation(fields: [blueprintId], references: [id])
+  vacancyApplication VacancyApplication? @relation("AdminApplication", fields: [vacancyApplicationId], references: [id])
+  evaluationSession  EvaluationSession?  @relation("AdminSession", fields: [evaluationSessionId], references: [id])
+  company            Company             @relation(fields: [companyId], references: [id])
+  results            KnowledgeResult[]
+  responses          VacancyApplicationResponse[]
+
+  @@unique([vacancyApplicationId])
+  @@unique([evaluationSessionId])
+  @@index([companyId])
+  @@index([assessmentId])
+}
+
+// KnowledgeResult — the knowledge evidence result, EXPLICITLY SEPARATE from
+// overallScore (PASO 11). knowledgeScore=null means NO valid scoring evidence
+// (INSUFFICIENT semantics — never 0, A-03.2 criterion preserved).
+// No global formula is designed here; whether/how knowledgeScore enters
+// overallScore is a future methodological phase, out of A-03.5 scope.
+model KnowledgeResult {
+  id                 String   @id @default(cuid())
+  administrationId   String   @unique
+  companyId          String
+  knowledgeScore     Float?   // null = no valid keyed evidence (INSUFFICIENT) — NEVER 0
+  evidenceStatus     String   // VALID | LIMITED | INSUFFICIENT | INVALID | NOT_APPLICABLE
+  reasonCode         String?  // COMPLETE_KEYED | PARTIAL_RESPONSE | NO_KEYED_EVIDENCE | KNOWLEDGE_KEY_MISSING
+  correctCount       Int      @default(0)
+  keyedAnsweredCount Int      @default(0)
+  notScorableCount   Int      @default(0)
+  totalItems         Int      @default(0)
+  scoringVersion     String
+  computedAt         DateTime @default(now())
+  createdAt          DateTime @default(now())
+
+  administration KnowledgeAdministration @relation(fields: [administrationId], references: [id], onDelete: Restrict)
+  company        Company                 @relation(fields: [companyId], references: [id])
+
+  @@index([companyId])
 }
 
 // AuditLog — Security event log (Phase 1.7)

@@ -297,6 +297,11 @@ export async function generateTemplatesForPosition(
             category: 'KNOWLEDGE',
             order: q.order,
             evaluationTemplateId: conocimientosTemplate.id,
+            // A-03.5 ROOT-CAUSE FIX (A-03.1): the bank key is now PERSISTED so
+            // the canonical KnowledgeItemVersion can freeze a valid key.
+            // Keyless bank rows remain possible (correctAnswer null → not
+            // scorable, K-INS) but are never silently dropped anymore.
+            correctAnswer: q.correctAnswer ?? null,
           },
         })
         questionsCreated++

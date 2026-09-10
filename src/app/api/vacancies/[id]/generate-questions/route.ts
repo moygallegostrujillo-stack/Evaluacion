@@ -369,6 +369,11 @@ IMPORTANTE: Las preguntas deben ser específicas para "${vacancy.title}", no pre
           // PARTE 9/10 (D.2.9): tenant invariant — derived from the verified
           // parent vacancy, never from client or AI output.
           companyId: vacancy.companyId,
+          // A-03.5 (PASO 13): provenance marker — the IA can only produce
+          // DRAFT bank rows. Approval/publication authority stays SYSTEM-only:
+          // these rows enter the canonical chain only when the SYSTEM freeze
+          // derives the blueprint/requirements on the next administration.
+          origin: 'AI_DRAFT',
         },
       })
       createdQuestions.push({
