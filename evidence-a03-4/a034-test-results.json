@@ -1,0 +1,246 @@
+{
+  "phase": "A-03.4",
+  "total": 34,
+  "pass": 34,
+  "fail": 0,
+  "results": [
+    {
+      "id": "E2E-1",
+      "desc": "Candidato A inicia (step=data)",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "PUB-K1",
+      "desc": "Inicio público guarda assessmentVersion",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "PUB-K2",
+      "desc": "Inicio público guarda blueprintVersion",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "PUB-K3",
+      "desc": "Inicio público guarda scoringVersion",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "PUB-K4",
+      "desc": "Inicio guarda itemVersions congelados (3 items, v1, con clave)",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "E2E-2",
+      "desc": "A avanza a step 4 (conocimientos)",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "E2E-3",
+      "desc": "A recibe preguntas congeladas v1 (3 preguntas)",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "E2E-4",
+      "desc": "A responde parcialmente (2 respuestas aceptadas)",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "PUB-K8",
+      "desc": "Nuevo candidato recibe KA-v2",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "PUB-K6",
+      "desc": "KA-v1 intacta tras publicar KA-v2 (items/claves/hashes inmutables, status RETIRED)",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "PASO6-a",
+      "desc": "Cambio de clave genera itemVersion 2 para Q1",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "PASO6-b",
+      "desc": "Items sin cambio mantienen itemVersion 1",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "PUB-K5",
+      "desc": "Candidato A continúa usando versión congelada (3 items v1; Q4 NO aparece; versión informada = 1)",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "PUB-K14",
+      "desc": "No se expone correctAnswer/correctAnswerSnapshot al candidato (deep scan)",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "E2E-5",
+      "desc": "A responde Q3 (aceptada)",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "E2E-6",
+      "desc": "A finaliza con clave A → knowledgeScore 66.67 (2/3)",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "E2E-7",
+      "desc": "B avanza a step 4",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "E2E-8",
+      "desc": "B finaliza con clave B → knowledgeScore 25 (1/4)",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "PUB-K7",
+      "desc": "Cambio de clave no altera histórico (snapshot A sigue clave 0 y resultado reconstruido = 66.67)",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "PUB-K15",
+      "desc": "Resultado histórico reconstruible: Candidate→Assessment→ItemVersion→Response→KeySnapshot→ScoringVersion→Result",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "PUB-K9",
+      "desc": "Cliente intenta manipular assessmentVersion → rechazado",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "PUB-K10",
+      "desc": "Cliente intenta manipular itemVersion → rechazado",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "PUB-K11",
+      "desc": "Cliente intenta manipular correctAnswer → rechazado",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "SEC-a",
+      "desc": "Cliente no puede elegir scoringVersion (advance) ni cambiar blueprint (data) → rechazado",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "SEC-b",
+      "desc": "Respuesta fuera de la administración congelada → rechazada (fail-closed)",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "PUB-K12",
+      "desc": "Versión indeterminable (banco corrupto) → 500 CONFIGURATION_ERROR y NO se crea evaluación parcialmente versionada",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "PUB-K13",
+      "desc": "Legacy permanece LEGACY: califica por vía histórica, se etiqueta LEGACY, no se migra a versión",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "REG-4",
+      "desc": "Resultados legacy completos intactos (no migrados, no reinterpretados)",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "REG-1",
+      "desc": "IPIP idéntico: openness=100, neuroticism(rev)=100 vía calculateLikertScore sin cambios",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "REG-2",
+      "desc": "Knowledge interno intacto: /api/evaluations responde 401 (sin tocar scoring interno)",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "REG-3",
+      "desc": "overallScore intacto (pesos adaptativos sin cambios): overall = knowledge para A",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "REG-5",
+      "desc": "Sin knowledge: NOT_APPLICABLE, sin assessment, knowledgeScore null (nunca 0)",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "PASO11",
+      "desc": "IA no cambia assessment activa, versión, clave ni snapshot de administración existente",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    },
+    {
+      "id": "PASO11-b",
+      "desc": "Alta al banco (vía IA/admin) produce versión nueva para NUEVOS candidatos (C→v3); A sigue v1",
+      "expected": "true",
+      "got": "true",
+      "pass": true
+    }
+  ]
+}

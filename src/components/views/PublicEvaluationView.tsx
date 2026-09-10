@@ -209,13 +209,20 @@ export default function PublicEvaluationView() {
   }
 
   // Map a step number to the corresponding view
+  // A-03.4 FIX (before-audit §8): backend step numbering is
+  // 0=data, 1=psicometrica, 2=psicologica, 3=INTEGRIDAD, 4=CONOCIMIENTOS,
+  // 5=done. The client previously mapped conocimientos to 3 and treated
+  // nextStep=4 as "complete", so knowledge questions were silently never
+  // administered in the public flow. Backend step 3 (integridad) is entered
+  // through the conocimientos intro leg which skips when no KNOWLEDGE
+  // questions are served; backend step 4 now renders conocimientos.
   const mapStepToView = async (stepNum: number, data?: any) => {
     switch (stepNum) {
       case 0: setStep('candidate-data'); break
       case 1: await goToSectionIntro('psicometrica', data); break
       case 2: await goToSectionIntro('psicologica', data); break
-      case 3: await goToSectionIntro('conocimientos', data); break
-      case 4: setStep('complete'); break
+      case 3: await goToSectionIntro('conocimientos', data); break // backend step 3 (integridad) → skip leg
+      case 4: await goToSectionIntro('conocimientos', data); break // backend step 4 = conocimientos
       case 5: setStep('complete'); break
       default: setStep('candidate-data')
     }
@@ -423,7 +430,9 @@ export default function PublicEvaluationView() {
       case 'candidate-data': return 0
       case 'psicometrica': return 1
       case 'psicologica': return 2
-      case 'conocimientos': return 3
+      // A-03.4 FIX: conocimientos is backend step 4 (was 3 — mismatch that
+      // prevented knowledge scoring entirely in the public flow).
+      case 'conocimientos': return 4
       default: return 0
     }
   }

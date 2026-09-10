@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUnscopedClient } from '@/lib/rls'
 import { generatePublicToken, verifyPublicToken } from '@/lib/public-token'
+import {
+  KnowledgeVersioningError,
+  findClientGovernanceField,
+  publishAssessmentForBank,
+  scoreKnowledgeFromFrozenAdministration,
+} from '@/lib/knowledge-versioning'
 
 const db = getUnscopedClient()
 
@@ -935,6 +941,63 @@ export async function GET(req: NextRequest) {
 
     // Step 4: conocimientos (vacancy questions + position template questions)
     if (currentStep === 4) {
+      // ── A-03.4: VERSIONED administration → serve the FROZEN item set. ──
+      // The live bank is NEVER consulted for a frozen administration: the
+      // candidate continues with the assessment version frozen at start
+      // (PASO 4/5 — answer/advance never re-resolve "the currently ACTIVE
+      // assessment").
+      if (
+        application.knowledgeVersioningStatus === 'VERSIONED' &&
+        application.knowledgeAssessmentId
+      ) {
+        const frozenItems = await db.knowledgeAssessmentItem.findMany({
+          where: { assessmentId: application.knowledgeAssessmentId },
+          orderBy: { order: 'asc' },
+        })
+
+        if (frozenItems.length === 0) {
+          // Fail-closed (PASO 8): an administration without frozen items
+          // must not continue silently.
+          console.error(
+            `[A-03.4] CONFIGURATION_ERROR: administration ${application.knowledgeAssessmentId} has no frozen items`
+          )
+          return NextResponse.json(
+            { error: 'Internal server error', code: 'CONFIGURATION_ERROR' },
+            { status: 500 }
+          )
+        }
+
+        const allQuestions = frozenItems.map((item) => {
+          const snapshot = JSON.parse(item.questionSnapshot) as {
+            text: string
+            options: string[]
+            type: string
+          }
+          return {
+            id: item.itemId,
+            questionId: item.itemId, // join key for the answer step (frozen)
+            // vacancyQuestionId only for genuine VacancyQuestion items —
+            // template items are joined by questionId (no dangling FK).
+            ...(item.itemType === 'VACANCY_QUESTION' ? { vacancyQuestionId: item.itemId } : {}),
+            text: snapshot.text,
+            type: snapshot.type,
+            category: 'KNOWLEDGE' as const,
+            options: snapshot.options,
+            correctAnswer: undefined, // NEVER expose the frozen key to the candidate
+            order: item.order,
+          }
+        })
+
+        return NextResponse.json({
+          step: 4,
+          stepName: 'conocimientos',
+          applicationId: application.id,
+          knowledgeAssessmentVersion: application.knowledgeAssessmentVersion, // informational, server-frozen
+          questions: allQuestions,
+        })
+      }
+
+      // ── LEGACY administration (pre-A-03.4 row): live-bank path unchanged. ──
       const systemQuestions = await getSystemQuestions(vacancy.companyId, vacancy.includeIntegridad ?? true)
 
       // Start with vacancy custom questions
@@ -960,7 +1023,11 @@ export async function GET(req: NextRequest) {
             category: q.category as "KNOWLEDGE",
             correctAnswer: undefined, // Don't expose correct answer to candidate
             order: q.order,
-            vacancyQuestionId: q.id,
+            // A-03.4 FIX: template questions are joined by questionId (the
+            // scoring step looks them up via systemKnowledgeMap.get(questionId)).
+            // The previous code wrote the template id into vacancyQuestionId,
+            // producing a dangling FK against VacancyQuestion.
+            questionId: q.id,
           })
         }
       }
@@ -1030,6 +1097,21 @@ type ApplyBody = ApplyDataBody | ApplyAnswerBody | ApplyAdvanceBody
 export async function POST(req: NextRequest) {
   try {
     const body: ApplyBody = await req.json()
+
+    // ── A-03.4 (PASO 10): candidate can NEVER supply governance fields. ──
+    // assessmentVersion / itemVersion / correctAnswer / blueprintVersion /
+    // scoringVersion / snapshots are server-only authorities. Any attempt to
+    // transmit them is rejected BEFORE any lookup or write.
+    const govField = findClientGovernanceField(body as Record<string, unknown>)
+    if (govField) {
+      console.warn(
+        `[SECURITY][A-03.4] public/apply: client attempted to send governance field "${govField}" — rejected`
+      )
+      return NextResponse.json(
+        { error: 'Solicitud inválida', code: 'MANIPULATION_REJECTED' },
+        { status: 403 }
+      )
+    }
 
     // ---- step=data: Start application ----
     if (body.step === 'data') {
@@ -1121,19 +1203,71 @@ export async function POST(req: NextRequest) {
       // After data, check which steps are included
       // Steps: 0=data, 1=psicometrica, 2=psicologica, 3=integridad, 4=conocimientos, 5=done
 
-      const application = await db.vacancyApplication.create({
-        data: {
-          vacancyId: vacancy.id,
-          companyId: vacancy.companyId,
-          candidateName: name,
-          candidateEmail: email,
-          candidatePhone: phone || null,
-          candidateAge: age || null,
-          status: 'IN_PROGRESS',
-          currentStep: firstStep,
-          startedAt: new Date(),
-        },
-      })
+      // ── A-03.4 (PASO 2/4/8): resolve the knowledge version ONCE and freeze
+      // it in the SAME transaction that creates the application. ──
+      // The active version is resolved exactly one time here; every later
+      // request (answer/advance) uses the frozen administration. If the
+      // version chain cannot be determined, the error propagates, the
+      // transaction rolls back and NO partially-versioned evaluation exists.
+      let application
+      try {
+        application = await db.$transaction(async (tx) => {
+          const { assessment } = await publishAssessmentForBank(tx, vacancy)
+
+          const knowledgeFreeze: {
+            knowledgeAssessmentId: string | null
+            knowledgeAssessmentVersion: number | null
+            knowledgeBlueprintVersion: string | null
+            knowledgeScoringVersion: string | null
+            knowledgeFrozenAt: Date | null
+            knowledgeVersioningStatus: string
+          } =
+            assessment.status === 'NOT_APPLICABLE'
+              ? {
+                  knowledgeAssessmentId: null,
+                  knowledgeAssessmentVersion: null,
+                  knowledgeBlueprintVersion: null,
+                  knowledgeScoringVersion: assessment.scoringVersion,
+                  knowledgeFrozenAt: null,
+                  knowledgeVersioningStatus: 'NOT_APPLICABLE',
+                }
+              : {
+                  knowledgeAssessmentId: assessment.id,
+                  knowledgeAssessmentVersion: assessment.version,
+                  knowledgeBlueprintVersion: assessment.blueprintVersion,
+                  knowledgeScoringVersion: assessment.scoringVersion,
+                  knowledgeFrozenAt: new Date(),
+                  knowledgeVersioningStatus: 'VERSIONED',
+                }
+
+          return tx.vacancyApplication.create({
+            data: {
+              vacancyId: vacancy.id,
+              companyId: vacancy.companyId,
+              candidateName: name,
+              candidateEmail: email,
+              candidatePhone: phone || null,
+              candidateAge: age || null,
+              status: 'IN_PROGRESS',
+              currentStep: firstStep,
+              startedAt: new Date(),
+              // A-03.4: frozen knowledge version chain (server authority)
+              ...knowledgeFreeze,
+            },
+          })
+        })
+      } catch (versioningError) {
+        if (versioningError instanceof KnowledgeVersioningError) {
+          // PASO 8 — fail closed: INTERNAL_ERROR / CONFIGURATION_ERROR and no
+          // partially-versioned administration was created (rollback).
+          console.error(`[A-03.4] ${versioningError.code}: ${versioningError.message}`)
+          return NextResponse.json(
+            { error: 'No fue posible iniciar la evaluación', code: versioningError.code },
+            { status: 500 }
+          )
+        }
+        throw versioningError
+      }
 
       return NextResponse.json({
         applicationId: application.id,
@@ -1181,6 +1315,49 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Application not found' }, { status: 404 })
       }
 
+      // ── A-03.4 (PASO 3): knowledge answers bind to the FROZEN administration. ──
+      // The version, key and snapshot are derived SERVER-SIDE from the frozen
+      // assessment — never from client input. An answer referencing an item
+      // outside the frozen administration is rejected (fail-closed).
+      let knowledgeSnapshotData: {
+        itemVersion: number
+        questionSnapshot: string
+        correctAnswerSnapshot: number | null
+        scoringVersionSnapshot: string
+      } | null = null
+
+      if (
+        section === 'CONOCIMIENTOS' &&
+        application.knowledgeVersioningStatus === 'VERSIONED' &&
+        application.knowledgeAssessmentId
+      ) {
+        const joinKey = vacancyQuestionId || questionId || ''
+        const frozenItem = await db.knowledgeAssessmentItem.findFirst({
+          where: {
+            assessmentId: application.knowledgeAssessmentId,
+            itemId: joinKey,
+          },
+        })
+
+        if (!frozenItem) {
+          console.warn(
+            `[SECURITY][A-03.4] answer: item "${joinKey}" is not part of the frozen administration for application ${applicationId}`
+          )
+          return NextResponse.json(
+            { error: 'Solicitud inválida', code: 'ITEM_NOT_IN_ADMINISTRATION' },
+            { status: 403 }
+          )
+        }
+
+        knowledgeSnapshotData = {
+          itemVersion: frozenItem.itemVersion,
+          questionSnapshot: frozenItem.questionSnapshot,
+          correctAnswerSnapshot: frozenItem.correctAnswerSnapshot, // server-only; never returned to client
+          scoringVersionSnapshot:
+            application.knowledgeScoringVersion || 'PUB-KS-v1',
+        }
+      }
+
       // Upsert the response (in case they re-answer)
       const existingResponse = await db.vacancyApplicationResponse.findFirst({
         where: {
@@ -1197,6 +1374,9 @@ export async function POST(req: NextRequest) {
           data: {
             value,
             numericValue: numericValue || null,
+            // A-03.4: re-answers re-bind to the CURRENT frozen state (the
+            // frozen administration itself never changes for this application).
+            ...(knowledgeSnapshotData ? { ...knowledgeSnapshotData } : {}),
           },
         })
       } else {
@@ -1211,6 +1391,8 @@ export async function POST(req: NextRequest) {
             // PARTE 9/10 (D.2.9): tenant invariant — derived from the
             // verified parent application, never from client input.
             companyId: application.companyId,
+            // A-03.4: frozen knowledge snapshot (server-derived)
+            ...(knowledgeSnapshotData ? { ...knowledgeSnapshotData } : {}),
           },
         })
       }
@@ -1257,15 +1439,51 @@ export async function POST(req: NextRequest) {
       const vacancy = application.vacancy
 
       // Calculate scores for the completed step
-      const stepScores = await calculateStepScores(
-        applicationId,
-        completedStep,
-        vacancy.id,
-        vacancy.companyId
-      )
+      // ── A-03.4 (PASO 4): completedStep=4 for a VERSIONED administration is
+      // scored EXCLUSIVELY against the frozen version (the live bank is never
+      // consulted at scoring time). Legacy rows keep the historical path. ──
+      let stepScores: Record<string, unknown> | null = null
+      let knowledgeVersionedScoring = false
+
+      if (completedStep === 4 && application.knowledgeVersioningStatus === 'VERSIONED') {
+        try {
+          const frozen = await scoreKnowledgeFromFrozenAdministration(db, {
+            id: application.id,
+            knowledgeAssessmentId: application.knowledgeAssessmentId,
+            knowledgeScoringVersion: application.knowledgeScoringVersion,
+          })
+          stepScores = { knowledgeScore: frozen.knowledgeScore }
+          knowledgeVersionedScoring = true
+        } catch (scoringError) {
+          if (scoringError instanceof KnowledgeVersioningError) {
+            // PASO 8 — fail closed: do not advance/score a corrupted administration.
+            console.error(`[A-03.4] ${scoringError.code} during scoring: ${scoringError.message}`)
+            return NextResponse.json(
+              { error: 'No fue posible completar la evaluación', code: scoringError.code },
+              { status: 500 }
+            )
+          }
+          throw scoringError
+        }
+      } else {
+        stepScores = await calculateStepScores(
+          applicationId,
+          completedStep,
+          vacancy.id,
+          vacancy.companyId
+        )
+      }
 
       // Update application with step scores and advance step
       const updateData: Record<string, unknown> = {}
+
+      // A-03.4 (PASO 9): explicit LEGACY classification — in-flight rows
+      // created before A-03.4 complete through the historical path and are
+      // stamped LEGACY. They are never migrated to a new version nor
+      // reinterpreted as versioned.
+      if (completedStep === 4 && !knowledgeVersionedScoring && !application.knowledgeVersioningStatus) {
+        updateData.knowledgeVersioningStatus = 'LEGACY'
+      }
 
       if (completedStep === 1 && stepScores) {
         // Psicometrica scores
@@ -1343,14 +1561,6 @@ export async function POST(req: NextRequest) {
         updateData.currentStep = 5
         updateData.videoType = 'SKIPPED'
         updateData.videoUrl = null
-
-        // Calculate overall score
-        const overall = await calculateOverallScore(applicationId)
-        if (overall) {
-          updateData.overallScore = overall.overallScore
-          updateData.recommendation = overall.recommendation
-          updateData.summary = overall.summary
-        }
       }
 
       // Step 6+ is also done (backward compat)
@@ -1359,22 +1569,37 @@ export async function POST(req: NextRequest) {
         updateData.status = 'COMPLETED'
         updateData.completedAt = new Date()
         updateData.currentStep = nextStep
-
-        // Calculate overall score
-        const overall = await calculateOverallScore(applicationId)
-        if (overall) {
-          updateData.overallScore = overall.overallScore
-          updateData.recommendation = overall.recommendation
-          updateData.summary = overall.summary
-        }
       } else if (!completed) {
         updateData.currentStep = nextStep
       }
 
+      // ── A-03.4 ORDERING FIX (within /api/public/apply scope): ──
+      // Persist the step scores (e.g. the knowledgeScore scored from the
+      // frozen administration) BEFORE computing the overall score. The
+      // previous order computed calculateOverallScore() from a row that did
+      // NOT yet contain the scores of the completing step, so the overall
+      // silently excluded knowledge whenever completion happened on the
+      // knowledge step. The scoring FORMULA (calculateOverallScore weights)
+      // is unchanged — only the persist→compute order.
       await db.vacancyApplication.update({
         where: { id: applicationId },
         data: updateData,
       })
+
+      if (completed) {
+        // Calculate overall score — now sees the persisted step scores
+        const overall = await calculateOverallScore(applicationId)
+        if (overall) {
+          await db.vacancyApplication.update({
+            where: { id: applicationId },
+            data: {
+              overallScore: overall.overallScore,
+              recommendation: overall.recommendation,
+              summary: overall.summary,
+            },
+          })
+        }
+      }
 
       // Create EvaluationResult bridge record for HR/Admin visibility when evaluation completes
       if (completed) {
