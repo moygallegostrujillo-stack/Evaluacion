@@ -1,0 +1,27 @@
+questionType,purpose,competencyRelation,indicatorRelation,personalData,sensitiveData,discriminationRisk,proportionality,aiRisk,legalStatus,notes
+BDI past behavior (STAR),Evoke past conduct for a competency,DIRECT (competencyId),DIRECT (indicatorIds),professional experience,no,HIGH (if poorly worded),HIGH (5-question test),LOW (assist only),PUBLICABLE,Core BDI question type
+Situational (hypothetical),Evoke intention (not past),DIRECT,INDIRECT,no,no,MEDIUM,MEDIUM,MEDIUM,CONDICIONAL,LIMITED evidence (not SUPPORTED without past); see 08-hypothetical.md
+Job knowledge,Verify technical knowledge,DIRECT,INDIRECT,no,no,LOW,HIGH,LOW,PUBLICABLE,Overlaps with Knowledge canónico; use BDI for application not test
+Background/trajectory,Context for STAR,INDIRECT,no,professional,no,LOW,HIGH,LOW,PUBLICABLE,Only to frame the STAR example
+Reference verification,Confirm with ex-employer,DIRECT,INDIRECT,contact data,no,MEDIUM,HIGH,MEDIUM,CONDICIONAL,Requires separate consent to contact reference
+Age/date of birth,Infer age,NONE,NONE,no,YES (age),CRITICAL,NONE,N/A,NO_PUBLICABLE,LFT Art 3; LFPEPD; CONAPRED
+Gender/sex,Infer gender,NONE,NONE,no,YES,CRITICAL,NONE,N/A,NO_PUBLICABLE,LFT Art 3
+Pregnancy/maternity,Infer family status,NONE,NONE,no,YES,CRITICAL,NONE,N/A,NO_PUBLICABLE,LFT Art 3; discriminatory
+Marital status,Infer family,NONE,NONE,no,YES,CRITICAL,NONE,N/A,NO_PUBLICABLE,LFT Art 3
+Religion,Infer religion,NONE,NONE,no,YES,CRITICAL,NONE,N/A,NO_PUBLICABLE,LFT Art 3; LFPEPD
+Sexual orientation,Infer orientation,NONE,NONE,no,YES,CRITICAL,NONE,N/A,NO_PUBLICABLE,Constitución Art 1; LFPEPD
+Gender identity,Infer identity,NONE,NONE,no,YES,CRITICAL,NONE,N/A,NO_PUBLICABLE,LFPEPD
+Disability,Infer disability,NONE,NONE,no,YES,CRITICAL,NONE,N/A,NO_PUBLICABLE (BFOQ LEGAL_REVIEW),LFT Art 3; BFOQ restrictivo
+Health/illness,Infer health,NONE,NONE,no,YES,CRITICAL,NONE,N/A,NO_PUBLICABLE (BFOQ LEGAL_REVIEW),LFPDPPP datos sensibles; BFOQ restrictivo
+Genetic info,Infer genetics,NONE,NONE,no,YES,CRITICAL,NONE,N/A,NO_PUBLICABLE,Altamente sensible
+Ethnic origin,Infer origin,NONE,NONE,no,YES,CRITICAL,NONE,N/A,NO_PUBLICABLE,LFT Art 3; LFPEPD
+Nationality (non-BFOQ),Infer nationality,NONE,NONE,no,YES,HIGH,NONE,N/A,NO_PUBLICABLE,Salvo BFOQ (autorización trabajo)
+Political opinion,Infer politics,NONE,NONE,no,YES,CRITICAL,NONE,N/A,NO_PUBLICABLE,LFT Art 3
+Union affiliation,Infer affiliation,NONE,NONE,no,YES,HIGH,NONE,N/A,NO_PUBLICABLE,LFT protege actividad sindical
+Family situation,Infer family,NONE,NONE,no,YES,HIGH,NONE,N/A,NO_PUBLICABLE,LFT Art 3
+Address (unnecessary),Infer residence/origin,NONE,NONE,yes,no,MEDIUM,LOW,N/A,CONDICIONAL,Solo verificación logística justificada
+Appearance,Infer appearance/health,NONE,NONE,no,YES,HIGH,NONE,N/A,NO_PUBLICABLE,Discriminatorio
+Native language (non-BFOQ),Infer origin,NONE,NONE,no,YES,MEDIUM,MEDIUM,N/A,CONDICIONAL,Solo si BFOQ (idioma del puesto)
+Criminal record,Infer past,NONE,NONE,yes,no,MEDIUM,MEDIUM,N/A,CONDICIONAL (LEGAL_REVIEW),Solo si el puesto lo justifica
+Shift availability,Verify availability,NONE,NONE,yes,no,MEDIUM,HIGH,N/A,CONDICIONAL (BFOQ),Solo si turno es esencial y BFOQ documentado
+Hypothetical "what would you do",Evoke intention,INDIRECT,INDIRECT,no,no,MEDIUM,MEDIUM,MEDIUM,CONDICIONAL,HYPOTHETICAL → LIMITED (not SUPPORTED)

@@ -1,0 +1,21 @@
+activity,clientCompany,evaluaHR,shared,legalBasisOrReason,notes
+Determine selection purpose,YES,NO,NO,LFPDPPP Art 6 (responsable define finalidad),Empresa cliente decide para qué puesto contrata
+Define job (tasks requirements),YES,NO,NO,LFT (requisitos del puesto),Análisis de puesto por la empresa
+Approve competencies (JobCompetency),YES,YES,YES,LFPDPPP Art 6 (finalidad),Empresa aprueba; EvaluHR sugiere
+Decide hiring,YES,NO,NO,LFT (decisión humana),RR.HH. de la empresa decide
+Review evidence,YES,YES,YES,LFPDPPP Art 7 (consentimiento),Ambos pueden revisar; segregación recomendada
+Conduct interview,NO,YES,NO,LFPDPPP (encargado),EvaluHR opera la herramienta
+Retain evidence (STAR CompetencyResult),NO,YES,NO,LFPDPPP Art 6 (proporcionalidad),EvaluHR como encargado conserva
+Handle ARCO requests,NO,YES,YES,LFPDPPP Art 22,EvaluHR facilita canal; empresa responde como responsable
+Administer platform,NO,YES,NO,LFPDPPP (encargado técnico),Infraestructura EvaluHR
+Privacy notice,YES,YES,NO,LFPDPPP Art 16,Empresa responsable; EvaluHR provee texto
+Candidate consent,YES,YES,NO,LFPDPPP Art 7,Empresa obtiene; EvaluHR facilita formato
+Sub-processors (cloud),NO,YES,NO,LFPDPPP Art 37 + Reglamento Art 74,EvaluHR contrata y gestiona cloud
+Technical security,NO,YES,NO,LFPDPPP (seguridad),EvaluHR implementa medidas técnicas
+Organizational security (interviewer training),YES,YES,YES,LFPDPPP (seguridad),Quien entrevista forma a sus entrevistadores
+Audit compliance,YES,YES,NO,LFPDPPP (transparencia),Empresa puede auditar a EvaluHR
+Breach notification,YES,YES,NO,LFPDPPP reformada 2025 (REQUIERE REVISIÓN LEGAL),EvaluHR notifica a empresa; empresa notifica INAI
+BFOQ management,YES,NO,YES,LFT Art 3 + LFPEPD,Empresa justifica; EvaluHR respeta
+Conflict resolution (CV vs interview),YES,YES,YES,LFPDPPP (decisión humana),Reviewer decide; empresa aprueba
+Retention policy definition,YES,YES,YES,LFPDPPP Art 6,Empresa define; EvaluHR implementa; REQUIERE REVISIÓN LEGAL
+Data export (on termination),YES,YES,NO,LFPDPPP,EvaluHR devuelve/elimina al término del contrato
