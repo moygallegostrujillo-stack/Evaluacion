@@ -1,0 +1,11 @@
+questionId,jobId,competencyId,indicatorId,source,rationale,version,status
+Q-MES-SVC-001,MESERO,COMP-SVC-001,IND-SVC-001-A|IND-SVC-001-C|IND-SVC-001-D,JOB_ANALYSIS,"80% de interacciones del mesero son con comensales; la satisfacción determina propinas y retención",Question-v1,DRAFT/EXAMPLE
+Q-MES-COL-001,MESERO,COMP-COL-001,IND-COL-001-A|IND-COL-001-B,JOB_ANALYSIS,"El mesero coordina con cocina y hostess; sin coordinación el servicio falla",Question-v1,DRAFT/EXAMPLE
+Q-MES-ORG-001,MESERO,COMP-ORG-001,IND-ORG-001-A|IND-ORG-001-B,JOB_ANALYSIS,"El mesero maneja múltiples mesas simultáneamente; sin organización se retrasa",Question-v1,DRAFT/EXAMPLE
+Q-MES-SVC-002,MESERO,COMP-SVC-002,IND-SVC-002-A|IND-SVC-002-B|IND-SVC-002-C,JOB_ANALYSIS,"Los meseros enfrentan reclamos de comensales; el manejo adecuado previene escalamiento",Question-v1,DRAFT/EXAMPLE
+Q-MES-TRV-002,MESERO,COMP-TRV-002,IND-TRV-002-A|IND-TRV-002-B,JOB_ANALYSIS,"El restaurante tiene imprevistos (cambio de menú, ausencias); el mesero debe adaptarse",Question-v1,DRAFT/EXAMPLE
+Q-VEN-SVC-002,VENDEDOR,COMP-SVC-002,IND-SVC-002-A|IND-SVC-002-B|IND-SVC-002-C,JOB_ANALYSIS,"Los vendedores enfrentan reclamos de clientes; el manejo adecuado preserva la relación",Question-v1,DRAFT/EXAMPLE
+Q-VEN-ORG-001,VENDEDOR,COMP-ORG-001,IND-ORG-001-A|IND-ORG-001-B,JOB_ANALYSIS,"El vendedor maneja múltiples clientes y tareas; la organización es crítica",Question-v1,DRAFT/EXAMPLE
+Q-VEN-TRV-002,VENDEDOR,COMP-TRV-002,IND-TRV-002-A|IND-TRV-002-B,JOB_ANALYSIS,"El entorno de ventas cambia (nuevos productos, promociones); el vendedor debe adaptarse",Question-v1,DRAFT/EXAMPLE
+Q-VEN-COL-001,VENDEDOR,COMP-COL-001,IND-COL-001-A|IND-COL-001-B,JOB_ANALYSIS,"Los vendedores colaboran entre sí y con otras áreas; la cooperación mejora resultados",Question-v1,DRAFT/EXAMPLE
+Q-VEN-SVC-001,VENDEDOR,COMP-SVC-001,IND-SVC-001-A|IND-SVC-001-C|IND-SVC-001-D,JOB_ANALYSIS,"El vendedor atiende clientes con necesidades complejas; el servicio adecuado genera ventas",Question-v1,DRAFT/EXAMPLE
