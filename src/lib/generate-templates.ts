@@ -1,12 +1,22 @@
 /**
  * Auto-generate evaluation templates and questions for a position.
- * Every position gets: PSICOMETRICA (Big Five) + PSICOLOGICA + INTEGRIDAD
- * If hasKnowledgeTest: also CONOCIMIENTOS with category-specific questions
+ *
+ * A-05.3: PSICOMETRICA (Big Five) is NO LONGER created for new V1 positions.
+ * The Big Five demo is PROJECT-CREATED with UNKNOWN rights and NOT_ESTABLISHED
+ * evidence (A-05.1/A-05.2). Per A-05.2 OPTION E, Personality is NOT_IMPLEMENTED
+ * in V1. New positions get: PSICOLOGICA + INTEGRIDAD (+ CONOCIMIENTOS if applicable).
+ *
+ * Existing positions with PSICOMETRICA templates retain them (LEGACY); their
+ * Big Five responses are preserved but do NOT feed the overallScore (the
+ * canonical engine excludes BIG_FIVE with reason PERSONALITY_NOT_APPROVED_FOR_V1).
  */
 
 import { getUnscopedClient } from '@/lib/rls'
 
-// ── Big Five personality questions (shared across all positions) ──
+// ── Big Five personality questions ──
+// A-05.3: LEGACY / DEVELOPMENT_ONLY — retained for reference and for serving
+// existing positions that already have a PSICOMETRICA template. NOT used to
+// create new PSICOMETRICA templates for V1 positions (see generateTemplatesForPosition).
 const BIG_FIVE_QUESTIONS = [
   { text: 'Disfruto probar nuevas formas de hacer las cosas en el trabajo', category: 'OPENNESS', order: 1 },
   { text: 'Me considero una persona creativa e imaginativa', category: 'OPENNESS', order: 2 },
@@ -214,35 +224,19 @@ export async function generateTemplatesForPosition(
   let templatesCreated = 0
   let questionsCreated = 0
 
-  // 1. Create PSICOMETRICA template (Big Five)
-  const psicoTemplate = await db.evaluationTemplate.create({
-    data: {
-      name: `Evaluación Psicométrica - ${categoryName}`,
-      type: 'PSICOMETRICA',
-      description: `Test Big Five de personalidad para puesto de ${categoryName}`,
-      order: 1,
-      positionId,
-      companyId: positionCompanyId,
-      active: true,
-    },
-  })
-  templatesCreated++
+  // ── A-05.3: PSICOMETRICA (Big Five) template is NOT created for new V1 positions.
+  // Personality is NOT_IMPLEMENTED in V1 (A-05.2 OPTION E). The BIG_FIVE_QUESTIONS
+  // array is retained above as LEGACY/DEVELOPMENT_ONLY for reference and for
+  // serving existing positions that already have a PSICOMETRICA template.
+  // The canonical overall-score engine excludes BIG_FIVE with reason
+  // PERSONALITY_NOT_APPROVED_FOR_V1 regardless of whether data exists.
+  //
+  // Historical positions with an existing PSICOMETRICA template are unaffected:
+  // their Big Five questions remain served (LEGACY), responses are persisted,
+  // but the scores do NOT feed the overallScore for new evaluations.
+  // ──
 
-  for (const q of BIG_FIVE_QUESTIONS) {
-    await db.question.create({
-      data: {
-        text: q.text,
-        type: 'LIKERT',
-        category: q.category,
-        reverseScored: q.reverseScored || false,
-        order: q.order,
-        evaluationTemplateId: psicoTemplate.id,
-      },
-    })
-    questionsCreated++
-  }
-
-  // 2. Create PSICOLOGICA template
+  // 1. Create PSICOLOGICA template
   const psicologicaTemplate = await db.evaluationTemplate.create({
     data: {
       name: `Evaluación Psicológica - ${categoryName}`,

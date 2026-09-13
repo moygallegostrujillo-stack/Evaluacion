@@ -273,13 +273,27 @@ model EvaluationResult {
   // Conocimientos (0-100, null si no aplica)
   knowledgeScore    Float?
 
-  // Integridad (0-100)
+  // Integridad (0-100) — A-04.5: isolated from overallScore (still stored
+  // separately for IntegrityResult / future phases). Legacy values untouched.
   integrityScore    Float    @default(0)
 
   // General
   overallScore      Float    @default(0)
   recommendation    String   @default("PENDIENTE") // PERFIL_COMPLETO, PERFIL_PARCIAL, PENDIENTE
   summary           String?
+
+  // ── A-04.5: CANONICAL OVERALL SCORE VERSIONING ──
+  // formulaVersion identifies the technical formula that produced the
+  // overallScore. 'OVERALL-v1' = canonical engine (new evaluations).
+  // NULL = LEGACY-OVERALL (pre-A-04.5 rows; value preserved as-is,
+  // NEVER recalculated).
+  formulaVersion     String?
+  // JSON array of included instrument kinds (e.g. ["BIG_FIVE","KNOWLEDGE"]).
+  includedSections   String?
+  // JSON array of excluded instrument kinds.
+  excludedSections   String?
+  // JSON map instrument→exclusion reason (e.g. {"INTEGRITY":"INTEGRITY_NOT_APPROVED_FOR_OVERALL"}).
+  excludedReasons    String?
 
   // Retention fields (Phase 3)
   retainedUntil     DateTime? // When this result should be purged (2 years after createdAt)
@@ -405,6 +419,13 @@ model VacancyApplication {
   overallScore       Float     @default(0)
   recommendation     String    @default("PENDIENTE") // PERFIL_COMPLETO, PERFIL_PARCIAL, PENDIENTE
   summary            String?
+
+  // ── A-04.5: CANONICAL OVERALL SCORE VERSIONING ──
+  // 'OVERALL-v1' = canonical engine; NULL = LEGACY-OVERALL (preserved, never recalculated).
+  formulaVersion     String?
+  includedSections   String? // JSON array of instrument kinds
+  excludedSections   String? // JSON array of instrument kinds
+  excludedReasons    String? // JSON map instrument→reason
 
   vacancy    Vacancy                      @relation(fields: [vacancyId], references: [id])
   company    Company                      @relation(fields: [companyId], references: [id])

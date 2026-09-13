@@ -241,6 +241,12 @@ model EvaluationResult {
   recommendation    String   @default("PENDIENTE") // PERFIL_COMPLETO, PERFIL_PARCIAL, PENDIENTE
   summary           String?
 
+  // A-04.5: canonical overall score versioning (synced from schema.prisma)
+  formulaVersion     String?
+  includedSections   String?
+  excludedSections   String?
+  excludedReasons    String?
+
   createdAt         DateTime @default(now())
 
   // PHASE 3.5 (B4) retention columns — synced from schema.prisma
@@ -352,6 +358,12 @@ model VacancyApplication {
   overallScore       Float     @default(0)
   recommendation     String    @default("PENDIENTE") // PERFIL_COMPLETO, PERFIL_PARCIAL, PENDIENTE
   summary            String?
+
+  // A-04.5: canonical overall score versioning (synced from schema.prisma)
+  formulaVersion     String?
+  includedSections   String?
+  excludedSections   String?
+  excludedReasons    String?
 
   vacancy    Vacancy                      @relation(fields: [vacancyId], references: [id])
   company    Company                      @relation(fields: [companyId], references: [id])

@@ -1,0 +1,6 @@
+route,oldFormula,newFormula,integrityIncluded,knowledgeIncluded,insufficientBehavior,formulaVersion,status
+/api/evaluations,F1 calculateScores branch-matrix (0.25/0.25/0.15/0.35; 0.30/0.30/0.40; 0.50/0.50; equal-split),OVERALL-v1 canonical engine,NO (isolated),YES (if VALID/LIMITED),EXCLUDED (never 0),OVERALL-v1,UNIFIED
+/api/public/apply (per-step),F2 calculateScores branch-matrix (same as F1),OVERALL-v1 canonical engine,NO (isolated),YES (if VALID/LIMITED),EXCLUDED (never 0),OVERALL-v1,UNIFIED
+/api/public/apply (final),F3 calculateOverallScore branch-matrix (same as F1),OVERALL-v1 canonical engine,NO (isolated),YES (if VALID/LIMITED),EXCLUDED (never 0),OVERALL-v1,UNIFIED
+/api/public/video,F4 inline proportional-renorm (0.30/0.30/0.40; neuroticism re-inverted; /5 fixed; no INT),OVERALL-v1 canonical engine,NO (isolated),YES (if VALID/LIMITED),EXCLUDED (never 0),OVERALL-v1,UNIFIED
+LEGACY rows (pre-A-04.5),F1/F2/F3/F4 historical values,PRESERVED (never recalculated),N/A (frozen),N/A (frozen),N/A (frozen),NULL = LEGACY-OVERALL,PRESERVED

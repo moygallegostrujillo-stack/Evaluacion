@@ -1,0 +1,6 @@
+transferencia,datos,destino,proveedor,mecanismo,revisionLegal
+T1 Alojamiento BD produccion,Inventario completo,Canada (POR CONFIRMAR),Supabase,Contrato de subencargo + mecanismo por dictamen (marco 2025),LEGAL_REVIEW
+T2 Hosting/cron app,"Solicitudes, logs, cookies",POR CONFIRMAR,Vercel,Idem,LEGAL_REVIEW
+T3 Proveedor IA (prompts de generacion),Contexto de puesto (sin PII detectado),POR CONFIRMAR,Endpoint Z-AI,Idem + prohibicion de entrenamiento,LEGAL_REVIEW
+T4 WhatsApp manual,Nombre+enlace; video,Segun uso,WhatsApp/Meta (fuera del sistema),Sin API; transparencia en aviso,LEGAL_REVIEW
+T5 Otras,-,-,-,-,NO DETECTADA

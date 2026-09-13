@@ -1,0 +1,6 @@
+proveedor,servicio,datos,pais,transferencia,subencargado,riesgo,legalStatus
+Supabase,BD Postgres produccion,Todo inventario (02),Canada (ca-central-1 documentado en auditoria previa; region real POR CONFIRMAR),SI (posible),SI (encargo pendiente),ALTO,LEGAL_REVIEW - DOCUMENTACION PENDIENTE
+Vercel,Hosting app + cron,"Solicitudes, logs, cookies",POR CONFIRMAR,SI (posible),SI (encargo pendiente),MEDIO,LEGAL_REVIEW
+Proveedor IA (endpoint Z-AI / SDK),Generacion de preguntas,Contexto de puesto (sin PII detectado),POR CONFIRMAR,SI (posible),SI (encargo pendiente),MEDIO,LEGAL_REVIEW
+WhatsApp (uso manual),Canal invitacion/video,Nombre+enlace; video fuera del sistema,Segun servicio,De facto (manual),NO (uso manual de RR.HH.),MEDIO,LEGAL_REVIEW (transparencia)
+Email/SMTP/SMS,-,-,-,-,NO DETECTADO en codigo,-,NO APLICA HOY

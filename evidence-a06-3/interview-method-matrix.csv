@@ -1,0 +1,13 @@
+element,purpose,evidenceValue,standardization,risk,aiRole,humanReview,status
+BDI main question,Evoke past behavior for a competency,HIGH (conducta pasada verificable),HIGH (mismas preguntas),MEDIUM (interviewer bias),Assist (draft generation),MANDATORY,DRAFT
+Probe,Force specificity (Action/Result),MEDIUM (completa STAR),HIGH (banco aprobado),LOW (predefined),Assist (suggest probes),MANDATORY,DRAFT
+STAR capture,Structure evidence (Situation/Task/Action/Result),HIGH (evidencia organizada),HIGH (formato fijo),LOW,Assist (summarize),MANDATORY,DRAFT
+Rubric,Assign qualitative level,HIGH (categorías claras),HIGH (misma rúbrica),MEDIUM (subjectividad),NONE (suggest only),MANDATORY,DRAFT
+Consent/Information,LFPDPPP transparency,N/A (legal),HIGH (obligatorio),LOW,NONE,MANDATORY,DESIGNED
+Introduction,Rapport + format,N/A,N/A,LOW,NONE,MANDATORY,DESIGNED
+Closure,Professional close + next steps,N/A,N/A,LOW,NONE,MANDATORY,DESIGNED
+InterviewReview,Human interpretation of evidence,HIGH (assigns level),HIGH (append-only),MEDIUM (reviewer bias),NONE (suggest level),MANDATORY,DESIGNED
+ConflictRecord,Register CV-vs-interview contradiction,N/A (flag),HIGH (documented),LOW,NONE (detect only),MANDATORY,DESIGNED
+CompetencyResult,Aggregate evidence per competency,HIGH (qualitative level),HIGH (per competency),MEDIUM,NONE,MANDATORY,DESIGNED
+Hypothetical response,Classify intent (not conduct),LOW (LIMITED not SUPPORTED),HIGH (rule),LOW,NONE (detect only),MANDATORY,DESIGNED
+Vague response,Classify insufficient,LOW (INSUFFICIENT not 0),HIGH (rule),LOW,NONE (detect only),MANDATORY,DESIGNED

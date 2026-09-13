@@ -1,0 +1,21 @@
+dato,origen,finalidad,baseJuridicaRequerida,sensible,necesario,acceso,conservacion,transferencia,riesgo,accionLegal
+Nombre candidato,RR.HH. / postulacion publica,Identificar proceso,Aviso + base por dictamen,NO,SI,"RR.HH., SUPER_ADMIN",730 dias (PII purge),Supabase/Vercel,Bajo,Dictamen plazos
+Email,Invitacion / auto-login placeholder,Cuenta + contacto,Aviso + base por dictamen,NO,SI,RR.HH.,730 dias,Supabase/Vercel,Bajo,Dictamen plazos
+Telefono,RR.HH. (requerido),Invitacion WhatsApp manual + dedupe,Aviso + base por dictamen,NO,SI,RR.HH.,730 dias,WhatsApp manual (fuera del sistema),Medio,Transparencia en aviso; dictamen
+Edad (candidateAge),Postulacion publica,Por definir,Por dictamen - atributo protegido,NO (pero protegido),DUDOSO,RR.HH.,730 dias,Supabase,MEDIO-ALTO,Justificar o eliminar (PQ-22)
+"Respuestas Big Five (10 items propios, legacy)",Candidato,Perfil de personalidad (excluido de overall),Consentimiento expreso (sensibles),SI,DUDOSO (declinado V1),RR.HH.,90 dias inactividad,Supabase,Medio,Dictamen: retirar o licenciar (OLI-007)
+Respuestas psicologicas (14 categorias),Candidato,Competencias psicologicas,Consentimiento expreso,SI,SI,RR.HH.,90 dias inactividad,Supabase,Medio,Tratamiento reforzado (10)
+Respuestas conocimientos + snapshots,Candidato,Aptitud tecnica,Aviso + consentimiento,NO,SI,RR.HH. (key solo admin),730 dias / congelado,Supabase,Bajo-Medio,Dictamen exposicion admin (OLI-019)
+Respuestas integridad + integrityScore,Candidato,Indicador orientativo (aislado),Consentimiento expreso,SI,DUDOSO,RR.HH.,90 dias inactividad,Supabase,Medio,Dictamen continuar/retirar (OLI-008)
+videoType/videoUrl (marca de paso),Sistema,Marcar paso de video,Aviso,NO (sin grabacion),CONDICIONADO,RR.HH.,730 dias,Video via WhatsApp fuera del sistema,Medio,Transparencia (OLI-023)
+Scores Big Five / Psicologica,Motor,Insumo informativo,Aviso + consentimiento,SI (derivados),SI,"RR.HH., candidato propio",730 dias,Supabase,Medio,Dictamen
+knowledgeScore,Motor (INSUFFICIENT != 0),Aptitud,Aviso + consentimiento,NO,SI,"RR.HH., candidato",730 dias,Supabase,Bajo,Dictamen
+overallScore (OVERALL-v1.1),Motor (excluye Big Five e Integridad),Orientacion de completitud,Aviso + consentimiento,Parcial,SI,"RR.HH., candidato",730 dias,Supabase,Bajo,Lenguaje + art. 26 (14/25)
+recommendation (PERFIL_COMPLETO/PARCIAL/PENDIENTE),Motor,Orientacion informativa NO decision,Aviso + consentimiento,NO,SI,"RR.HH., candidato",730 dias,Supabase,Bajo,Lenguaje contractual/aviso
+InterviewSchedule (fecha/lugar/estado/notes),RR.HH.,Agendar entrevista,Aviso,NO,SI,RR.HH.,Sin purga especifica,Supabase,Bajo,Incluir en matriz retencion
+Consentimiento (User.consent* + ConsentLog con noticeHash),Candidato,Evidencia de consentimiento,Obligacion legal,NO,SI,Compliance/abogado,Sin purga (evidencia),Supabase,Bajo,Dictamen plazos; gap canal publico (OLI-004)
+ArcoRequest (tipo/estados/deadline),Titular / RR.HH.,Gestionar derechos,Obligacion legal,NO,SI,"RR.HH., SUPER_ADMIN",Sin purga,Supabase,Bajo,Dictamen plazos evidencia
+"AuditLog (11 acciones, IP, UA)",Sistema,Seguridad/gobernanza,Interes legitimo/obligacion,NO,SI,SUPER_ADMIN,90 dias,Supabase,Bajo,Dictamen plazo vs evidencia
+"Cookie evaluhr_token (httpOnly, 8h)",Sistema,Sesion,Necesidad tecnica,NO,SI,Titular de sesion,8 horas,No,Bajo,Aviso de cookies in-app ya existe
+Metadatos de purga (piiPurgeAt/sensitivePurgeAt/retainedUntil),Sistema,Minimizacion,Obligacion,NO,SI,Sistema,-,No,Bajo,Activar cron (OLI-011)
+Prompts/preguntas IA (VacancyQuestion AI_DRAFT),IA (generacion de preguntas),Asistencia RR.HH.,Aviso (uso IA) + contrato,NO (sin PII detectado),SI,RR.HH.,Sin purga especifica,Proveedor IA,Medio,Anexo IA + subencargados (12/17)

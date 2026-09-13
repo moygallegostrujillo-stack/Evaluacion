@@ -1,0 +1,27 @@
+{
+  "phase": "3.5-D.2.5",
+  "createdAt": "2026-09-04T19:51:12.199Z",
+  "input": {
+    "title": "Cajero IA mtndd7ff",
+    "sector": "RESTAURANT",
+    "description": "Descripción Cajero IA mtndd7ff"
+  },
+  "note": "No existe snapshot original pre-migración; la equivalencia funcional se establece por (1) diff de código del prompt/modelo/params/fallback = 0 cambios, (2) validación estructural de la salida. Este snapshot queda como base para fases futuras.",
+  "output": {
+    "count": 8,
+    "latencyMs": 72,
+    "source": "fallback bank (probable)",
+    "orders": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9
+    ],
+    "firstQuestionPreview": "¿Cuál es el procedimiento correcto al recibir un billete de alta denominación?"
+  },
+  "persistedRows": 9
+}

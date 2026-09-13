@@ -1,0 +1,17 @@
+requisito,pdfPublico,avisoInApp,brecha,accion
+Identidad+domicilio responsable,SI (s1),SI (s2-3),-,-
+Finalidades,SI (s3),SI (s9),Cita NOM-035 imprecisa,Corregir redaccion
+Datos tratados,SI (s2),SI (s6),Faltan edad/canal publico/entrevista,Anadir
+Datos sensibles,SI (s2),SI (s6.1-6.2),Cita marco 2011,Actualizar
+Medios de obtencion,PARCIAL,PARCIAL,No explicito,Explicitar
+Consentimiento,SI (s4/s9),SI (s15/s23),Cita Art. 8 de 2011,Actualizar fundamento
+Transferencias,SI (s7),SI (s11),Dice no-transferencias vs infraestructura,Rehacer con subencargados
+IA,NO,PARCIAL,PDF omite IA,Anadir bloque IA
+Revision humana,PARCIAL,SI (s25),-,Unificar
+Conservacion plazos,NO,SI (s16),PDF omite plazos,Anadir [PLAZO POR DICTAMEN]
+ARCO,SI (s6),SI (s13),Autoridad obsoleta (INAI),SABC
+Revocacion,NO,SI (s14/s22),PDF omite,Anadir
+Contacto,SI (s10),SI,-,-
+Cambios al aviso,SI (s11),SI (s22),-,-
+Cookies,NO,SI (s20),PDF omite,Anadir
+Menores,NO,SI (s24),PDF omite,Anadir

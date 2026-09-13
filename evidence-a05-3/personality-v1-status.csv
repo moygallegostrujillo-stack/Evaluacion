@@ -1,0 +1,18 @@
+component,legacy,v1Status,implemented,overallParticipation,frontendVisible,canCreate,canScore,notes
+BIG_FIVE_QUESTIONS (generate-templates.ts),LEGACY/DEVELOPMENT_ONLY,NOT_IMPLEMENTED,YES (array retained for legacy),NO (PERSONALITY_NOT_APPROVED_FOR_V1),YES (legacy positions only; V1 shows "no disponible"),NO (new positions skip PSICOMETRICA template),YES (legacy positions with existing template),Array retained as LEGACY reference; new V1 positions do not get PSICOMETRICA template
+HARDCODED_BIG_FIVE (apply/route.ts),LEGACY,NOT_IMPLEMENTED,YES (fallback retained for legacy),NO (engine excludes),YES (legacy fallback only),NO (new positions have no psicometrica step),YES (legacy flow),Fallback retained for legacy compatibility; engine excludes from overall
+PSICOMETRICA template creation,LEGACY,NOT_IMPLEMENTED,NO (skipped for new V1 positions),N/A,NO (new positions),NO (blocked in generateTemplatesForPosition),N/A,generateTemplatesForPosition skips PSICOMETRICA block for V1
+openness/conscientiousness/extraversion/agreeableness/neuroticism (schema),LEGACY,NOT_IMPLEMENTED (no new data),YES (columns retained),NO (engine excludes BIG_FIVE),YES (legacy data; V1 shows "no disponible" if all 0),NO (no new Big Five questions served),YES (legacy scores persisted),Columns preserved; not nulled retroactively; formulaVersion=null or OVERALL-v1 rows keep their values
+canonical engine (overall-score.ts),OVERALL-v1 (A-04.5),OVERALL-v1.1 (A-05.3),YES,BIG_FIVE EXCLUDED (PERSONALITY_NOT_APPROVED_FOR_V1),N/A,N/A,N/A,getExclusionReason unconditionally returns PERSONALITY_NOT_APPROVED_FOR_V1 for BIG_FIVE
+classifyOverallLineage,N/A,UPDATED,YES,N/A,N/A,N/A,N/A,Recognizes null=LEGACY-OVERALL + OVERALL-v1 (A-04.5) + OVERALL-v1.1 (A-05.3)
+guidance (PERFIL_COMPLETO),LEGACY (required BF),UPDATED (no BF required),YES,N/A,YES,N/A,N/A,allPresent no longer requires hasData(bigFive); V1 candidate PSY+KN+INT = PERFIL_COMPLETO
+EvaluationView description,LEGACY,UPDATED,YES,N/A,YES,N/A,N/A,"Changed to: 'Indicador experimental de personalidad (no disponible como instrumento formal en V1)'"
+PublicEvaluationView STEP_LABEL,LEGACY,UPDATED,YES,N/A,YES,N/A,N/A,"Changed to: 'Indicador experimental de personalidad (no disponible como instrumento formal en V1)'"
+CandidateDetailView Big Five radar,LEGACY,UPDATED,YES,N/A,CONDITIONAL (legacy data only),N/A,N/A,"Shows radar if hasBigFiveData; otherwise shows 'Evaluación de personalidad: no disponible en V1'"
+CompareView Big Five radar,LEGACY,UPDATED,YES,N/A,CONDITIONAL (legacy data only),N/A,N/A,"Shows radar if hasAnyBigFiveData; otherwise shows 'no disponible' card"
+InvitationWelcomeView,LEGACY,UPDATED,YES,N/A,YES,N/A,N/A,"Changed to: 'Indicador experimental de personalidad — no disponible como instrumento formal en V1'"
+ConsentView,LEGACY,UPDATED,YES,N/A,YES,N/A,N/A,"Changed: removed 'Big Five'; now says 'indicador experimental de personalidad, no disponible como instrumento formal en V1'"
+IPIP,NOT_IMPLEMENTED,NOT_IMPLEMENTED,NO,NO,NO,NO,NO,Not installed (grep=0); A-05.2 decision OPTION E
+JobFit,NOT_IMPLEMENTED,NOT_IMPLEMENTED,NO,NO,NO,NO,NO,Not implemented (A-04.5/A-05.3 confirmed)
+Knowledge,IMPLEMENTED (canonical),UNCHANGED,YES,YES (if VALID/LIMITED),YES,N/A,N/A,Not modified by A-05.3
+Integrity,LEGACY (demo),UNCHANGED (isolated A-04.5),YES,NO (INTEGRITY_NOT_APPROVED_FOR_OVERALL),YES,N/A,N/A,Not modified by A-05.3; remains isolated from overallScore

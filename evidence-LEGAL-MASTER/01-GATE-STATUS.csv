@@ -1,0 +1,23 @@
+gate,requirement,status,evidence,owner,blocking,legalReview,nextAction
+LEGAL-DICTAMEN,Dictamen legal profesional emitido,BLOCKED,Paquete completo; sin dictamen,Abogado,SI,SI,Emitir dictamen (28/29)
+LEGAL-AVISO,Aviso alineado con marco 2025 y practica real,OPEN,06 (brechas PDF vs in-app),EvaluHR+Abogado,SI (candidatos),SI,LEGAL-001
+LEGAL-CONSENT,Formas de consentimiento por tratamiento,OPEN,05 (matriz C1-C8),Abogado,SI,SI,LEGAL-002
+LEGAL-CONTRATO,Contrato maestro firmado,BLOCKED,08 (borrador); sin contrato real,EvaluHR+Cliente,SI,SI,LEGAL-003 + OLI-025
+LEGAL-SENSIBLES,Regimen de datos sensibles aprobado,OPEN,"10, 20, 22",Abogado,SI,SI,LEGAL-006
+LEGAL-ARCO,Flujo ARCO conforme texto vigente,CONDITIONAL,09 (implementado 20 dias habiles),EvaluHR,NO,SI,LEGAL-013
+LEGAL-RETENCION,Plazos de conservacion por dictamen,OPEN,15,Abogado+EvaluHR,SI (pre-produccion),SI,LEGAL-004/009
+LEGAL-SUBENCARGADOS,Subencargados declarados y contratados,BLOCKED,17 (sin lista ni acuerdos),EvaluHR,SI,SI,LEGAL-010
+LEGAL-TRANSFERENCIAS,Mecanismos de transferencia aprobados,OPEN,18,Abogado,SI,SI,LEGAL-010
+LEGAL-INCIDENTES,Protocolo de incidentes con plazos,OPEN,19,Abogado+EvaluHR,SI (produccion),SI,LEGAL-011
+LEGAL-SEGURIDAD,Controles declarables sin certificaciones,CONDITIONAL,16 (RLS DB no ejecutado; backups sin soporte),EvaluHR,SI (produccion),SI,LEGAL-005/012
+LEGAL-NO-DISCRIMINACION,Politica adoptada,OPEN,11,EvaluHR+Cliente,NO,SI,LEGAL-014
+LEGAL-IA,Anexo IA validado,OPEN,12,Abogado,NO,SI,LEGAL-002/003 anexos
+LEGAL-ART26,Salvaguardas de evaluacion automatizada,OPEN,"14, 25",Abogado,SI,SI,LEGAL-017
+INTERVIEW-G7,Revision legal de entrevista estructurada,BLOCKED,evidence-a06-11; banco DRAFT,Abogado,SI (activar entrevista),SI,PQ-20/26
+INTERVIEW-G9,Piloto no productivo ejecutado,BLOCKED,A-06.10 NO EJECUTADO,EvaluHR,SI (activar entrevista),NO,Post-dictamen
+LEGAL-G10,Validacion legal post-piloto,BLOCKED,Requiere G8+G9,Abogado,NO (post-V1),SI,Despues del piloto
+PROD-RETENTION-CRON,Cron de retencion operativo,OPEN,15 (middleware bloquea Bearer),EvaluHR,NO,NO,LEGAL-009 (OPER-01)
+PROD-RLS-DB,RLS Postgres activado,BLOCKED,rls-policies.sql NOT EXECUTED,EvaluHR,SI (produccion),NO,LEGAL-005
+PROD-SCHEMA-PARITY,Paridad dev/prod de modelos,OPEN,7 modelos Knowledge ausentes en prod,EvaluHR,NO,NO,LEGAL-022
+PROD-IPIP,Licencia/retiro de Big Five,OPEN,20,EvaluHR,NO,SI,LEGAL-015
+PROD-AGE,Justificacion o eliminacion de candidateAge,OPEN,"02, 11",Cliente+EvaluHR,SI (pre-produccion),SI,LEGAL-007

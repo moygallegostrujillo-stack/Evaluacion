@@ -11,7 +11,7 @@ import { Separator } from '@/components/ui/separator'
 import {
   ArrowLeft, CheckCircle2, AlertTriangle, XCircle,
   Calendar, MapPin, FileText, Mail, Phone, User,
-  ShieldCheck, ShieldX, Scale, AlertCircle, RefreshCw, Download, Info
+  ShieldCheck, ShieldX, Scale, AlertCircle, RefreshCw, Download, Info, Brain
 } from 'lucide-react'
 import {
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
@@ -81,6 +81,14 @@ export default function CandidateDetailView() {
     { dimension: 'Neuroticismo', valor: result.neuroticism, fullMark: 100 },
   ]
 
+  // A-05.3: Big Five is NOT_IMPLEMENTED for V1. If all Big Five scores are 0,
+  // the evaluation is a V1 new evaluation (no Big Five questions served).
+  // Legacy results with real Big Five data still show the radar.
+  const hasBigFiveData =
+    result.openness > 0 || result.conscientiousness > 0 ||
+    result.extraversion > 0 || result.agreeableness > 0 ||
+    result.neuroticism > 0
+
   const psychData = [
     { dimension: 'Estrés', valor: result.stressLevel, fullMark: 100 },
     { dimension: 'Empatía', valor: result.empathy, fullMark: 100 },
@@ -92,7 +100,10 @@ export default function CandidateDetailView() {
   const hasIntegrity = result.integrityScore !== undefined && result.integrityScore !== null && result.integrityScore > 0
 
   const scoresBarData = [
-    { name: 'Big Five', puntaje: Math.round((result.openness + result.conscientiousness + result.extraversion + result.agreeableness + (100 - result.neuroticism)) / 5) },
+    // A-05.3: Big Five only shown if legacy data exists (V1 new evaluations have no Big Five)
+    ...(hasBigFiveData
+      ? [{ name: 'Big Five (legado)', puntaje: Math.round((result.openness + result.conscientiousness + result.extraversion + result.agreeableness + (100 - result.neuroticism)) / 5) }]
+      : []),
     { name: 'Psicológica', puntaje: Math.round((result.stressLevel + result.empathy + result.adaptability + result.leadership + result.teamwork) / 5) },
     ...(hasIntegrity ? [{ name: 'Integridad', puntaje: Math.round(result.integrityScore!) }] : []),
     ...(result.knowledgeScore !== null && result.knowledgeScore !== undefined
@@ -395,27 +406,37 @@ export default function CandidateDetailView() {
 
       {/* Radar Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Big Five */}
+        {/* Big Five — A-05.3: only shown if legacy data exists */}
         <Card className="shadow-sm">
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg">Big Five - Personalidad</CardTitle>
+            <CardTitle className="text-lg">Personalidad {hasBigFiveData ? '(legado)' : ''}</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <RadarChart data={bigFiveData}>
-                <PolarGrid />
-                <PolarAngleAxis dataKey="dimension" tick={{ fontSize: 11 }} />
-                <PolarRadiusAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
-                <Radar name="Puntuación" dataKey="valor" stroke="#10b981" fill="#10b981" fillOpacity={0.3} />
-              </RadarChart>
-            </ResponsiveContainer>
-            <div className="space-y-2 mt-4">
-              <ScoreBar label="Apertura a la experiencia" value={result.openness} />
-              <ScoreBar label="Responsabilidad" value={result.conscientiousness} />
-              <ScoreBar label="Extraversión" value={result.extraversion} />
-              <ScoreBar label="Amabilidad" value={result.agreeableness} />
-              <ScoreBar label="Neuroticismo (menor es mejor)" value={result.neuroticism} invert />
-            </div>
+            {hasBigFiveData ? (
+              <>
+                <ResponsiveContainer width="100%" height={300}>
+                  <RadarChart data={bigFiveData}>
+                    <PolarGrid />
+                    <PolarAngleAxis dataKey="dimension" tick={{ fontSize: 11 }} />
+                    <PolarRadiusAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
+                    <Radar name="Puntuación" dataKey="valor" stroke="#10b981" fill="#10b981" fillOpacity={0.3} />
+                  </RadarChart>
+                </ResponsiveContainer>
+                <div className="space-y-2 mt-4">
+                  <ScoreBar label="Apertura a la experiencia" value={result.openness} />
+                  <ScoreBar label="Responsabilidad" value={result.conscientiousness} />
+                  <ScoreBar label="Extraversión" value={result.extraversion} />
+                  <ScoreBar label="Amabilidad" value={result.agreeableness} />
+                  <ScoreBar label="Neuroticismo (menor es mejor)" value={result.neuroticism} invert />
+                </div>
+              </>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-[300px] text-center">
+                <Brain className="w-10 h-10 text-gray-300 mb-3" />
+                <p className="text-sm text-gray-500 font-medium">Evaluación de personalidad: no disponible en V1</p>
+                <p className="text-xs text-gray-400 mt-1">Indicador experimental retirado de la versión actual.</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 

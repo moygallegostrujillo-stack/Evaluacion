@@ -1,0 +1,14 @@
+responsabilidad,empresaCliente,evaluaHR,legalStatus
+Aviso de privacidad y bases,PRINCIPAL (bajo su nombre),ASISTENTE (borradores),LEGAL_REVIEW
+Definir puesto/criterios/competencias,PRINCIPAL,-,LEGAL_REVIEW
+Recabar consentimiento,PRINCIPAL,PLATAFORMA (registra evidencia),LEGAL_REVIEW
+Conducir entrevistas / revisar resultados,PRINCIPAL,-,LEGAL_REVIEW
+Decision de contratacion,EXCLUSIVA,NUNCA,VIGENTE (diseno)
+Responder ARCO,PRINCIPAL,ASISTENTE/EJECUTOR por instruccion,LEGAL_REVIEW
+Conservar/eliminar,INSTRUYE,EJECUTA (retencion/purga),LEGAL_REVIEW
+Seguridad de plataforma,VERIFICA,IMPLEMENTA,LEGAL_REVIEW
+Incidentes,RECIBE,NOTIFICA,LEGAL_REVIEW
+Subencargados/transferencias,AUTORIZA,DECLARA Y MANTIENE,LEGAL_REVIEW
+Cooperacion con autoridad (SABC),PRINCIPAL,ASISTENTE,LEGAL_REVIEW
+WhatsApp/envios manuales,PRINCIPAL (practica RRHH),-,LEGAL_REVIEW
+Entrenamiento/calibracion de evaluadores,PRINCIPAL,ASISTENTE (diseno),LEGAL_REVIEW

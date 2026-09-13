@@ -1,0 +1,253 @@
+Spanish Translation of the Lexical Big-Five Factor Markers
+Spanish Translation of the 
+Lexical
+Big-Five Factor Markers
+Provided by Rodrigo de Oliveira
+ 
+ 
+ 
+ 
+Item No.
+Spanish
+English
+Extraversion
+q01
+Soy el alma de la fiesta
+Am the
+life of the party
+q06r
+No hablo mucho
+Don't
+talk a lot
+q11
+Me siento cómodo con la
+gente
+Feel
+comfortable around people
+q16r
+Prefiero mantenerme al
+margen
+Keep
+in the background
+q21
+Comienzo las conversaciones
+Start
+conversations
+q26r
+No tengo mucho que decir
+Have
+little to say
+q31
+En las fiestas hablo con
+muchas personas diferentes
+Talk
+to a lot of different people at parties
+q36r
+No me gusta llamar la
+atención
+Don't
+like to draw attention to myself
+q41
+No me importa ser el
+centro de atención
+Don't
+mind being the center of attention
+q46r
+Cuando estoy entre
+desconocidos me mantengo callado
+Am
+quiet around strangers
+Agreeableness
+q02r
+Me preocupo poco por los
+demás
+Feel
+little concern for others
+q07
+Me intereso por la gente
+Am
+interested in people
+q12r
+Ofendo a la gente
+Insult
+people
+q17
+Soy sensible hacia las
+emociones de otros
+Sympathize
+with others' feelings
+q22r
+No me interesan los
+problemas de otras personas
+Am not
+interested in other people's problems
+q27
+Tengo un corazón sensible
+Have a
+soft heart
+q32r
+En realidad no me intereso
+por los demás
+Am not
+really interested in others
+q37
+Dedico tiempo a los demás
+Take
+time out for others
+q42
+Siento las emociones de
+los otros
+Feel
+others' emotions
+q47
+Hago sentir cómoda a la
+gente
+Make
+people feel at ease
+Conscientiousness
+q03
+Siempre estoy preparado
+Am
+always prepared
+q08r
+Dejo mis pertenencias en
+cualquier lado
+Leave
+my belongings around
+q13
+Pongo atención en los
+detalles
+Pay
+attention to details
+q18r
+Soy desordenado
+Make a
+mess of things
+q23
+Realizo mis tareas
+inmediatamente
+Get
+chores done right away
+q28r
+A menudo olvido poner las
+cosas en su lugar
+Often
+forget to put things back in their proper place
+q33
+Me gusta el orden
+Like
+order
+q38r
+Evado mis obligaciones
+Shirk
+my duties
+q43
+Hago un programa y lo sigo
+Follow
+a schedule
+q48
+Soy perfeccionista en mi
+trabajo
+Am
+exacting in my work
+Emotional Stability
+q04r
+Me estreso con facilidad
+Get
+stressed out easily
+q09
+Estoy relajado la mayor
+parte del tiempo
+Am
+relaxed most of the time
+q14r
+Me preocupo por todo
+Worry
+about things
+q19
+Rara vez me siento triste
+Seldom
+feel blue
+q24r
+Me molesto fácilmente
+Am
+easily disturbed
+q29r
+Me disgusto con facilidad
+Get
+upset easily
+q34r
+Cambio mucho de humor
+Change
+my mood a lot
+q39r
+Tengo cambios frecuentes
+de estado de ánimo
+Have
+frequent mood swings
+q44r
+Me irrito fácilmente
+Get
+irritated easily
+q49r
+Me siento triste
+frecuentemente
+Often
+feel blue
+Intellect
+q05
+Tengo un vocabulario amplio
+Have a
+rich vocabulary
+q10r
+Me cuesta entender ideas
+abstractas
+Have
+difficulty understanding abstract ideas
+q15
+Tengo mucha imaginación
+Have a
+vivid imagination
+q20r
+No me interesan las ideas
+abstractas
+Am not
+interested in abstract ideas
+q25
+Tengo excelentes ideas
+Have
+excellent ideas
+q30r
+No tengo una buena
+imaginación
+Do not
+have a good imagination
+q35
+Soy rápido para entender
+las cosas
+Am
+quick to understand things
+q40
+Utilizo palabras difíciles
+Use
+difficult words
+q45
+Dedico tiempo a reflexionar
+Spend
+time reflecting on things
+q50
+Estoy lleno de ideas
+Am
+full of ideas
+Reference
+de Oliveira, R., Cherubini, M., Oliver, N. (2013). Influence of
+personality on satisfaction with mobile phone services. 
+ACM Transactions on
+Computer-Human Interaction
+, 
+20
+(2) Article 10,
+10:1-10:23. DOI: http://dx.doi.org/10.1145/2463579.2463581
+Return to the 
+Item
+Translations Page

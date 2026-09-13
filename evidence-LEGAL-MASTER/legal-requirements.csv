@@ -1,0 +1,22 @@
+id,norma,articulo,requisito,aplicabilidad,fuente,fechaConsulta,estado,accion
+LR-01,CPEUM,Art. 1 (parr. 3),No discriminacion,Toda seleccion,diputados.gob.mx (oficial),2026-09-12/13,VIGENTE (parr. por confirmar),Politica no discriminacion (11)
+LR-02,CPEUM,Art. 6,Proteccion de datos reglamentada,Todo tratamiento,diputados.gob.mx (oficial),2026-09-12/13,VIGENTE,Dictamen
+LR-03,CPEUM,Art. 16,Vida privada,Todo tratamiento,diputados.gob.mx (oficial),2026-09-12/13,VIGENTE,Dictamen
+LR-04,CPEUM,Art. 28,Transparencia/datos; extincion INAI (20-dic-2024),Autoridad,DOF (oficial),2026-09-12/13,VIGENTE,Mapear autoridad SABC
+LR-05,LFPDPPP 2025,Art. 2,Definiciones (datos personales/sensibles),Todo,diputados.gob.mx LeyesBiblio (oficial); iapp.org,2026-09-12/13,VIGENTE (DOF 20-mar-2025; reforma 14-nov-2025),Dictamen clasificacion
+LR-06,LFPDPPP 2025,Art. 9,Excepciones al consentimiento,Tratamientos sin consentimiento,iapp.org (analisis texto),2026-09-12/13,VIGENTE,Dictamen bases
+LR-07,LFPDPPP 2025,Art. 11,Nueva finalidad = nuevo consentimiento,Cambios de finalidad,iapp.org,2026-09-12/13,VIGENTE,Matriz finalidades (03)
+LR-08,LFPDPPP 2025,Art. 15,Requisitos del aviso (datos+finalidades diferenciando consentimiento),Aviso,iapp.org,2026-09-12/13,VIGENTE,Aviso consolidado (06)
+LR-09,LFPDPPP 2025,Art. 26,Oposicion: evaluacion automatizada sin intervencion humana,Scoring/presentacion,iapp.org,2026-09-12/13,VIGENTE,Salvaguardas (14/25)
+LR-10,LFPDPPP 2025,Art. 39,Atribuciones de autoridad,Fiscalizacion,iapp.org,2026-09-12/13,VIGENTE,Cooperacion
+LR-11,LFPDPPP 2025,Datos sensibles,Tratamiento reforzado; consentimiento expreso,Psicologica/Big Five/Integridad,garrigues/gtlaw (secundarias),2026-09-12/13,VIGENTE (num. art. POR CONFIRMAR),Matriz sensibles (10)
+LR-12,LFPDPPP 2025,ARCO,Derechos + 20 dias habiles,Titulares,resguard/growly (secundarias 2026),2026-09-12/13,VIGENTE (num. art. POR CONFIRMAR),Flujo ARCO (09)
+LR-13,LFPDPPP 2025,Violaciones de seguridad,Notificacion,Incidentes,nordsterntech (secundaria),2026-09-12/13,VIGENTE (num. art. POR CONFIRMAR),Protocolo (19)
+LR-14,LFPDPPP 2025,Multas,"Hasta 320,000 UMA",Riesgo economico,nordsterntech (secundaria),2026-09-12/13,VIGENTE (POR CONFIRMAR),Gestion de riesgo
+LR-15,LFPDPPP 2025,Conservacion,Definir plazos; supresion al cumplir finalidad,Retencion,cosio.mx (secundaria 2026),2026-09-12/13,VIGENTE,Matriz retencion (15)
+LR-16,"LFT (nueva, DOF 15-ene-2026)",No discriminacion en el trabajo / prohibiciones al patron,Seleccion no discriminatoria,Seleccion,congresomich.site (ley publicada 15-ene-2026); sidof (reforma 1-may-2026),2026-09-12/13,VIGENTE (articulado POR COTEJAR),Dictamen articulado
+LR-17,LFPED,Reforma 14-nov-2025,Practicas discriminatorias (catalogo ampliado),Empleo,sep.gob.mx; legislacion.scjn.gob.mx,2026-09-12/13,VIGENTE,Politica (11)
+LR-18,NOM-035-STPS-2018,-,Evalua entorno laboral con cuestionarios propios; no sustituye pruebas,Declaraciones del producto,gob.mx/stps (oficial); DOF 23-oct-2018,2026-09-12/13,VIGENTE,Corregir redaccion aviso (LEGAL-001)
+LR-19,Codigo Penal Federal,Arts. 210-211,Revelacion de secretos / acceso ilicito,Confidencialidad,diputados.gob.mx; oas.org,2026-09-12/13,VIGENTE,Clausula confidencialidad (08)
+LR-20,IA (Mexico),-,Sin ley general de IA al 2S-2026; regulacion sectorial + LFPDPPP,Uso de IA,yahoo/La Cadena 23-jul-2026; lexology,2026-09-12/13,NO HAY LEY GENERAL,Anexo IA (12)
+LR-21,Reglamento LFPDPPP,-,Reglamento 2011 abrogado; nuevo PENDIENTE,Cumplimiento operativo,sharkit.mx jul-2026 (secundaria),2026-09-12/13,PENDIENTE,Monitorear (LEGAL-025)

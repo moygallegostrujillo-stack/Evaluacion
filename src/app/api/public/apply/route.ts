@@ -10,6 +10,14 @@ import {
   scoreCanonicalAdministration,
   writeKnowledgeResult,
 } from '@/lib/knowledge-canonical'
+import {
+  calculateCanonicalOverallScore,
+  buildCanonicalInput,
+  serializeSections,
+  serializeExcludedReasons,
+  type EvidenceStatus,
+  type CanonicalOverallOutput,
+} from '@/lib/overall-score'
 
 const db = getUnscopedClient()
 
@@ -148,69 +156,33 @@ function calculateScores(responses: ScoredResponse[]) {
   const avgIntegrity = integrityCategoriesWithResponses > 0 ? integritySum / integrityCategoriesWithResponses : 0
   const hasIntegrityData = integrityCategoriesWithResponses > 0
 
-  // Overall score calculation — adaptive weighting based on which sections have data
-  // This fixes the bug where missing sections scored 0 and dragged the overall down
-  let overallScore: number
-  const sectionsWithData: string[] = []
-  if (hasBigFiveData) sectionsWithData.push('bigFive')
-  if (hasPsychData) sectionsWithData.push('psych')
-  if (hasIntegrityData) sectionsWithData.push('integrity')
-  if (knowledgeScore !== null) sectionsWithData.push('knowledge')
-
-  if (sectionsWithData.length === 0) {
-    overallScore = 0
-  } else if (sectionsWithData.length === 1) {
-    // Only one section — use its score directly
-    if (knowledgeScore !== null) overallScore = knowledgeScore
-    else if (hasBigFiveData) overallScore = psicometricaAvg
-    else if (hasPsychData) overallScore = psicologicaAvg
-    else overallScore = avgIntegrity
-  } else if (sectionsWithData.length === 2) {
-    // Two sections — equal split
-    const active: number[] = []
-    if (hasBigFiveData) active.push(psicometricaAvg)
-    if (hasPsychData) active.push(psicologicaAvg)
-    if (hasIntegrityData) active.push(avgIntegrity)
-    if (knowledgeScore !== null) active.push(knowledgeScore)
-    overallScore = active.reduce((a, b) => a + b, 0) / active.length
-  } else if (hasBigFiveData && hasPsychData && hasIntegrityData && knowledgeScore !== null) {
-    // All 4 sections
-    overallScore = 0.25 * psicometricaAvg + 0.25 * psicologicaAvg + 0.15 * avgIntegrity + 0.35 * knowledgeScore
-  } else if (hasBigFiveData && hasPsychData && hasIntegrityData && knowledgeScore === null) {
-    // 3 present, no knowledge
-    overallScore = 0.30 * psicometricaAvg + 0.30 * psicologicaAvg + 0.40 * avgIntegrity
-  } else if (hasBigFiveData && hasPsychData && !hasIntegrityData && knowledgeScore !== null) {
-    // 3 present, no integrity (legacy path)
-    overallScore = 0.30 * psicometricaAvg + 0.30 * psicologicaAvg + 0.40 * knowledgeScore
-  } else if (knowledgeScore !== null && (hasBigFiveData || hasPsychData || hasIntegrityData)) {
-    // Knowledge + one or two behavioral/integrity sections
-    const behavioralScores: number[] = []
-    if (hasBigFiveData) behavioralScores.push(psicometricaAvg)
-    if (hasPsychData) behavioralScores.push(psicologicaAvg)
-    if (hasIntegrityData) behavioralScores.push(avgIntegrity)
-    const behavioralAvg = behavioralScores.reduce((a, b) => a + b, 0) / behavioralScores.length
-    overallScore = 0.50 * behavioralAvg + 0.50 * knowledgeScore
-  } else {
-    // Only behavioral/integrity sections (no knowledge)
-    const behavioralScores: number[] = []
-    if (hasBigFiveData) behavioralScores.push(psicometricaAvg)
-    if (hasPsychData) behavioralScores.push(psicologicaAvg)
-    if (hasIntegrityData) behavioralScores.push(avgIntegrity)
-    overallScore = behavioralScores.reduce((a, b) => a + b, 0) / behavioralScores.length
-  }
-
-  // Guidance level — NOT a hiring decision, just informational orientation
-  // PERFIL_COMPLETO = all sections completed
-  // PERFIL_PARCIAL = only some sections completed
-  // PENDIENTE = no data yet
-  let guidance: string
-  if (sectionsWithData.length === 0) {
-    guidance = 'PENDIENTE'
-  } else if (hasBigFiveData && hasPsychData && hasIntegrityData && knowledgeScore !== null) {
-    guidance = 'PERFIL_COMPLETO'
-  } else {
-    guidance = 'PERFIL_PARCIAL'
-  }
+  // ── A-04.5: CANONICAL OVERALL SCORE ─────────────────────────────────
+  // Per-step preliminary overall via the SINGLE canonical engine. Integrity
+  // is isolated (excluded from the weighted score). At step completion the
+  // final overall is recomputed by calculateOverallScore() (below) using the
+  // canonical knowledge score + evidenceStatus. The same engine guarantees
+  // the per-step and final values are consistent.
+  const canonicalInput = buildCanonicalInput(
+    {
+      openness: bigFiveScores['OPENNESS'] || 0,
+      conscientiousness: bigFiveScores['CONSCIENTIOUSNESS'] || 0,
+      extraversion: bigFiveScores['EXTRAVERSION'] || 0,
+      agreeableness: bigFiveScores['AGREEABLENESS'] || 0,
+      neuroticism: bigFiveScores['NEUROTICISM'] || 0,
+    },
+    {
+      stressLevel: psychScores['STRESS'] || 0,
+      empathy: psychScores['EMPATHY'] || 0,
+      adaptability: psychScores['ADAPTABILITY'] || 0,
+      leadership: psychScores['LEADERSHIP'] || 0,
+      teamwork: psychScores['TEAMWORK'] || 0,
+    },
+    knowledgeScore,
+    null, // per-step: canonical evidenceStatus not yet resolved
+    hasIntegrityData ? avgIntegrity : 0
+  )
+  const canonicalOverall = calculateCanonicalOverallScore(canonicalInput)
+  const guidance = canonicalOverall.guidance
 
   return {
     openness: bigFiveScores['OPENNESS'] || 0,
@@ -225,8 +197,12 @@ function calculateScores(responses: ScoredResponse[]) {
     teamwork: psychScores['TEAMWORK'] || 0,
     knowledgeScore,
     integrityScore: hasIntegrityData ? Math.round(avgIntegrity * 100) / 100 : 0,
-    overallScore: Math.round(overallScore * 100) / 100,
+    overallScore: canonicalOverall.score,
     recommendation: guidance, // Keep field name for DB compatibility, but value is now guidance
+    formulaVersion: canonicalOverall.formulaVersion,
+    includedSections: serializeSections(canonicalOverall.includedSections),
+    excludedSections: serializeSections(canonicalOverall.excludedSections),
+    excludedReasons: serializeExcludedReasons(canonicalOverall.excludedReasons),
     psicometricaAvg: Math.round(psicometricaAvg * 100) / 100,
     psicologicaAvg: Math.round(psicologicaAvg * 100) / 100,
   }
@@ -544,17 +520,23 @@ async function calculateStepScores(
 // HELPER: Calculate overall score and guidance
 // ============================================
 
-async function calculateOverallScore(applicationId: string) {
+async function calculateOverallScore(applicationId: string): Promise<CanonicalOverallOutput & { summary: string } | null> {
   const application = await db.vacancyApplication.findUnique({
     where: { id: applicationId },
-    include: { vacancy: true },
+    include: {
+      vacancy: true,
+      // A-04.5: look up the canonical Knowledge evidence status so
+      // INSUFFICIENT/INVALID evidence is EXCLUDED (never coerced to 0).
+      knowledgeAdministration: { include: { knowledgeResult: true } },
+    },
   })
   if (!application) return null
 
   const vacancy = application.vacancy
 
-  // Determine which sections actually have data
-  // A section is considered to have data if the vacancy included it AND scores are non-zero
+  // Determine which sections actually have data (for the orientation summary).
+  // The canonical engine independently determines inclusion from the scores +
+  // evidence status; these flags are only for the summary text.
   const hasBigFiveData = vacancy.includePsicometrica === true && (
     application.openness > 0 || application.conscientiousness > 0 ||
     application.extraversion > 0 || application.agreeableness > 0 ||
@@ -566,81 +548,43 @@ async function calculateOverallScore(applicationId: string) {
     application.teamwork > 0
   )
   const hasIntegrityData = (vacancy.includeIntegridad ?? true) === true && application.integrityScore > 0
-  const hasKnowledgeData = application.knowledgeScore !== null
 
-  // Big Five average — adaptive (only categories with responses)
-  // NEUROTICISM is already reverse-scored via calculateLikertScore, so high = stable
-  const bigFiveValues = [application.openness, application.conscientiousness, application.extraversion, application.agreeableness, application.neuroticism]
-  const nonZeroBigFive = bigFiveValues.filter(s => s > 0)
-  const psicometricaAvg = nonZeroBigFive.length > 0 ? nonZeroBigFive.reduce((a, b) => a + b, 0) / nonZeroBigFive.length : 0
+  // A-04.5: resolve the canonical Knowledge evidence status. When a
+  // KnowledgeResult exists, its evidenceStatus (VALID/LIMITED/INSUFFICIENT)
+  // drives exclusion — INSUFFICIENT evidence NEVER becomes 0. When no
+  // administration/result exists (legacy), the status is null and the
+  // engine excludes via NO_DATA if knowledgeScore is null.
+  const knowledgeResult = application.knowledgeAdministration?.knowledgeResult
+  const knowledgeEvidenceStatus: EvidenceStatus = knowledgeResult
+    ? (knowledgeResult.evidenceStatus as EvidenceStatus)
+    : null
 
-  // Psych average — adaptive
-  const psychValues = [application.stressLevel, application.empathy, application.adaptability, application.leadership, application.teamwork]
-  const nonZeroPsych = psychValues.filter(s => s > 0)
-  const psicologicaAvg = nonZeroPsych.length > 0 ? nonZeroPsych.reduce((a, b) => a + b, 0) / nonZeroPsych.length : 0
+  // ── A-04.5: CANONICAL OVERALL SCORE ─────────────────────────────────
+  // ONE engine, SAME as evaluations and public/video. Integrity is isolated
+  // (excluded from the weighted score). INSUFFICIENT/INVALID evidence is
+  // excluded. Historical weights preserved verbatim inside the engine.
+  const canonicalInput = buildCanonicalInput(
+    {
+      openness: application.openness,
+      conscientiousness: application.conscientiousness,
+      extraversion: application.extraversion,
+      agreeableness: application.agreeableness,
+      neuroticism: application.neuroticism,
+    },
+    {
+      stressLevel: application.stressLevel,
+      empathy: application.empathy,
+      adaptability: application.adaptability,
+      leadership: application.leadership,
+      teamwork: application.teamwork,
+    },
+    application.knowledgeScore,
+    knowledgeEvidenceStatus,
+    application.integrityScore
+  )
+  const canonical = calculateCanonicalOverallScore(canonicalInput)
 
-  // Integrity score from DB
-  const avgIntegrity = application.integrityScore || 0
-
-  // Overall score — adaptive weighting based on which sections have data
-  let overallScore: number
-  const sectionsWithData: string[] = []
-  if (hasBigFiveData) sectionsWithData.push('bigFive')
-  if (hasPsychData) sectionsWithData.push('psych')
-  if (hasIntegrityData) sectionsWithData.push('integrity')
-  if (hasKnowledgeData) sectionsWithData.push('knowledge')
-
-  if (sectionsWithData.length === 0) {
-    overallScore = 0
-  } else if (sectionsWithData.length === 1) {
-    if (hasKnowledgeData) overallScore = application.knowledgeScore!
-    else if (hasBigFiveData) overallScore = psicometricaAvg
-    else if (hasPsychData) overallScore = psicologicaAvg
-    else overallScore = avgIntegrity
-  } else if (sectionsWithData.length === 2) {
-    const active: number[] = []
-    if (hasBigFiveData) active.push(psicometricaAvg)
-    if (hasPsychData) active.push(psicologicaAvg)
-    if (hasIntegrityData) active.push(avgIntegrity)
-    if (hasKnowledgeData) active.push(application.knowledgeScore!)
-    overallScore = active.reduce((a, b) => a + b, 0) / active.length
-  } else if (hasBigFiveData && hasPsychData && hasIntegrityData && hasKnowledgeData) {
-    // All 4 sections
-    overallScore = 0.25 * psicometricaAvg + 0.25 * psicologicaAvg + 0.15 * avgIntegrity + 0.35 * application.knowledgeScore!
-  } else if (hasBigFiveData && hasPsychData && hasIntegrityData && !hasKnowledgeData) {
-    // 3 present, no knowledge
-    overallScore = 0.30 * psicometricaAvg + 0.30 * psicologicaAvg + 0.40 * avgIntegrity
-  } else if (hasBigFiveData && hasPsychData && !hasIntegrityData && hasKnowledgeData) {
-    // 3 present, no integrity (legacy path)
-    overallScore = 0.30 * psicometricaAvg + 0.30 * psicologicaAvg + 0.40 * application.knowledgeScore!
-  } else if (hasKnowledgeData && (hasBigFiveData || hasPsychData || hasIntegrityData)) {
-    // Knowledge + one or two behavioral/integrity sections
-    const behavioralScores: number[] = []
-    if (hasBigFiveData) behavioralScores.push(psicometricaAvg)
-    if (hasPsychData) behavioralScores.push(psicologicaAvg)
-    if (hasIntegrityData) behavioralScores.push(avgIntegrity)
-    const behavioralAvg = behavioralScores.reduce((a, b) => a + b, 0) / behavioralScores.length
-    overallScore = 0.50 * behavioralAvg + 0.50 * application.knowledgeScore!
-  } else {
-    // Only behavioral/integrity sections (no knowledge)
-    const behavioralScores: number[] = []
-    if (hasBigFiveData) behavioralScores.push(psicometricaAvg)
-    if (hasPsychData) behavioralScores.push(psicologicaAvg)
-    if (hasIntegrityData) behavioralScores.push(avgIntegrity)
-    overallScore = behavioralScores.reduce((a, b) => a + b, 0) / behavioralScores.length
-  }
-
-  // Guidance level — NOT a hiring decision, just informational orientation
-  let guidance: string
-  if (sectionsWithData.length === 0) {
-    guidance = 'PENDIENTE'
-  } else if (hasBigFiveData && hasPsychData && hasIntegrityData && hasKnowledgeData) {
-    guidance = 'PERFIL_COMPLETO'
-  } else {
-    guidance = 'PERFIL_PARCIAL'
-  }
-
-  // Generate orientation summary
+  // Generate orientation summary (guidance, NOT a hiring decision)
   const bigFiveScores = {
     OPENNESS: application.openness,
     CONSCIENTIOUSNESS: application.conscientiousness,
@@ -655,16 +599,14 @@ async function calculateOverallScore(applicationId: string) {
     LEADERSHIP: application.leadership,
     TEAMWORK: application.teamwork,
   }
-
   const summary = generateSummary(
-    bigFiveScores, psychScores, application.knowledgeScore, guidance,
+    bigFiveScores, psychScores, application.knowledgeScore, canonical.guidance,
     hasBigFiveData, hasPsychData,
     hasIntegrityData ? application.integrityScore : null, hasIntegrityData
   )
 
   return {
-    overallScore: Math.round(overallScore * 100) / 100,
-    recommendation: guidance, // Keep field name for DB compatibility, but value is now guidance
+    ...canonical,
     summary,
   }
 }
@@ -1629,8 +1571,13 @@ export async function POST(req: NextRequest) {
             where: { id: applicationId },
             data: {
               overallScore: overall.overallScore,
-              recommendation: overall.recommendation,
+              recommendation: overall.guidance,
               summary: overall.summary,
+              // A-04.5: persist the canonical formula version + section audit
+              formulaVersion: overall.formulaVersion,
+              includedSections: serializeSections(overall.includedSections),
+              excludedSections: serializeSections(overall.excludedSections),
+              excludedReasons: serializeExcludedReasons(overall.excludedReasons),
             },
           })
         }
@@ -1717,6 +1664,11 @@ export async function POST(req: NextRequest) {
                   overallScore: updatedApp.overallScore || 0,
                   recommendation: updatedApp.recommendation || 'PENDIENTE',
                   summary: updatedApp.summary,
+                  // A-04.5: propagate canonical formula version + section audit
+                  formulaVersion: updatedApp.formulaVersion,
+                  includedSections: updatedApp.includedSections,
+                  excludedSections: updatedApp.excludedSections,
+                  excludedReasons: updatedApp.excludedReasons,
                 },
               })
             }

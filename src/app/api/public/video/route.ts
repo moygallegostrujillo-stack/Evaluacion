@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getUnscopedClient } from '@/lib/rls'
 import { hashPassword } from '@/lib/password'
 import { verifyPublicToken } from '@/lib/public-token'
+import {
+  calculateCanonicalOverallScore,
+  buildCanonicalInput,
+  serializeSections,
+  serializeExcludedReasons,
+  type EvidenceStatus,
+} from '@/lib/overall-score'
 
 // ============================================
 // POST - Mark video step complete via WhatsApp (no file storage)
@@ -79,57 +86,51 @@ export async function POST(req: NextRequest) {
       videoUrl: videoSent ? 'via-whatsapp' : null,
     }
 
-    // Calculate final scores if all steps are done
+    // ── A-04.5: CANONICAL OVERALL SCORE ─────────────────────────────────
+    // BEFORE A-04.5, this endpoint OVERWROTE overallScore with a FOURTH
+    // divergent formula (no Integrity, neuroticism RE-INVERTED, fixed /5
+    // denominators, PROPORTIONAL renormalization, 0.00-KN = absent). That
+    // divergence is REMOVED: the endpoint now delegates to the SAME
+    // canonical engine as evaluations and public/apply. Same persisted
+    // data → same overall, regardless of channel (PASO 12 determinism).
+    //
+    // The gate (only recompute when overallScore === 0) is PRESERVED as a
+    // "scoring closure" fallback — it does NOT introduce a new formula.
     if (application.overallScore === 0) {
-      // Determine which sections have data
-      const hasBigFive = application.openness > 0 || application.conscientiousness > 0 ||
-        application.extraversion > 0 || application.agreeableness > 0 || application.neuroticism > 0
-      const hasPsych = application.stressLevel > 0 || application.empathy > 0 ||
-        application.adaptability > 0 || application.leadership > 0 || application.teamwork > 0
-      const hasKnowledge = application.knowledgeScore !== null && application.knowledgeScore > 0
+      // Look up the canonical Knowledge evidence status so INSUFFICIENT
+      // evidence is EXCLUDED (never coerced to 0).
+      const appWithKn = await db.vacancyApplication.findUnique({
+        where: { id: applicationId },
+        include: {
+          vacancy: true,
+          knowledgeAdministration: { include: { knowledgeResult: true } },
+        },
+      })
+      const knowledgeResult = appWithKn?.knowledgeAdministration?.knowledgeResult
+      const knowledgeEvidenceStatus: EvidenceStatus = knowledgeResult
+        ? (knowledgeResult.evidenceStatus as EvidenceStatus)
+        : null
 
-      // Psicometrica average
-      const psicometricaAvg =
-        (100 - application.neuroticism +
-          application.openness +
-          application.conscientiousness +
-          application.extraversion +
-          application.agreeableness) / 5
-
-      // Psicologica average
-      const psicologicaAvg =
-        (application.stressLevel +
-          application.empathy +
-          application.adaptability +
-          application.leadership +
-          application.teamwork) / 5
-
-      // Adaptive scoring — only average sections with data
-      let overallScore: number
-      const sectionScores: { score: number; weight: number }[] = []
-      if (hasBigFive) sectionScores.push({ score: psicometricaAvg, weight: 0.30 })
-      if (hasPsych) sectionScores.push({ score: psicologicaAvg, weight: 0.30 })
-      if (hasKnowledge) sectionScores.push({ score: application.knowledgeScore!, weight: 0.40 })
-
-      if (sectionScores.length === 0) {
-        overallScore = 0
-      } else if (sectionScores.length === 1) {
-        overallScore = sectionScores[0].score
-      } else {
-        const totalWeight = sectionScores.reduce((s, x) => s + x.weight, 0)
-        overallScore = sectionScores.reduce((s, x) => s + x.score * (x.weight / totalWeight), 0)
-      }
-
-      // Guidance based on section completeness (NOT hiring decision)
-      let guidance: string
-      const totalSections = [hasBigFive, hasPsych, hasKnowledge].filter(Boolean).length
-      if (totalSections === 0) {
-        guidance = 'PENDIENTE'
-      } else if (hasBigFive && hasPsych && hasKnowledge) {
-        guidance = 'PERFIL_COMPLETO'
-      } else {
-        guidance = 'PERFIL_PARCIAL'
-      }
+      const canonicalInput = buildCanonicalInput(
+        {
+          openness: application.openness,
+          conscientiousness: application.conscientiousness,
+          extraversion: application.extraversion,
+          agreeableness: application.agreeableness,
+          neuroticism: application.neuroticism,
+        },
+        {
+          stressLevel: application.stressLevel,
+          empathy: application.empathy,
+          adaptability: application.adaptability,
+          leadership: application.leadership,
+          teamwork: application.teamwork,
+        },
+        application.knowledgeScore,
+        knowledgeEvidenceStatus,
+        application.integrityScore
+      )
+      const canonical = calculateCanonicalOverallScore(canonicalInput)
 
       // Generate neutral summary (orientation, not decision)
       const parts: string[] = []
@@ -155,23 +156,22 @@ export async function POST(req: NextRequest) {
       if (concerns.length > 0) summary += `Áreas a explorar: ${concerns.join(', ')}. `
 
       if (application.knowledgeScore !== null) {
-        if (application.knowledgeScore >= 80) {
-          summary += `Dominio de conocimientos técnicos: ${application.knowledgeScore}%. `
-        } else if (application.knowledgeScore >= 60) {
-          summary += `Conocimientos técnicos: ${application.knowledgeScore}%. `
-        } else {
-          summary += `Conocimientos técnicos: ${application.knowledgeScore}%. `
-        }
+        summary += `Conocimientos técnicos: ${application.knowledgeScore}%. `
       }
 
-      const perfilScope = guidance === 'PERFIL_COMPLETO' ? 'completo' : 'parcial'
-      summary += `Puntuación general: ${Math.round(overallScore)}. Alcance del perfil: ${perfilScope}. La decisión final corresponde al área de Recursos Humanos.`
+      const perfilScope = canonical.guidance === 'PERFIL_COMPLETO' ? 'completo' : 'parcial'
+      summary += `Puntuación general: ${Math.round(canonical.score)}. Alcance del perfil: ${perfilScope}. La decisión final corresponde al área de Recursos Humanos.`
 
-      updateData.overallScore = Math.round(overallScore * 100) / 100
-      updateData.recommendation = guidance
+      updateData.overallScore = canonical.score
+      updateData.recommendation = canonical.guidance
       updateData.summary = summary
       updateData.status = 'COMPLETED'
       updateData.completedAt = new Date()
+      // A-04.5: persist the canonical formula version + section audit
+      updateData.formulaVersion = canonical.formulaVersion
+      updateData.includedSections = serializeSections(canonical.includedSections)
+      updateData.excludedSections = serializeSections(canonical.excludedSections)
+      updateData.excludedReasons = serializeExcludedReasons(canonical.excludedReasons)
     }
 
     await db.vacancyApplication.update({
@@ -247,6 +247,11 @@ export async function POST(req: NextRequest) {
         const calculatedOverallScore = (updateData.overallScore as number) || application.overallScore || 0
         const calculatedRecommendation = (updateData.recommendation as string) || application.recommendation || 'PENDIENTE'
         const calculatedSummary = (updateData.summary as string) || application.summary
+        // A-04.5: propagate canonical formula version + section audit (if computed)
+        const calculatedFormulaVersion = (updateData.formulaVersion as string | undefined) ?? application.formulaVersion
+        const calculatedIncludedSections = (updateData.includedSections as string | undefined) ?? application.includedSections
+        const calculatedExcludedSections = (updateData.excludedSections as string | undefined) ?? application.excludedSections
+        const calculatedExcludedReasons = (updateData.excludedReasons as string | undefined) ?? application.excludedReasons
 
         await db.evaluationResult.create({
           data: {
@@ -270,6 +275,10 @@ export async function POST(req: NextRequest) {
             overallScore: calculatedOverallScore,
             recommendation: calculatedRecommendation,
             summary: calculatedSummary,
+            formulaVersion: calculatedFormulaVersion,
+            includedSections: calculatedIncludedSections,
+            excludedSections: calculatedExcludedSections,
+            excludedReasons: calculatedExcludedReasons,
           },
         })
       }

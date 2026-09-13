@@ -285,7 +285,7 @@ export default function InvitationWelcomeView() {
                 </div>
                 <div>
                   <p className="font-medium text-sm text-gray-900">Evaluación Psicométrica</p>
-                  <p className="text-xs text-gray-500">Perfil de personalidad Big Five — ~15 preguntas</p>
+                  <p className="text-xs text-gray-500">Indicador experimental de personalidad — no disponible como instrumento formal en V1</p>
                 </div>
               </div>
               <div className="flex items-start gap-3 p-3 rounded-lg bg-sky-50/60">

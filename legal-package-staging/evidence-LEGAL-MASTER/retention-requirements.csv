@@ -1,0 +1,11 @@
+dato,plazoSistema,fundamentoPropuesto,motivo,accionAlVencimiento,legalStatus
+PII candidatos (no contratado),730 dias,Minimizacion,Limite de finalidad,Anonimizacion,[PLAZO POR DICTAMEN]
+PII candidatos (contratado),No diferenciado (sin hiredAt),Relacion laboral,Historial,[POR DICTAMEN],POR DICTAMEN
+Sensibles (psicologica/Big Five/integridad),90 dias inactividad,Tratamiento reforzado,Refuerzo,Eliminacion,[PLAZO POR DICTAMEN]
+Conocimientos/evidencia congelada,Indefinido,Interes probatorio,Evidencia,Anonimizar/eliminar,[PLAZO POR DICTAMEN]
+Consentimiento (ConsentLog),Indefinido,Evidencia legal,Defensa,Eliminar tras plazo de presunciones,[PLAZO POR DICTAMEN]
+ARCO (ArcoRequest),Indefinido,Evidencia legal,Defensa,Idem,[PLAZO POR DICTAMEN]
+AuditLog,90 dias,Seguridad,Deteccion,Eliminacion,[PLAZO POR DICTAMEN]
+Resultados (scores),730 dias (con PII),Minimizacion,Limite,Anonimizacion,[PLAZO POR DICTAMEN]
+Grabaciones,NO EXISTEN,-,-,-,NO APLICA
+Contenido sensible involuntario,NO CONSERVAR,Protocolo,Refuerzo,Inexistente por diseno,VIGENTE (diseno)

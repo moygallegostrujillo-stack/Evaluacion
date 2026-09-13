@@ -1,0 +1,39 @@
+0) limpieza de sesiones demo previas OK
+=== A-01.2 E2E — flujo completo IPIP-50-MX ===
+1) login OK
+2) posición: Gerente de Piso (Café de Chiapas)
+3) sesión iniciada — 3 secciones: PSICOMETRICA(50) + PSICOLOGICA(10) + CONOCIMIENTOS(10)
+   sección 1 = IPIP-50-MX (50 ítems IPIP_*) ✓
+4) respuestas IPIP enviadas: 50/50
+5) evaluación completada
+  ✅ instrumentId correcto
+  ✅ instrumentVersion 1.0
+  ✅ languageVersion
+  ✅ scoringVersion
+  ✅ raw extraversionRaw = 30
+  ✅ raw agreeablenessRaw = 32
+  ✅ raw conscientiousnessRaw = 32
+  ✅ raw emotionalStabilityRaw = 24
+  ✅ raw intellectRaw = 34
+  ✅ legacy openness = 0 (separación)
+  ✅ legacy neuroticism = 0 (separación)
+  ✅ overallScore = 25 (psic=50 + knowledge=0; SIN IPIP)
+  ✅ recommendation = PERFIL_PARCIAL (puesto sin INTEGRIDAD — semántica legacy)
+  ✅ knowledgeScore = 0 (seed sin clave — legacy existente)
+  ✅ summary del instrumento nuevo (menciona IPIP-50)
+  ✅ summary sin decisión de contratación
+  ✅ summary menciona dimensiones (tendencias de respuesta)
+--- Parte A (puesto sembrado sin INTEGRIDAD/clave de conocimientos) lista ---
+B) puesto nuevo creado: Mesero A01-E2E 1788929511422
+   secciones: PSICOMETRICA(50) + PSICOLOGICA(10) + CONOCIMIENTOS(10) + INTEGRIDAD(10)
+B) evaluación completa completada
+  ✅ instrumentId correcto
+  ✅ raws IPIP (todas=4): E=30 A=32 C=32 ES=24 I=34
+  ✅ legacy Big Five = 0 (separación)
+  ✅ knowledgeScore = 0 (defecto preexistente: correctAnswer no se persiste)
+  ✅ integrityScore ≈ 50 (todo=3)
+  ✅ overallScore = 25 = 0.5×(psic50+integ50)/2 + 0.5×0 — SIN IPIP
+  ✅ recommendation = PERFIL_COMPLETO
+  ✅ summary menciona IPIP-50 y tendencias
+  ✅ summary NO crea score global psicométrico
+=== E2E RESULTADO: TODAS LAS VERIFICACIONES OK ===

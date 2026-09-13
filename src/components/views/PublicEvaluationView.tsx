@@ -64,7 +64,7 @@ const STEP_LABELS: Record<string, { label: string; icon: React.ReactNode; color:
     icon: <Brain className="w-5 h-5" />,
     color: 'bg-violet-100 text-violet-700',
     bgGradient: 'from-violet-500 to-purple-600',
-    description: 'Test de personalidad Big Five — mide tu perfil de competencias y rasgos de personalidad.'
+    description: 'Indicador experimental de personalidad (no disponible como instrumento formal en V1).'
   },
   psicologica: {
     label: 'Evaluación Psicológica',
@@ -626,7 +626,7 @@ export default function PublicEvaluationView() {
                   {vacancy.includePsicometrica !== false && (
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-lg bg-violet-100 text-violet-700 flex items-center justify-center"><Brain className="w-4 h-4" /></div>
-                      <div><p className="text-sm font-medium">Evaluación Psicométrica</p><p className="text-xs text-gray-500">Test de personalidad Big Five</p></div>
+                      <div><p className="text-sm font-medium">Evaluación Psicométrica</p><p className="text-xs text-gray-500">Indicador experimental (no disponible en V1)</p></div>
                     </div>
                   )}
                   {vacancy.includePsicologica !== false && (

@@ -1,0 +1,27 @@
+clausula,requerimiento,marca,estado
+1 Objeto,Prestacion de plataforma para seleccion,LEGAL_REVIEW,BORRADOR
+2 Alcance,Demo en desarrollo; servicios incluidos,LEGAL_REVIEW,BORRADOR
+3 Roles,Cliente=responsable / EvaluHR=encargado + cambio de rol,OBLIGATORIO,BORRADOR
+4 Instrucciones,Tratamiento solo por instruccion documentada,OBLIGATORIO,BORRADOR
+5 Finalidad,Unica: seleccion; usos secundarios prohibidos,OBLIGATORIO,BORRADOR
+6 Datos,Categorias del inventario; sin ampliar sin aviso/base,OBLIGATORIO,BORRADOR
+7 Datos sensibles,Refuerzo; expreso; UNINVITED_DISCLOSURE,OBLIGATORIO,BORRADOR
+8 Seleccion,Decision de EL CLIENTE; insumo complementario,OBLIGATORIO,BORRADOR
+9 Evaluaciones,Instrumentos y limitaciones declaradas,OBLIGATORIO,BORRADOR
+10 Entrevista,Agendamiento; estructurada NO activa,OBLIGATORIO,BORRADOR
+11 IA,Anexo IA; sin entrenamiento; AI_GENERATED+HUMAN_REVIEWED,OBLIGATORIO-LEGAL_REVIEW,BORRADOR
+12 Revision humana,Cadena resultado→revision→decision,OBLIGATORIO,BORRADOR
+13 Seguridad,Controles (16); notificacion incidentes [PLAZO],OBLIGATORIO,BORRADOR
+14 Subencargados,Lista declarada; autorizacion previa,OBLIGATORIO,BORRADOR
+15 Transferencias,Solo las declaradas; mecanismo por dictamen,OBLIGATORIO,BORRADOR
+16 Incidentes,Protocolo (19); cooperacion,OBLIGATORIO,BORRADOR
+17 ARCO,Asistencia y ejecucion por instruccion,OBLIGATORIO,BORRADOR
+18 Conservacion,Categorias (15); plazos del dictamen,OBLIGATORIO,BORRADOR
+19 Eliminacion,Eliminacion segura + certificado,OBLIGATORIO,BORRADOR
+20 Auditoria,AuditLog; derecho de auditoria del cliente,OBLIGATORIO,BORRADOR
+21 Confidencialidad,Personal bajo confidencialidad (CPF 210-211),OBLIGATORIO,BORRADOR
+22 Propiedad intelectual,Software=Proveedor; datos=titular; resultados=Cliente,LEGAL_REVIEW,BORRADOR
+23 Responsabilidades,"Regimen, indemnidades, limites, seguros",LEGAL_REVIEW,BORRADOR
+24 Limitaciones,No decidir/publicar/activar/tratar para fines propios,OBLIGATORIO,BORRADOR
+25 Terminacion,"Causales, efectos, entrega/eliminacion",LEGAL_REVIEW,BORRADOR
+26 Cooperacion legal,Autoridad SABC; amparo; requerimientos,OBLIGATORIO,BORRADOR

@@ -1,0 +1,72 @@
+
+TEST 1 — Todas las respuestas = 3 → cada factor 30/50 (60/100 visual)
+  ✅ instrumento completo
+  ✅ todos los raw = 30
+  ✅ todos los visual = 60 (30/50×100, NO percentil)
+
+TEST 2 — Todas las respuestas = 1 → inversión correcta (esperado E=30 A=26 C=26 ES=42 I=22)
+  ✅ instrumento completo
+  ✅ extraversionRaw = 30
+  ✅ agreeablenessRaw = 26
+  ✅ conscientiousnessRaw = 26
+  ✅ emotionalStabilityRaw = 42
+  ✅ intellectRaw = 22
+  ✅ inversión aplicada (ES=42 demuestra 8 inversos×5 + 2 directos×1)
+
+TEST 3 — Todas las respuestas = 5 → inversión correcta (esperado E=30 A=34 C=34 ES=18 I=38)
+  ✅ instrumento completo
+  ✅ extraversionRaw = 30
+  ✅ agreeablenessRaw = 34
+  ✅ conscientiousnessRaw = 34
+  ✅ emotionalStabilityRaw = 18
+  ✅ intellectRaw = 38
+
+TEST 4 — Cada ítem pertenece a EXACTAMENTE un factor
+  ✅ todo ítem tiene un factor válido
+  ✅ scorer clasifica 10 respuestas por factor y nada más
+  ✅ posición oficial única 1..50
+
+TEST 5 — Exactamente 50 ítems
+  ✅ IPIP50_ITEMS.length === 50
+  ✅ ipip50QuestionData().length === 50
+  ✅ códigos oficiales únicos (q01..q50)
+  ✅ textos únicos (sin duplicados)
+
+TEST 6 — Exactamente 10 ítems por factor
+  ✅ EXTRAVERSION = 10
+  ✅ AGREEABLENESS = 10
+  ✅ CONSCIENTIOUSNESS = 10
+  ✅ EMOTIONAL_STABILITY = 10
+  ✅ INTELLECT = 10
+  ✅ ítems inversos según clave oficial = 24
+
+TEST 7 — Versionado presente
+  ✅ instrumentId
+  ✅ instrumentVersion
+  ✅ languageVersion
+  ✅ scoringVersion
+  ✅ escala 1-5 con 5 anclas
+
+TEST 8 — Las preguntas antiguas (10 de PSICOMETRICA legacy) NO participan
+  ✅ 0 textos legacy presentes en el instrumento nuevo
+  ✅ 0 colisión entre categorías IPIP_* y legacy (igualdad exacta)
+  ✅ scorer IPIP ignora categorías legacy (answeredTotal=0, complete=false)
+  ✅ isIPIP50Category rechaza categorías legacy
+
+TEST 9 — 0 ítems generados por IA (verbatim de la fuente oficial)
+  ✅ 50/50 textos presentes verbatim en evidence-a01 (fuente ipip.ori.org)
+  ✅ módulo documenta fuente y atribución (Rodrigo de Oliveira / ipip.ori.org)
+  ✅ módulo declara prohibición de IA en reactivos
+  ✅ instrucción con proveniencia IPIP (no estandarizada, muestra oficial)
+
+TEST 10 — NO existe overall psicométrico
+  ✅ salida del scorer = solo {answeredByFactor, answeredTotal, complete, raw, visual}
+  ✅ raw = exactamente las 5 dimensiones especificadas
+  ✅ el módulo no expone ningún promedio/combinado (no hay campo overall/total/global)
+  ✅ disclaimer obligatorio A-01.2 §12 definido
+  ✅ visual 0-100 documentado como NO percentil
+  ✅ sin normas/categorías bajo-medio-alto en el módulo
+
+════════════════════════════════════
+RESULTADO: 48 verificaciones OK · 0 FALLIDAS
+════════════════════════════════════

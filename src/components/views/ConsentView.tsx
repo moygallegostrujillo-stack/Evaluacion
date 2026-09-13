@@ -225,7 +225,7 @@ export default function ConsentView() {
                 </li>
                 <li className="flex items-start gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
-                  Respuestas a evaluaciones psicométricas (Big Five),
+                  Respuestas a evaluaciones psicométricas (indicador experimental de personalidad, no disponible como instrumento formal en V1),
                   psicológicas y de integridad
                 </li>
                 <li className="flex items-start gap-2">
@@ -282,7 +282,7 @@ export default function ConsentView() {
                     </span>
                   </div>
                   <p className="text-sm text-gray-600 leading-relaxed">
-                    Incluye evaluación <strong>psicométrica</strong> (Big Five),{' '}
+                    Incluye evaluación <strong>psicométrica</strong> (indicador experimental de personalidad, no disponible como instrumento formal en V1),{' '}
                     <strong>psicológica</strong> (estrés, empatía,
                     adaptabilidad, liderazgo, trabajo en equipo), de{' '}
                     <strong>conocimientos técnicos</strong> y de{' '}

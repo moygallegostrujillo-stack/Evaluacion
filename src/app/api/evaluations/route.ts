@@ -12,6 +12,15 @@ import {
 } from '@/lib/knowledge-canonical'
 import { logUnauthorizedAccess } from '@/lib/audit'
 import { needsReconsent } from '@/lib/consent-version'
+import {
+  calculateCanonicalOverallScore,
+  buildCanonicalInput,
+  instrument,
+  serializeSections,
+  serializeExcludedReasons,
+  type EvidenceStatus,
+  type CanonicalOverallInput,
+} from '@/lib/overall-score'
 
 // ============================================
 // A-03.5 — CANONICAL KNOWLEDGE SERVING HELPERS
@@ -252,69 +261,29 @@ function calculateScores(
   const avgIntegrity = integrityCategoriesWithResponses > 0 ? integritySum / integrityCategoriesWithResponses : 0
   const hasIntegrityData = integrityCategoriesWithResponses > 0
 
-  // Overall score calculation — adaptive weighting based on which sections have data
-  // This fixes the bug where missing sections scored 0 and dragged the overall down
-  let overallScore: number
-  const sectionsWithData: string[] = []
-  if (hasBigFiveData) sectionsWithData.push('bigFive')
-  if (hasPsychData) sectionsWithData.push('psych')
-  if (hasIntegrityData) sectionsWithData.push('integrity')
-  if (knowledgeScore !== null) sectionsWithData.push('knowledge')
-
-  if (sectionsWithData.length === 0) {
-    overallScore = 0
-  } else if (sectionsWithData.length === 1) {
-    // Only one section — use its score directly
-    if (knowledgeScore !== null) overallScore = knowledgeScore
-    else if (hasBigFiveData) overallScore = avgBigFive
-    else if (hasPsychData) overallScore = avgPsychological
-    else overallScore = avgIntegrity
-  } else if (sectionsWithData.length === 2) {
-    // Two sections — equal split
-    const active: number[] = []
-    if (hasBigFiveData) active.push(avgBigFive)
-    if (hasPsychData) active.push(avgPsychological)
-    if (hasIntegrityData) active.push(avgIntegrity)
-    if (knowledgeScore !== null) active.push(knowledgeScore)
-    overallScore = active.reduce((a, b) => a + b, 0) / active.length
-  } else if (hasBigFiveData && hasPsychData && hasIntegrityData && knowledgeScore !== null) {
-    // All 4 sections
-    overallScore = 0.25 * avgBigFive + 0.25 * avgPsychological + 0.15 * avgIntegrity + 0.35 * knowledgeScore
-  } else if (hasBigFiveData && hasPsychData && hasIntegrityData && knowledgeScore === null) {
-    // 3 present, no knowledge
-    overallScore = 0.30 * avgBigFive + 0.30 * avgPsychological + 0.40 * avgIntegrity
-  } else if (hasBigFiveData && hasPsychData && !hasIntegrityData && knowledgeScore !== null) {
-    // 3 present, no integrity (legacy path)
-    overallScore = 0.30 * avgBigFive + 0.30 * avgPsychological + 0.40 * knowledgeScore
-  } else if (knowledgeScore !== null && (hasBigFiveData || hasPsychData || hasIntegrityData)) {
-    // Knowledge + one or two behavioral/integrity sections
-    const behavioralScores: number[] = []
-    if (hasBigFiveData) behavioralScores.push(avgBigFive)
-    if (hasPsychData) behavioralScores.push(avgPsychological)
-    if (hasIntegrityData) behavioralScores.push(avgIntegrity)
-    const behavioralAvg = behavioralScores.reduce((a, b) => a + b, 0) / behavioralScores.length
-    overallScore = 0.50 * behavioralAvg + 0.50 * knowledgeScore
-  } else {
-    // Only behavioral/integrity sections (no knowledge)
-    const behavioralScores: number[] = []
-    if (hasBigFiveData) behavioralScores.push(avgBigFive)
-    if (hasPsychData) behavioralScores.push(avgPsychological)
-    if (hasIntegrityData) behavioralScores.push(avgIntegrity)
-    overallScore = behavioralScores.reduce((a, b) => a + b, 0) / behavioralScores.length
+  // ── A-04.5: CANONICAL OVERALL SCORE ─────────────────────────────────
+  // The overall is computed by the SINGLE canonical engine. Integrity is
+  // ISOLATED (methodologically not approved — A-04.2 OPTION B) and never
+  // participates in the weighted score; its data is still stored separately
+  // for IntegrityResult / future phases. Absent (null) instruments are
+  // EXCLUDED (never coerced to 0). INSUFFICIENT/INVALID/PENDING_REVIEW/
+  // NOT_APPROVED instruments are EXCLUDED (never coerced to 0).
+  //
+  // The historical branch-matrix weights are PRESERVED verbatim inside the
+  // engine — no new weights were invented. See src/lib/overall-score.ts.
+  //
+  // NOTE: at this point `knowledgeScore` is the LEGACY value (live keys).
+  // If a canonical administration exists, completeEvaluation() will OVERRIDE
+  // knowledgeScore with the canonical value + evidenceStatus and RECOMPUTE
+  // the overall below — fixing the historical "pre-canonical overall" bug.
+  const canonicalInput: CanonicalOverallInput = {
+    bigFive: instrument('BIG_FIVE', hasBigFiveData ? avgBigFive : null),
+    psychological: instrument('PSYCHOLOGICAL', hasPsychData ? avgPsychological : null),
+    knowledge: instrument('KNOWLEDGE', knowledgeScore),
+    integrity: instrument('INTEGRITY', hasIntegrityData ? avgIntegrity : null),
   }
-
-  // Guidance level — NOT a hiring decision, just informational orientation
-  // PERFIL_COMPLETO = all sections completed
-  // PERFIL_PARCIAL = only some sections completed (e.g. knowledge-only consent)
-  // PENDIENTE = no data yet
-  let guidance: string
-  if (sectionsWithData.length === 0) {
-    guidance = 'PENDIENTE'
-  } else if (hasBigFiveData && hasPsychData && hasIntegrityData && knowledgeScore !== null) {
-    guidance = 'PERFIL_COMPLETO'
-  } else {
-    guidance = 'PERFIL_PARCIAL'
-  }
+  const canonicalOverall = calculateCanonicalOverallScore(canonicalInput)
+  const guidance = canonicalOverall.guidance
 
   return {
     openness: bigFiveScores['OPENNESS'] || 0,
@@ -329,8 +298,12 @@ function calculateScores(
     teamwork: psychScores['TEAMWORK'] || 0,
     knowledgeScore,
     integrityScore: hasIntegrityData ? Math.round(avgIntegrity * 100) / 100 : 0,
-    overallScore: Math.round(overallScore * 100) / 100,
+    overallScore: canonicalOverall.score,
     recommendation: guidance, // Keep field name for DB compatibility, but value is now guidance
+    formulaVersion: canonicalOverall.formulaVersion,
+    includedSections: serializeSections(canonicalOverall.includedSections),
+    excludedSections: serializeSections(canonicalOverall.excludedSections),
+    excludedReasons: serializeExcludedReasons(canonicalOverall.excludedReasons),
     summary: generateSummary(
       bigFiveScores, psychScores, knowledgeScore, guidance, hasBigFiveData, hasPsychData,
       hasIntegrityData ? Math.round(avgIntegrity * 100) / 100 : null, hasIntegrityData
@@ -1380,6 +1353,41 @@ async function completeEvaluation(
     try {
       canonicalKnowledge = await scoreCanonicalAdministration(rlsDb, administration.id)
       scores.knowledgeScore = canonicalKnowledge.knowledgeScore
+      // ── A-04.5: RECOMPUTE the canonical overall AFTER the canonical
+      // knowledge score is resolved. This fixes the historical
+      // "pre-canonical overall" bug (A-04.4 found that overall was
+      // computed at L1350 BEFORE the canonical KN override at L1382,
+      // so the overall silently embedded the legacy KN while the
+      // knowledgeScore FIELD showed the canonical value). Now the
+      // overall uses the canonical KN + its evidenceStatus, and
+      // Integrity is excluded by the engine. The legacy knowledgeScore
+      // value computed inside calculateScores() is discarded here. ──
+      const recomputedInput = buildCanonicalInput(
+        {
+          openness: scores.openness,
+          conscientiousness: scores.conscientiousness,
+          extraversion: scores.extraversion,
+          agreeableness: scores.agreeableness,
+          neuroticism: scores.neuroticism,
+        },
+        {
+          stressLevel: scores.stressLevel,
+          empathy: scores.empathy,
+          adaptability: scores.adaptability,
+          leadership: scores.leadership,
+          teamwork: scores.teamwork,
+        },
+        scores.knowledgeScore,
+        canonicalKnowledge.evidenceStatus as EvidenceStatus,
+        scores.integrityScore
+      )
+      const recomputedOverall = calculateCanonicalOverallScore(recomputedInput)
+      scores.overallScore = recomputedOverall.score
+      scores.recommendation = recomputedOverall.guidance
+      scores.formulaVersion = recomputedOverall.formulaVersion
+      scores.includedSections = serializeSections(recomputedOverall.includedSections)
+      scores.excludedSections = serializeSections(recomputedOverall.excludedSections)
+      scores.excludedReasons = serializeExcludedReasons(recomputedOverall.excludedReasons)
     } catch (scoringError) {
       if (scoringError instanceof KnowledgeVersioningError) {
         console.error(`[A-03.5] ${scoringError.code} during internal scoring: ${scoringError.message}`)

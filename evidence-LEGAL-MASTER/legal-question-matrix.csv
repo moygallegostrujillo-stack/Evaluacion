@@ -1,0 +1,27 @@
+id,pregunta,riesgo,evidence,recomendacionAnalisis,estado
+PQ-01,Es defendible Empresa=responsable / EvaluHR=encargado por tratamiento,ALTO,"04, 03",Dictamen profesional,OPEN
+PQ-02,Que fundamento corresponde a cada tratamiento (LFPDPPP 2025),ALTO,"02, 01",Dictamen profesional,OPEN
+PQ-03,Que tratamientos requieren consentimiento y en que forma,ALTO,05,Dictamen profesional,OPEN
+PQ-04,Redaccion definitiva del consentimiento,MEDIO,"05, 06",Dictamen profesional,OPEN
+PQ-05,Plazos de conservacion por categoria,MEDIO,15,Dictamen profesional,OPEN
+PQ-06,Que datos sensibles pueden tratarse,ALTO,"10, 20, 22",Dictamen profesional,OPEN
+PQ-07,Suficiencia del protocolo UNINVITED_DISCLOSURE,ALTO,10,Dictamen profesional,OPEN
+PQ-08,Contenido del aviso y consolidacion PDF+in-app,ALTO,06,Dictamen profesional,OPEN
+PQ-09,Que decir sobre IA en aviso/contrato,MEDIO,12,Dictamen profesional,OPEN
+PQ-10,Como documentar revision humana,MEDIO,13,Dictamen profesional,OPEN
+PQ-11,Que transferencias requieren que mecanismo,ALTO,"17, 18",Dictamen profesional,OPEN
+PQ-12,Que subencargados declarar,ALTO,17,Dictamen profesional,OPEN
+PQ-13,Obligaciones ARCO por parte y plazos vigentes,MEDIO,09,Dictamen profesional,OPEN
+PQ-14,Restricciones por puesto (edad/disponibilidad),MEDIO,"11, 02",Dictamen profesional,OPEN
+PQ-15,Controles de no discriminacion a incorporar,MEDIO,11,Dictamen profesional,OPEN
+PQ-16,Riesgo juridico especifico de BDI/STAR,MEDIO,"24, evidence-a06-11",Dictamen profesional,OPEN
+PQ-17,Resultados como evidencia de competencia (art. 26),MEDIO,"25, 14",Dictamen profesional,OPEN
+PQ-18,Cambios al contrato maestro,ALTO,08,Dictamen profesional,OPEN
+PQ-19,Cambios al aviso,ALTO,06,Dictamen profesional,OPEN
+PQ-20,Puede cerrarse INTERVIEW-G7 con el paquete A-06.11,CRITICO,"24, 23",Dictamen profesional,OPEN
+PQ-21,Indicador de integridad como orientacion visible,MEDIO,22,Dictamen profesional,OPEN
+PQ-22,Debe recolectarse candidateAge,MEDIO-ALTO,"02, 11",Dictamen profesional,OPEN
+PQ-23,Evidencia de consentimiento suficiente (gap canal publico),MEDIO,05,Dictamen profesional,OPEN
+PQ-24,Regimen de incidentes/notificacion conforme texto vigente,MEDIO,19,Dictamen profesional,OPEN
+PQ-25,Como documentar la no validez psicometrica sin afirmaciones enganosas,MEDIO,20,Dictamen profesional,OPEN
+PQ-26,Condiciones del dictamen para piloto (G9) y validacion (G10),MEDIO,"23, 24",Dictamen profesional,OPEN

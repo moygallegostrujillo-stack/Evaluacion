@@ -6,7 +6,7 @@ import { apiFetch } from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, BarChart3 } from 'lucide-react'
+import { ArrowLeft, BarChart3, Brain } from 'lucide-react'
 import {
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend
@@ -139,6 +139,14 @@ export default function CompareView() {
     fill: COLORS[i % COLORS.length],
   }))
 
+  // A-05.3: Big Five is NOT_IMPLEMENTED for V1. Only show the Big Five radar
+  // if at least one result has legacy Big Five data (any score > 0).
+  const hasAnyBigFiveData = results.some(r =>
+    r.openness > 0 || r.conscientiousness > 0 ||
+    r.extraversion > 0 || r.agreeableness > 0 ||
+    r.neuroticism > 0
+  )
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -209,10 +217,11 @@ export default function CompareView() {
         </CardContent>
       </Card>
 
-      {/* Big Five Radar */}
+      {/* Big Five Radar — A-05.3: only shown if legacy data exists */}
+      {hasAnyBigFiveData && (
       <Card className="shadow-sm">
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Big Five - Comparativo</CardTitle>
+          <CardTitle className="text-lg">Personalidad - Comparativo (legado)</CardTitle>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={350}>
@@ -236,6 +245,21 @@ export default function CompareView() {
           </ResponsiveContainer>
         </CardContent>
       </Card>
+      )}
+      {!hasAnyBigFiveData && (
+      <Card className="shadow-sm">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg">Personalidad</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col items-center justify-center h-[200px] text-center">
+            <Brain className="w-10 h-10 text-gray-300 mb-3" />
+            <p className="text-sm text-gray-500 font-medium">Evaluación de personalidad: no disponible en V1</p>
+            <p className="text-xs text-gray-400 mt-1">Indicador experimental retirado de la versión actual.</p>
+          </div>
+        </CardContent>
+      </Card>
+      )}
 
       {/* Psychological Bar Comparison */}
       <Card className="shadow-sm">

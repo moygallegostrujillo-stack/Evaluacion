@@ -393,7 +393,7 @@ export default function EvaluationView() {
 
   const getStepDescription = (type: string) => {
     switch (type) {
-      case 'PSICOMETRICA': return 'Evalúa tu perfil de personalidad a través del modelo Big Five: apertura a la experiencia, responsabilidad, extraversión, amabilidad y neuroticismo.'
+      case 'PSICOMETRICA': return 'Indicador experimental de personalidad (no disponible como instrumento formal en V1). Las respuestas históricas se conservan con fines de trazabilidad.'
       case 'PSICOLOGICA': return 'Evalúa aspectos psicológicos relevantes para el trabajo: manejo de estrés, empatía, adaptabilidad, liderazgo y trabajo en equipo.'
       case 'CONOCIMIENTOS': return 'Evalúa tus conocimientos técnicos específicos para el puesto al que estás aplicando.'
       case 'INTEGRIDAD': return 'Evaluación de Integridad (dato sensible, orientativo). Indicadores de honestidad, cumplimiento de normas, responsabilidad y prevención de robos.'
