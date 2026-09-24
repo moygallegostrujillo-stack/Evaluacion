@@ -14,13 +14,14 @@ import InviteView from '@/components/views/InviteView'
 import InterviewsView from '@/components/views/InterviewsView'
 import QuestionsManagementView from '@/components/views/QuestionsManagementView'
 import CompanyManagementView from '@/components/views/CompanyManagementView'
+import LegalReviewView from '@/components/views/LegalReviewView'
 import InvitationWelcomeView from '@/components/views/InvitationWelcomeView'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import {
   LayoutDashboard, Users, UserPlus,
   BarChart3, Calendar, LogOut, Menu, X, HelpCircle,
-  Building2, FileDown, FileText, Download
+  Building2, FileDown, FileText, Download, Scale
 } from 'lucide-react'
 
 // Restore auth from localStorage
@@ -104,7 +105,17 @@ function useInvitationCheck() {
   }, [])
 }
 
-function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
+function Sidebar({
+  collapsed,
+  onToggle,
+  mobileOpen,
+  onCloseMobile,
+}: {
+  collapsed: boolean
+  onToggle: () => void
+  mobileOpen: boolean
+  onCloseMobile: () => void
+}) {
   const user = useAppStore((s) => s.user)
   const currentView = useAppStore((s) => s.currentView)
   const setCurrentView = useAppStore((s) => s.setCurrentView)
@@ -125,17 +136,20 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
     { view: 'invite', label: 'Invitar', icon: <UserPlus className="w-5 h-5" />, show: isRH },
     { view: 'compare', label: 'Comparar', icon: <BarChart3 className="w-5 h-5" />, show: isRH || isGerente },
     { view: 'interviews', label: 'Entrevistas', icon: <Calendar className="w-5 h-5" />, show: isRH },
+    { view: 'legal-review', label: 'Revisión Legal', icon: <Scale className="w-5 h-5" />, show: isRH },
   ]
 
   return (
     <aside
-      className={`bg-white border-r border-gray-200 flex flex-col transition-all duration-300 ${
-        collapsed ? 'w-16' : 'w-64'
-      }`}
+      aria-label="Navegación principal"
+      className={`bg-white border-r border-gray-200 flex flex-col transition-all duration-300
+        ${collapsed ? 'md:w-16' : 'md:w-64'} md:flex-shrink-0
+        max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-40 max-md:shadow-xl max-md:w-64
+        ${mobileOpen ? 'max-md:translate-x-0' : 'max-md:-translate-x-full'}`}
     >
       {/* Header */}
       <div className="p-4 flex items-center justify-between">
-        {!collapsed && (
+        {!(collapsed && !mobileOpen) && (
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center font-bold text-sm">
               E
@@ -144,10 +158,14 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
           </div>
         )}
         <button
-          onClick={onToggle}
+          onClick={() => {
+            onToggle()
+            onCloseMobile()
+          }}
+          aria-label={collapsed ? 'Abrir menú lateral' : 'Cerrar menú lateral'}
           className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400"
         >
-          {collapsed ? <Menu className="w-5 h-5" /> : <X className="w-5 h-5" />}
+          {mobileOpen ? <X className="w-5 h-5" /> : collapsed ? <Menu className="w-5 h-5" /> : <X className="w-5 h-5" />}
         </button>
       </div>
 
@@ -158,7 +176,11 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
         {menuItems.filter(m => m.show).map(item => (
           <button
             key={item.view}
-            onClick={() => setCurrentView(item.view)}
+            onClick={() => {
+              setCurrentView(item.view)
+              onCloseMobile()
+            }}
+            aria-current={currentView === item.view ? 'page' : undefined}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
               currentView === item.view
                 ? 'bg-emerald-50 text-emerald-700 font-medium'
@@ -166,7 +188,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
             }`}
           >
             {item.icon}
-            {!collapsed && <span>{item.label}</span>}
+            <span className={collapsed && !mobileOpen ? 'md:hidden' : ''}>{item.label}</span>
           </button>
         ))}
       </nav>
@@ -182,7 +204,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
             className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors"
           >
             <FileDown className="w-5 h-5" />
-            {!collapsed && <span>Aviso de Privacidad</span>}
+            <span className={collapsed && !mobileOpen ? 'md:hidden' : ''}>Aviso de Privacidad</span>
           </a>
         </div>
       )}
@@ -191,7 +213,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
 
       {/* User Info */}
       <div className="p-3">
-        {!collapsed && (
+        {!(collapsed && !mobileOpen) && (
           <div className="mb-2 px-2">
             <p className="text-sm font-medium text-gray-900 truncate">{user.name}</p>
             <p className="text-xs text-gray-500 truncate">{user.companyName}</p>
@@ -205,7 +227,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
           className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50 transition-colors"
         >
           <LogOut className="w-5 h-5" />
-          {!collapsed && <span>Cerrar sesión</span>}
+          <span className={collapsed && !mobileOpen ? 'md:hidden' : ''}>Cerrar sesión</span>
         </button>
       </div>
     </aside>
@@ -267,6 +289,8 @@ function renderView(view: ViewType) {
       return <InterviewsView />
     case 'companies':
       return <CompanyManagementView />
+    case 'legal-review':
+      return <LegalReviewView />
     default:
       return <DashboardView />
   }
@@ -276,6 +300,7 @@ export default function Home() {
   const user = useAppStore((s) => s.user)
   const currentView = useAppStore((s) => s.currentView)
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false)
+  const [mobileNavOpen, setMobileNavOpen] = React.useState(false)
   // Track client mount to avoid flashing LoginView during SSR/hydration.
   // Before mount, we render a neutral loading state (matches SSR output,
   // so no hydration mismatch). After mount, the URL check + store state
@@ -413,9 +438,30 @@ export default function Home() {
       <Sidebar
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+        mobileOpen={mobileNavOpen}
+        onCloseMobile={() => setMobileNavOpen(false)}
       />
+
+      {/* Mobile nav backdrop */}
+      {mobileNavOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 z-30 md:hidden"
+          onClick={() => setMobileNavOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Mobile menu button (floating) */}
+      <button
+        onClick={() => setMobileNavOpen(true)}
+        aria-label="Abrir menú"
+        className="md:hidden fixed top-3 left-3 z-20 p-2.5 rounded-lg bg-white border border-gray-200 shadow-sm text-gray-600 hover:bg-gray-50 min-w-[44px] min-h-[44px] flex items-center justify-center"
+      >
+        <Menu className="w-5 h-5" />
+      </button>
+
       <div className="flex-1 flex flex-col min-w-0">
-        <main className="flex-1 p-4 sm:p-6 overflow-y-auto">
+        <main className="flex-1 p-4 pt-16 sm:p-6 md:pt-6 overflow-y-auto">
           {renderView(currentView)}
         </main>
         <footer className="bg-white border-t border-gray-200 py-3 px-6 text-center text-xs text-gray-400">

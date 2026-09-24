@@ -18,6 +18,7 @@ export type ViewType =
   | 'questions'
   | 'companies'
   | 'settings'
+  | 'legal-review'
   | 'invitation-welcome'
 
 export interface User {
