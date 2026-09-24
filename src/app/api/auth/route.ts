@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getUnscopedClient } from '@/lib/rls'
 import { hashPassword, verifyPassword, isLegacyHash } from '@/lib/password'
 import { generateToken } from '@/lib/auth'
+import { setSessionCookie, clearSessionCookie } from '@/lib/session-cookie'
 import { needsReconsent } from '@/lib/consent-version'
 import crypto from 'crypto'
 
@@ -64,13 +65,8 @@ export async function POST(req: NextRequest) {
 
     if (action === 'logout') {
       const response = NextResponse.json({ success: true })
-      response.cookies.set('evaluhr_token', '', {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 0, // Expire immediately
-        path: '/',
-      })
+      // Atributos idénticos al set — requerido para borrar la cookie en iframes (CHIPS)
+      clearSessionCookie(response)
       return response
     }
 
@@ -133,13 +129,7 @@ export async function POST(req: NextRequest) {
         needsReconsent: userResponse.role === 'CANDIDATO' && userResponse.consentGiven && reconsentCheck.needsReconsent,
       })
 
-      response.cookies.set('evaluhr_token', token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 8, // 8 hours
-        path: '/',
-      })
+      setSessionCookie(response, token)
 
       return response
     }
@@ -334,13 +324,7 @@ export async function POST(req: NextRequest) {
         needsReconsent: autoUserResponse.role === 'CANDIDATO' && autoUserResponse.consentGiven && autoReconsentCheck.needsReconsent,
       })
 
-      response.cookies.set('evaluhr_token', jwtToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 8, // 8 hours
-        path: '/',
-      })
+      setSessionCookie(response, jwtToken)
 
       return response
     }
