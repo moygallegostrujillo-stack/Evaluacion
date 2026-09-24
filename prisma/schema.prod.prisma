@@ -2,6 +2,11 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// PRODUCTION schema (PostgreSQL / Supabase).
+// Auto-synced from schema.prisma (source of truth) — ONLY the datasource
+// block differs. Keep every model/enum change in BOTH files in sync.
+// scripts/vercel-build.sh copies THIS file over schema.prisma before
+// `prisma generate` + `prisma db push` on Vercel.
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
@@ -25,7 +30,6 @@ model Company {
 
   users       User[]
   positions   Position[]
-  arcoRequests ArcoRequest[]
   invitations CandidateInvitation[]
   results     EvaluationResult[]
   interviews  InterviewSchedule[]
@@ -33,10 +37,16 @@ model Company {
   vacancies   Vacancy[]
   vacancyApplications VacancyApplication[]
   privacyNotice CompanyPrivacyNotice?
+  arcoRequests ArcoRequest[]
   evaluationResponses EvaluationResponse[]
   evaluationTemplates EvaluationTemplate[]
   vacancyQuestions    VacancyQuestion[]
   vacancyApplicationResponses VacancyApplicationResponse[]
+  knowledgeAssessments KnowledgeAssessment[] // A-03.4: knowledge versioning (tenant scope)
+  // A-03.5: canonical knowledge model backrelations (tenant scope)
+  knowledgeBlueprints     KnowledgeBlueprint[]
+  knowledgeAdministrations KnowledgeAdministration[]
+  knowledgeResults         KnowledgeResult[]
 }
 
 model User {
@@ -51,16 +61,15 @@ model User {
   consentGiven     Boolean   @default(false)
   consentDate      DateTime?
   consentOption    String?   // FULL, KNOWLEDGE_ONLY — which consent option the candidate chose
-  anonymousStats   Boolean   @default(false) // Option C: anonymous statistics consent
+  anonymousStats   Boolean   @default(false) // Option C: anonymous statistics consent (DEPRECATED — not used in current flow)
   consentConfirmed Boolean   @default(false) // Did candidate confirm reading all options + ARCO?
   consentWithdrawnAt DateTime? // When consent was withdrawn (retracted from FULL to KNOWLEDGE_ONLY)
   consentVersion   String?   // Version of the privacy notice the candidate consented to
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-
-  // PHASE 3.5 (B4) retention columns — synced from schema.prisma (source of truth)
+  // Retention fields (Phase 3)
   piiPurgeAt       DateTime? // When candidate PII should be purged (2 years after eval)
   sensitivePurgeAt DateTime? // When sensitive data should be purged (on conclusion/withdrawal)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   company          Company?              @relation(fields: [companyId], references: [id])
   sessions         EvaluationSession[]
@@ -68,7 +77,6 @@ model User {
   sentInvitations  CandidateInvitation[] @relation("InvitationSender")
   interviews       InterviewSchedule[]   @relation("InterviewCandidate")
   consentLogs      ConsentLog[]
-  // PHASE 3.5-H sync: relations restored (were missing from this prod schema)
   auditLogs        AuditLog[]             @relation("AuditActor")
   arcoRequests     ArcoRequest[]          @relation("ArcoRequestSubject")
   arcoAssignments  ArcoRequest[]          @relation("ArcoRequestAssignee")
@@ -80,13 +88,41 @@ model CompanyPrivacyNotice {
   companyId   String   @unique
   contentHtml String
   version     String   @default("2026-01-v2")
-  isCustom    Boolean  @default(false)
+  isCustom    Boolean  @default(false) // true if RH edited the notice
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@index([companyId])
+}
+
+model ConsentLog {
+  id              String   @id @default(cuid())
+  userId          String?  // NULLABLE — when User is deleted, this becomes NULL (SET NULL)
+                          // but the consent evidence (snapshots below) is preserved.
+  action          String   // GIVEN, WITHDRAWN, MODIFIED, REVOKED, RE_CONSENTED
+  previousOption  String?
+  newOption       String?
+  anonymousStats  Boolean  @default(false)
+  consentVersion  String?
+  ipAddress       String?
+  userAgent       String?  // Browser user-agent string for evidentiary completeness
+  companyId       String?  // Tenant context at time of consent
+  adminUserId     String?  // If action was performed by an admin (e.g., system override)
+  reason          String?  // Optional reason for withdrawal/modification
+  // PII snapshots — captured at consent time so evidence survives user deletion.
+  // These are IMMUTABLE after creation (no UPDATE path exists).
+  // Allows reconstructing WHO consented, even after the User row is deleted/anonymized.
+  candidateNameSnapshot    String?  // Snapshot of User.name at consent time
+  candidateEmailSnapshot   String?  // Snapshot of User.email at consent time
+  candidatePhoneSnapshot   String?  // Snapshot of User.phone at consent time
+  // Hash of the privacy notice text at consent time — cryptographic binding
+  // between the consent record and the exact text the candidate saw.
+  noticeHash     String?
+  createdAt       DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull) // CHANGED: CASCADE → SetNull
 }
 
 model Position {
@@ -108,6 +144,8 @@ model Position {
   sessions            EvaluationSession[]
   results             EvaluationResult[]
   interviews          InterviewSchedule[]
+  // A-03.5: canonical knowledge assessments frozen for this position (internal channel)
+  knowledgeAssessments KnowledgeAssessment[]
 }
 
 model EvaluationTemplate {
@@ -118,8 +156,8 @@ model EvaluationTemplate {
   order       Int      @default(1)
   active      Boolean  @default(true)
   positionId  String
-  // PHASE 3.5-D.2.9: direct tenant column — REQUIRED (synced with
-  // schema.prisma; prod column is backfilled by backfill-indirect-companyid.sql).
+  // PHASE 3.5-D.2.9 (PARTE 9): direct tenant column (RLS-ready, NOT NULL after backfill).
+  // Invariant: companyId == position.companyId.
   companyId   String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -187,6 +225,9 @@ model EvaluationSession {
   position  Position            @relation(fields: [positionId], references: [id])
   responses EvaluationResponse[]
   result    EvaluationResult?
+
+  // ── A-03.5: canonical knowledge administration frozen at evaluation start ──
+  knowledgeAdministration KnowledgeAdministration? @relation("AdminSession")
 }
 
 model EvaluationResponse {
@@ -195,13 +236,18 @@ model EvaluationResponse {
   questionId   String
   value        String
   numericValue Int?
-  // PHASE 3.5-D.2.9: direct tenant column — REQUIRED (synced with schema.prisma).
+  // PHASE 3.5-D.2.9 (PARTE 9): direct tenant column (RLS-ready, NOT NULL after backfill).
+  // Invariant: companyId == session.companyId (enforced on every write path).
   companyId    String
   createdAt    DateTime @default(now())
 
   session  EvaluationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   question Question          @relation(fields: [questionId], references: [id])
   company  Company           @relation(fields: [companyId], references: [id])
+
+  // ── A-03.5: when the answer belongs to a canonical knowledge administration,
+  // the server stamps the administration id (never client-supplied). ──
+  knowledgeAdministrationId String?
 
   @@unique([sessionId, questionId])
   @@index([companyId])
@@ -233,7 +279,8 @@ model EvaluationResult {
   // Conocimientos (0-100, null si no aplica)
   knowledgeScore    Float?
 
-  // Integridad (0-100)
+  // Integridad (0-100) — A-04.5: isolated from overallScore (still stored
+  // separately for IntegrityResult / future phases). Legacy values untouched.
   integrityScore    Float    @default(0)
 
   // General
@@ -241,17 +288,24 @@ model EvaluationResult {
   recommendation    String   @default("PENDIENTE") // PERFIL_COMPLETO, PERFIL_PARCIAL, PENDIENTE
   summary           String?
 
-  // A-04.5: canonical overall score versioning (synced from schema.prisma)
+  // ── A-04.5: CANONICAL OVERALL SCORE VERSIONING ──
+  // formulaVersion identifies the technical formula that produced the
+  // overallScore. 'OVERALL-v1' = canonical engine (new evaluations).
+  // NULL = LEGACY-OVERALL (pre-A-04.5 rows; value preserved as-is,
+  // NEVER recalculated).
   formulaVersion     String?
+  // JSON array of included instrument kinds (e.g. ["BIG_FIVE","KNOWLEDGE"]).
   includedSections   String?
+  // JSON array of excluded instrument kinds.
   excludedSections   String?
+  // JSON map instrument→exclusion reason (e.g. {"INTEGRITY":"INTEGRITY_NOT_APPROVED_FOR_OVERALL"}).
   excludedReasons    String?
 
-  createdAt         DateTime @default(now())
-
-  // PHASE 3.5 (B4) retention columns — synced from schema.prisma
+  // Retention fields (Phase 3)
   retainedUntil     DateTime? // When this result should be purged (2 years after createdAt)
   purgedAt          DateTime? // When the result was actually purged/anonymized
+
+  createdAt         DateTime @default(now())
 
   session           EvaluationSession @relation(fields: [sessionId], references: [id])
   candidate         User              @relation(fields: [candidateId], references: [id])
@@ -292,9 +346,10 @@ model Vacancy {
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
-  company       Company                @relation(fields: [companyId], references: [id])
-  questions     VacancyQuestion[]
-  applications  VacancyApplication[]
+  company             Company                @relation(fields: [companyId], references: [id])
+  questions           VacancyQuestion[]
+  applications        VacancyApplication[]
+  knowledgeAssessments KnowledgeAssessment[]  // A-03.4: frozen knowledge administrations per vacancy
 }
 
 model VacancyQuestion {
@@ -305,13 +360,18 @@ model VacancyQuestion {
   correctAnswer  Int?     // 0-based index of correct answer
   order          Int
   vacancyId      String
-  // PHASE 3.5-D.2.9: direct tenant column — REQUIRED (synced with schema.prisma).
+  // PHASE 3.5-D.2.9 (PARTE 9): direct tenant column (RLS-ready, NOT NULL after backfill).
+  // Invariant: companyId == vacancy.companyId.
   companyId      String
   createdAt      DateTime @default(now())
 
   vacancy    Vacancy                       @relation(fields: [vacancyId], references: [id], onDelete: Cascade)
   company    Company                       @relation(fields: [companyId], references: [id])
   responses  VacancyApplicationResponse[]
+
+  // ── A-03.5: provenance of bank rows. AI can only create AI_DRAFT rows;
+  // RH creates RH_MANUAL rows; null = pre-A-03.5 (unknown/manual). ──
+  origin String? // RH_MANUAL | AI_DRAFT
 
   @@index([companyId])
 }
@@ -333,6 +393,13 @@ model VacancyApplication {
   completedAt        DateTime?
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
+
+  // PHASE 3.5-A.1 (B2): FK to User for reliable cleanup on deletion.
+  // Nullable because some vacancy applications may come from unregistered
+  // users. When the linked User is deleted, this FK is set to NULL
+  // (onDelete: SetNull) — the VacancyApplication record is preserved for
+  // audit but the PII fields are anonymized by the DELETE handler.
+  candidateUserId    String?
 
   // Big Five scores (0-100)
   openness           Float     @default(0)
@@ -359,19 +426,34 @@ model VacancyApplication {
   recommendation     String    @default("PENDIENTE") // PERFIL_COMPLETO, PERFIL_PARCIAL, PENDIENTE
   summary            String?
 
-  // A-04.5: canonical overall score versioning (synced from schema.prisma)
+  // ── A-04.5: CANONICAL OVERALL SCORE VERSIONING ──
+  // 'OVERALL-v1' = canonical engine; NULL = LEGACY-OVERALL (preserved, never recalculated).
   formulaVersion     String?
-  includedSections   String?
-  excludedSections   String?
-  excludedReasons    String?
+  includedSections   String? // JSON array of instrument kinds
+  excludedSections   String? // JSON array of instrument kinds
+  excludedReasons    String? // JSON map instrument→reason
 
   vacancy    Vacancy                      @relation(fields: [vacancyId], references: [id])
   company    Company                      @relation(fields: [companyId], references: [id])
+  candidateUser User?                     @relation("VacancyApplicant", fields: [candidateUserId], references: [id], onDelete: SetNull)
   responses  VacancyApplicationResponse[]
-  // PHASE 3.5-H sync: candidateUser FK restored (D.2.6 VUL-01 ownership
-  // checks depend on candidateUserId — it was missing from this prod schema).
-  candidateUserId    String?
-  candidateUser User?                        @relation("VacancyApplicant", fields: [candidateUserId], references: [id], onDelete: SetNull)
+
+  // ── A-03.4: KNOWLEDGE VERSION FREEZE (frozen at evaluation start) ──
+  // Null on rows created before A-03.4 → classified LEGACY (never migrated).
+  knowledgeAssessmentId      String?   // FK to the frozen KnowledgeAssessment administration
+  knowledgeAssessmentVersion Int?      // denormalized assessmentVersion (KA-v{n})
+  knowledgeBlueprintVersion  String?   // co-versioned blueprint of the frozen item set (BP-v{n})
+  knowledgeScoringVersion    String?   // scoring rules version frozen for this administration
+  knowledgeFrozenAt          DateTime? // when the version chain was frozen
+  knowledgeVersioningStatus  String?   // VERSIONED | LEGACY | NOT_APPLICABLE
+
+  knowledgeAssessment KnowledgeAssessment? @relation(fields: [knowledgeAssessmentId], references: [id], onDelete: Restrict)
+
+  // ── A-03.5: canonical KnowledgeAdministration (formal entity for what the
+  // candidate received). One administration per application. ──
+  knowledgeAdministration KnowledgeAdministration? @relation("AdminApplication")
+
+  @@index([knowledgeAssessmentId])
 }
 
 model VacancyApplicationResponse {
@@ -382,7 +464,8 @@ model VacancyApplicationResponse {
   section          String   // PSICOMETRICA, PSICOLOGICA, CONOCIMIENTOS, INTEGRIDAD
   value            String
   numericValue     Int?
-  // PHASE 3.5-D.2.9: direct tenant column — REQUIRED (synced with schema.prisma).
+  // PHASE 3.5-D.2.9 (PARTE 9): direct tenant column (RLS-ready, NOT NULL after backfill).
+  // Invariant: companyId == application.companyId (enforced on every write path).
   companyId        String
   createdAt        DateTime @default(now())
 
@@ -390,41 +473,260 @@ model VacancyApplicationResponse {
   vacancyQuestion VacancyQuestion?   @relation(fields: [vacancyQuestionId], references: [id])
   company         Company            @relation(fields: [companyId], references: [id])
 
+  // ── A-03.5: administration linkage (server-stamped on knowledge answers) ──
+  knowledgeAdministrationId String?
+  knowledgeAdministration   KnowledgeAdministration? @relation(fields: [knowledgeAdministrationId], references: [id])
+
+  // ── A-03.4: per-response KNOWLEDGE SNAPSHOT (server-derived, never client-sent) ──
+  // Allows historical result reconstruction: Response → frozen key → score.
+  // correctAnswerSnapshot is stored server-side ONLY — it is NEVER sent to the
+  // candidate frontend (PASO 3/10). Null on legacy responses.
+  itemVersion            Int?    // frozen itemVersion answered
+  questionSnapshot       String? // JSON {text, options[], type} at administration time
+  correctAnswerSnapshot  Int?    // frozen key (0-based) — server-only
+  scoringVersionSnapshot String? // scoring version bound to this administration
+
   @@index([companyId])
 }
 
-model ConsentLog {
-  id              String   @id @default(cuid())
-  userId          String?  // NULLABLE — when User is deleted, this becomes NULL (SET NULL)
-                          // but the consent evidence (snapshots below) is preserved.
-  action          String   // GIVEN, WITHDRAWN, MODIFIED, REVOKED, RE_CONSENTED
-  previousOption  String?
-  newOption       String?
-  anonymousStats  Boolean  @default(false)
-  consentVersion  String?
-  ipAddress       String?
-  userAgent       String?  // Browser user-agent string for evidentiary completeness
-  companyId       String?  // Tenant context at time of consent
-  adminUserId     String?  // If action was performed by an admin (e.g., system override)
-  reason          String?  // Optional reason for withdrawal/modification
-  // PII snapshots — captured at consent time so evidence survives user deletion.
-  candidateNameSnapshot    String?  // Snapshot of User.name at consent time
-  candidateEmailSnapshot   String?  // Snapshot of User.email at consent time
-  candidatePhoneSnapshot   String?  // Snapshot of User.phone at consent time
-  // Hash of the privacy notice text at consent time — cryptographic binding
-  noticeHash     String?
-  createdAt       DateTime @default(now())
+// ══════════════════════════════════════════════════════════════════
+// A-03.4 / A-03.5 — KNOWLEDGE VERSIONING (canonical model)
+// ══════════════════════════════════════════════════════════════════
+// A-03.5 CANONICAL CHAIN (both internal and public flows):
+//
+//   JOB (Position | Vacancy)
+//     → KnowledgeBlueprint        (jobId + blueprintVersion)
+//       → KnowledgeRequirement    (blueprintId; domain/subdomain/importance)
+//         → KnowledgeItemVersion  (requirementId + itemId + itemVersion;
+//                                  question/options/correctAnswer protected)
+//           → KnowledgeAssessment (jobId + blueprintId + assessmentVersion
+//                                  + scoringVersion, published by SYSTEM only)
+//             → KnowledgeAssessmentItem (frozen administration copy)
+//               → KnowledgeAdministration (candidate/application binding)
+//                 → Response (+ server snapshots)
+//                   → KnowledgeResult (INSUFFICIENT ≠ 0; separate from
+//                                      overallScore)
+//
+// A-03.4 rows keep vacancyId and a null blueprintId: they are classified
+// KA-V1+ PRE-CANONICAL and are NEVER migrated or reinterpreted.
+model KnowledgeAssessment {
+  id               String    @id @default(cuid())
+  // A-03.5: job generalization — a knowledge assessment belongs to ONE job.
+  // Legacy A-03.4 rows have jobType='VACANCY' + vacancyId set + positionId null.
+  jobType          String    @default("VACANCY") // VACANCY (public) | POSITION (internal)
+  vacancyId        String?
+  positionId       String?
+  companyId        String
+  version          Int       // assessmentVersion: KA-v{version} (1, 2, 3…)
+  // A-03.5: canonical blueprint backing this assessment. Null ONLY on
+  // pre-canonical (A-03.4) rows — new publications ALWAYS link a blueprint.
+  blueprintId      String?
+  blueprintVersion String    // co-versioned blueprint (BP-v{version})
+  scoringVersion   String    // frozen scoring rules id (e.g. PUB-KS-v1)
+  status           String    @default("ACTIVE") // ACTIVE | RETIRED (latest = ACTIVE; superseded = RETIRED)
+  contentHash      String    // canonical hash of the bank state at publish time
+  itemCount        Int       @default(0)
+  publishSource    String    @default("SYSTEM_BOOTSTRAP") // SYSTEM_BOOTSTRAP | SYSTEM_ON_BANK_CHANGE | SYSTEM_ON_CANONICAL_MIGRATION
+  publishedBy      String    // 'SYSTEM:KNOWLEDGE_FREEZE' — server authority. AI has NO publish authority.
+  publishedAt      DateTime  @default(now())
+  retiredAt        DateTime?
+  createdAt        DateTime  @default(now())
 
-  user User? @relation(fields: [userId], references: [id], onDelete: SetNull) // CHANGED: CASCADE → SetNull
+  vacancy      Vacancy?                  @relation(fields: [vacancyId], references: [id])
+  position     Position?                 @relation(fields: [positionId], references: [id])
+  blueprint    KnowledgeBlueprint?       @relation(fields: [blueprintId], references: [id])
+  company      Company                   @relation(fields: [companyId], references: [id])
+  items        KnowledgeAssessmentItem[]
+  administrations KnowledgeAdministration[]
+  applications VacancyApplication[]
+
+  @@unique([vacancyId, version])
+  @@unique([positionId, version])
+  @@index([companyId, status])
+  @@index([blueprintId])
 }
 
-// PHASE 3.5-H sync: AuditLog restored — it was MISSING from this production
-// schema, which silently dropped every impersonation/aggregate/unauthorized
-// audit write at deployment time (audit.ts swallows write errors).
+// One frozen item inside a KnowledgeAssessment version.
+// questionSnapshot/correctAnswerSnapshot freeze question text, options and key.
+// Editing the bank NEVER touches these rows (immutable after creation).
+// A-03.5: each administered item RESOLVES the canonical chain
+// (requirementId → KnowledgeRequirement, itemVersionId → KnowledgeItemVersion).
+// Both links are nullable ONLY for pre-canonical A-03.4 rows; every new
+// publication sets both (fail-closed — see knowledge-versioning.ts).
+model KnowledgeAssessmentItem {
+  id                    String             @id @default(cuid())
+  assessmentId          String
+  itemId                String             // source bank row: VacancyQuestion.id or Question.id
+  itemType              String             // VACANCY_QUESTION | TEMPLATE_QUESTION
+  itemVersion           Int                @default(1) // bumps when content changes across versions
+  order                 Int
+  questionSnapshot      String             // JSON {text, options[], type} frozen at publish
+  correctAnswerSnapshot Int?               // frozen key (0-based); null = item has NO key (not scorable, K-INS — never scored as 0)
+  hasKey                Boolean            @default(false)
+  difficulty            String             @default("UNKNOWN") // never invented (KD rules)
+  source                String             // VACANCY_BANK | TEMPLATE_BANK (origin of the item)
+  // A-03.5 canonical resolution links
+  requirementId         String?            // → KnowledgeRequirement (null only on pre-canonical rows)
+  itemVersionId         String?            // → KnowledgeItemVersion (null only on pre-canonical rows)
+  createdAt             DateTime           @default(now())
+
+  assessment KnowledgeAssessment @relation(fields: [assessmentId], references: [id], onDelete: Restrict)
+  requirement        KnowledgeRequirement?    @relation(fields: [requirementId], references: [id])
+  canonicalItemVersion KnowledgeItemVersion?  @relation(fields: [itemVersionId], references: [id])
+
+  @@unique([assessmentId, itemId])
+  @@index([assessmentId])
+  @@index([requirementId])
+}
+
+// ══════════════════════════════════════════════════════════════════
+// A-03.5 — CANONICAL KNOWLEDGE MODEL ENTITIES
+// ══════════════════════════════════════════════════════════════════
+
+// KnowledgeBlueprint — the job-specific knowledge structure. It contains ONLY
+// knowledge relevant to the job. The global Question.category is NEVER used as
+// a blueprint substitute (PASO 3). One ACTIVE blueprint per job at a time.
+model KnowledgeBlueprint {
+  id               String   @id @default(cuid()) // blueprintId
+  jobId            String   // Position.id (POSITION) or Vacancy.id (VACANCY)
+  jobType          String   // POSITION | VACANCY
+  companyId        String
+  blueprintVersion String   // BP-v{n}
+  status           String   @default("ACTIVE") // ACTIVE | RETIRED (latest per job = ACTIVE)
+  contentHash      String   // canonical hash of the requirement structure
+  derivedFrom      String   @default("SYSTEM:CANONICAL_DERIVATION")
+  createdAt        DateTime @default(now())
+
+  company      Company                @relation(fields: [companyId], references: [id])
+  requirements KnowledgeRequirement[]
+  assessments  KnowledgeAssessment[]
+  administrations KnowledgeAdministration[]
+
+  @@unique([jobId, jobType, blueprintVersion])
+  @@index([jobId, jobType, status])
+  @@index([companyId])
+}
+
+// KnowledgeRequirement — a knowledge the job requires, verified by items.
+// Every administered question MUST belong to a requirement (PASO 4/17).
+// APPROVED status is only granted through SYSTEM publication; AI can only
+// ever produce DRAFT content and has no approval authority (PASO 13).
+model KnowledgeRequirement {
+  id            String   @id @default(cuid()) // requirementId
+  blueprintId   String
+  domain        String   @default("KNOWLEDGE")
+  subdomain     String   @default("GENERAL")
+  description   String
+  importance    String   @default("REQUIRED") // REQUIRED | OPTIONAL — no weights, no scoring impact
+  source        String   @default("SYSTEM_DERIVED") // SYSTEM_DERIVED | AI_DRAFT_ORIGIN | HUMAN
+  rationale     String?
+  sourceItemId  String?  // bank row this requirement verifies (canonical 1:1 derivation)
+  version       Int      @default(1)
+  status        String   @default("APPROVED") // DRAFT | APPROVED | RETIRED — APPROVED only via SYSTEM publication
+  createdAt     DateTime @default(now())
+
+  blueprint KnowledgeBlueprint     @relation(fields: [blueprintId], references: [id], onDelete: Restrict)
+  items     KnowledgeItemVersion[]
+  assessmentItems KnowledgeAssessmentItem[]
+
+  @@index([blueprintId])
+}
+
+// KnowledgeItemVersion — the canonical, versioned content of an administered
+// item. Immutable once APPROVED: content changes publish a NEW itemVersion.
+// correctAnswer is PROTECTED scoring material — it is never serialized to any
+// candidate client (PASO 9). Inspectable only server-side.
+model KnowledgeItemVersion {
+  id            String   @id @default(cuid())
+  requirementId String
+  itemId        String   // source bank row: VacancyQuestion.id | Question.id
+  itemType      String   // VACANCY_QUESTION | TEMPLATE_QUESTION
+  itemVersion   Int      @default(1) // bumps when question/options/correctAnswer change
+  question      String
+  options       String   // JSON array of option strings
+  correctAnswer Int?     // PROTECTED (0-based key); null = no valid key (not scorable, K-INS)
+  hasKey        Boolean  @default(false)
+  source        String   // VACANCY_BANK | TEMPLATE_BANK | AI_DRAFT
+  rationale     String?
+  difficulty    String   @default("UNKNOWN") // never invented (KD rules)
+  status        String   @default("APPROVED") // DRAFT | APPROVED | RETIRED
+  createdAt     DateTime @default(now())
+
+  requirement     KnowledgeRequirement      @relation(fields: [requirementId], references: [id], onDelete: Restrict)
+  assessmentItems KnowledgeAssessmentItem[]
+
+  @@unique([itemId, itemVersion])
+  @@index([requirementId])
+}
+
+// KnowledgeAdministration — WHAT a specific candidate received, as a first-
+// class entity (PASO 8). Frozen at evaluation start for BOTH channels:
+// PUBLIC_VACANCY (VacancyApplication) and INTERNAL_POSITION (EvaluationSession).
+// Exactly one administration per application/session (enforced by unique FKs).
+model KnowledgeAdministration {
+  id                   String    @id @default(cuid())
+  channel              String    // PUBLIC_VACANCY | INTERNAL_POSITION
+  companyId            String
+  assessmentId         String
+  assessmentVersion    Int       // denormalized from assessment (KA-v{n}) — frozen copy
+  blueprintId          String?
+  blueprintVersion     String    // denormalized BP-v{n} — frozen copy
+  scoringVersion       String    // denormalized PUB-KS-v{n} — frozen copy
+  itemCount            Int
+  status               String    @default("FROZEN") // FROZEN | COMPLETED
+  frozenAt             DateTime  @default(now())
+  completedAt          DateTime?
+  vacancyApplicationId String?   // channel=PUBLIC_VACANCY
+  evaluationSessionId  String?   // channel=INTERNAL_POSITION
+  createdAt            DateTime  @default(now())
+
+  assessment         KnowledgeAssessment @relation(fields: [assessmentId], references: [id], onDelete: Restrict)
+  blueprint          KnowledgeBlueprint? @relation(fields: [blueprintId], references: [id])
+  vacancyApplication VacancyApplication? @relation("AdminApplication", fields: [vacancyApplicationId], references: [id])
+  evaluationSession  EvaluationSession?  @relation("AdminSession", fields: [evaluationSessionId], references: [id])
+  company            Company             @relation(fields: [companyId], references: [id])
+  results            KnowledgeResult[]
+  responses          VacancyApplicationResponse[]
+
+  @@unique([vacancyApplicationId])
+  @@unique([evaluationSessionId])
+  @@index([companyId])
+  @@index([assessmentId])
+}
+
+// KnowledgeResult — the knowledge evidence result, EXPLICITLY SEPARATE from
+// overallScore (PASO 11). knowledgeScore=null means NO valid scoring evidence
+// (INSUFFICIENT semantics — never 0, A-03.2 criterion preserved).
+// No global formula is designed here; whether/how knowledgeScore enters
+// overallScore is a future methodological phase, out of A-03.5 scope.
+model KnowledgeResult {
+  id                 String   @id @default(cuid())
+  administrationId   String   @unique
+  companyId          String
+  knowledgeScore     Float?   // null = no valid keyed evidence (INSUFFICIENT) — NEVER 0
+  evidenceStatus     String   // VALID | LIMITED | INSUFFICIENT | INVALID | NOT_APPLICABLE
+  reasonCode         String?  // COMPLETE_KEYED | PARTIAL_RESPONSE | NO_KEYED_EVIDENCE | KNOWLEDGE_KEY_MISSING
+  correctCount       Int      @default(0)
+  keyedAnsweredCount Int      @default(0)
+  notScorableCount   Int      @default(0)
+  totalItems         Int      @default(0)
+  scoringVersion     String
+  computedAt         DateTime @default(now())
+  createdAt          DateTime @default(now())
+
+  administration KnowledgeAdministration @relation(fields: [administrationId], references: [id], onDelete: Restrict)
+  company        Company                 @relation(fields: [companyId], references: [id])
+
+  @@index([companyId])
+}
+
+// AuditLog — Security event log (Phase 1.7)
+// Records access, modification, deletion, consent changes, and admin actions.
+// NEVER store passwords, tokens, or sensitive values in this table.
 model AuditLog {
   id          String   @id @default(cuid())
   actorId     String?  // User who performed the action (null = system/anonymous)
-  action      String   // LOGIN, LOGOUT, ACCESS, CREATE, UPDATE, DELETE, CONSENT_CHANGE, PERMISSION_CHANGE, ADMIN_ACCESS, UNAUTHORIZED_ATTEMPT, RETENTION_PURGE
+  action      String   // LOGIN, LOGOUT, ACCESS, CREATE, UPDATE, DELETE, CONSENT_CHANGE, PERMISSION_CHANGE, ADMIN_ACCESS, UNAUTHORIZED_ATTEMPT
   resource    String?  // Model/table affected (e.g., "User", "EvaluationResult")
   resourceId  String?  // ID of the affected record
   companyId   String?  // Tenant context
@@ -442,26 +744,35 @@ model AuditLog {
   @@index([createdAt])
 }
 
-// PHASE 3.5-H sync: ArcoRequest restored — it was MISSING from this
-// production schema while /api/arco and the RLS artifact set both expect it
-// (rls-policies.sql enables FORCE RLS on "ArcoRequest").
+// ArcoRequest — LFPDPPP ARCO rights workflow (Phase 3.5 - B4)
+// Records requests from data subjects to exercise their rights:
+// Access, Rectification, Cancellation, Opposition.
+// Managed by RH/SUPER_ADMIN with SLA tracking.
 model ArcoRequest {
   id              String   @id @default(cuid())
   // The data subject — may be a registered User, or an external requester
+  // (e.g., someone who never registered but wants their data deleted)
   userId          String?  // FK to User if they have an account (nullable for external requesters)
   requesterName   String   // Name of the person making the request
   requesterEmail  String   // Contact email for response
   requesterPhone  String?  // Optional phone
+  // What right they're exercising
   rightType       String   // ACCESS, RECTIFICATION, CANCELLATION, OPPOSITION
+  // Details of the request
   description     String   // Free-text description of what they want
+  // Tenant context
   companyId       String   // Which company is the data controller
+  // Workflow tracking
   status          String   @default("PENDING") // PENDING, IN_REVIEW, IDENTIFICATION_REQUIRED, APPROVED, REJECTED, COMPLETED, CANCELLED
   assignedTo      String?  // User ID of the RH/SUPER_ADMIN handling the request
+  // SLA tracking
   requestedAt     DateTime @default(now())
   legalDeadline   DateTime // 20 business days per LFPDPPP Art. 32 Reglamento
   resolvedAt      DateTime?
   resolutionNotes String? // What was done, by whom, when
+  // Evidence
   responseDocumentUrl String? // URL to any document delivered to the requester
+  // Audit
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
