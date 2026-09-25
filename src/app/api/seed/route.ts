@@ -63,6 +63,40 @@ export async function GET(req: NextRequest) {
       await db.company.deleteMany()
       console.log('All data deleted')
 
+      // ============================================
+      // SCHEMA SYNC — ensure Phase-3 "User" columns exist before user.create().
+      // prisma db push fails in the Vercel build (Supabase direct host is
+      // IPv6-only; build containers are IPv4-only), so the production DB can
+      // be missing newer columns and user.create() fails with P2022
+      // ("column does not exist"). Same idempotent fixed-literal pattern as
+      // POST /api/migrate. No client input is ever interpolated beyond the
+      // fixed name/type/default literals below.
+      // ============================================
+      const userColumns: Array<{ name: string; type: string; def: string }> = [
+        { name: 'consentGiven', type: 'BOOLEAN', def: 'false' },
+        { name: 'consentDate', type: 'TIMESTAMP(3)', def: 'NULL' },
+        { name: 'consentOption', type: 'TEXT', def: 'NULL' },
+        { name: 'anonymousStats', type: 'BOOLEAN', def: 'false' },
+        { name: 'consentConfirmed', type: 'BOOLEAN', def: 'false' },
+        { name: 'consentWithdrawnAt', type: 'TIMESTAMP(3)', def: 'NULL' },
+        { name: 'consentVersion', type: 'TEXT', def: 'NULL' },
+        { name: 'piiPurgeAt', type: 'TIMESTAMP(3)', def: 'NULL' },
+        { name: 'sensitivePurgeAt', type: 'TIMESTAMP(3)', def: 'NULL' },
+      ]
+      let schemaSynced = 0
+      for (const col of userColumns) {
+        try {
+          await db.$executeRawUnsafe(
+            `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "${col.name}" ${col.type} DEFAULT ${col.def};`
+          )
+          schemaSynced++
+          console.log(`✓ Column "User.${col.name}" ensured`)
+        } catch (colErr) {
+          console.error(`⚠️ Could not ensure "User.${col.name}":`, colErr)
+        }
+      }
+      console.log(`Schema sync: ${schemaSynced}/${userColumns.length} User columns ensured`)
+
       // Create SUPER_ADMIN with a GENERATED password (never hardcoded)
       const superAdminPasswordPlain = generatePassword()
       const hashedPassword = await hashPassword(superAdminPasswordPlain)
